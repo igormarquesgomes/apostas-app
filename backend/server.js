@@ -14,18 +14,7 @@ const HEADERS = () => ({
   'x-rapidapi-host': 'sofascore.p.rapidapi.com'
 });
 
-const CATEGORIAS = [
-  { id: 13   }, // Brasil
-  { id: 31   }, // Itália
-  { id: 32   }, // Espanha
-  { id: 1    }, // Inglaterra
-  { id: 30   }, // Alemanha
-  { id: 7    }, // França
-  { id: 44   }, // Portugal
-  { id: 1470 }, // América do Sul (Libertadores, Sul-Americana)
-  { id: 1465 }, // Europa (Champions, Europa League)
-  { id: 1468 }, // Mundial
-];
+const CATEGORIAS = [13, 31, 32, 1, 30, 7, 44, 1470, 1465, 1468];
 
 const LIGAS = {
   325:  { nome:'Série A',          tipo:'a',    pri:1 },
@@ -42,8 +31,18 @@ const LIGAS = {
   7:    { nome:'Champions League', tipo:'copa', pri:7 },
 };
 
-function formatData(date) {
-  return date.toISOString().split('T')[0];
+// Retorna data anterior no formato yyyy-mm-dd
+function dataAnterior(dataStr) {
+  const partes = dataStr.split('-');
+  const ano = parseInt(partes[0]);
+  const mes = parseInt(partes[1]) - 1;
+  const dia = parseInt(partes[2]);
+  const d = new Date(Date.UTC(ano, mes, dia));
+  d.setUTCDate(d.getUTCDate() - 1);
+  const a = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return `${a}-${m}-${dd}`;
 }
 
 async function buscarJogosCat(catId, data) {
@@ -103,29 +102,25 @@ app.post('/analisar', async (req, res) => {
   const minMinutos = hM * 60 + mM;
 
   // Janela do dia em Brasília (UTC-3)
-  // Ex: 25/05 Brasília = 25/05 03:00 UTC até 26/05 03:00 UTC
-  const inicioDia = new Date(data + 'T03:00:00Z').getTime() / 1000;
+  const partes = data.split('-');
+  const inicioDia = Date.UTC(parseInt(partes[0]), parseInt(partes[1])-1, parseInt(partes[2]), 3, 0, 0) / 1000;
   const fimDia = inicioDia + 86400;
 
-  // Buscar nos dois dias UTC que cobrem o dia Brasília
-  // Ex: jogos do dia 25 Brasília podem estar na data UTC 24 ou 25
-  const dataObj = new Date(data + 'T12:00:00Z');
-  const dataAnterior = new Date(dataObj);
-  dataAnterior.setUTCDate(dataAnterior.getUTCDate() - 1);
-  const datasParaBuscar = [formatData(dataAnterior), data];
+  // Buscar dia anterior e o próprio dia para cobrir todos os fusos
+  const diaAnterior = dataAnterior(data);
+  const datasParaBuscar = [diaAnterior, data];
 
   try {
     console.log(`\n=== Buscando jogos para ${data} (Brasília) ===`);
-    console.log(`Janela: ${new Date(inicioDia*1000).toISOString()} → ${new Date(fimDia*1000).toISOString()}`);
-    console.log(`Datas UTC buscadas: ${datasParaBuscar.join(', ')}`);
+    console.log(`Janela UTC: ${new Date(inicioDia*1000).toISOString()} → ${new Date(fimDia*1000).toISOString()}`);
+    console.log(`Datas buscadas na API: ${datasParaBuscar.join(', ')}`);
 
     const jogosMap = new Map();
 
-    // Buscar todas as combinações categoria x data em paralelo
     const buscas = [];
-    for (const cat of CATEGORIAS) {
+    for (const catId of CATEGORIAS) {
       for (const d of datasParaBuscar) {
-        buscas.push(buscarJogosCat(cat.id, d));
+        buscas.push(buscarJogosCat(catId, d));
       }
     }
     const resultados = await Promise.all(buscas);
@@ -137,12 +132,8 @@ app.post('/analisar', async (req, res) => {
         if (!liga) continue;
 
         const ts = ev.startTimestamp;
-        if (!ts) continue;
+        if (!ts || ts < inicioDia || ts >= fimDia) continue;
 
-        // Verificar se está dentro do dia Brasília
-        if (ts < inicioDia || ts >= fimDia) continue;
-
-        // Converter para horário Brasília (UTC-3)
         const dt = new Date(ts * 1000);
         const hBR = dt.getUTCHours() - 3;
         const mBR = dt.getUTCMinutes();
