@@ -14,7 +14,6 @@ const HEADERS = () => ({
   'x-rapidapi-host': 'sofascore.p.rapidapi.com'
 });
 
-// IDs únicos de torneio confirmados via Sofascore
 const LIGAS = {
   325:  { nome:'Série A',          tipo:'a',    pri:1 },
   390:  { nome:'Série B',          tipo:'b',    pri:2 },
@@ -36,21 +35,16 @@ async function fetchJSON(url) {
   return res.json();
 }
 
-// PASSO 1: Buscar todos os categoryIds de futebol
 async function buscarCategorias() {
   try {
     const json = await fetchJSON('https://sofascore.p.rapidapi.com/categories/list?sport=football');
-    const cats = json.categories || [];
-    // Retorna todos os IDs
-    return cats.map(c => c.id).filter(Boolean);
+    return (json.categories || []).map(c => c.id).filter(Boolean);
   } catch(e) {
-    console.error('Erro ao buscar categorias:', e.message);
-    // Fallback com os principais países
+    console.error('Erro categorias:', e.message);
     return [32, 35, 9, 1, 8, 4, 38, 108, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
   }
 }
 
-// PASSO 2: Buscar jogos de uma categoria na data
 async function buscarJogosCat(catId, data) {
   try {
     const json = await fetchJSON(
@@ -76,17 +70,19 @@ app.post('/analisar', async (req, res) => {
   const [hM, mM] = horaMin.split(':').map(Number);
   const minMinutos = hM * 60 + mM;
 
-  try {
-    console.log(`\n=== Buscando jogos para ${data} ===`);
+  // Limites do dia em Brasília convertidos para UTC
+  // Brasília = UTC-3, então início do dia Brasília = data 03:00 UTC
+  const inicioDiaBrasilia = new Date(data + 'T03:00:00Z').getTime() / 1000;
+  const fimDiaBrasilia = inicioDiaBrasilia + 86400;
 
-    // PASSO 1: Buscar todas as categorias
-    console.log('Buscando categorias...');
+  try {
+    console.log(`\n=== Buscando jogos para ${data} (Brasília) ===`);
+    console.log(`Janela UTC: ${new Date(inicioDiaBrasilia*1000).toISOString()} até ${new Date(fimDiaBrasilia*1000).toISOString()}`);
+
     const categorias = await buscarCategorias();
     console.log(`${categorias.length} categorias encontradas`);
 
-    // PASSO 2: Buscar jogos de todas as categorias em paralelo
-    // Processar em lotes de 10 para não sobrecarregar a API
-    const jogosEncontrados = new Map(); // key = "timeCasa-timeFora" para evitar duplicatas
+    const jogosEncontrados = new Map();
 
     const lotes = [];
     for (let i = 0; i < categorias.length; i += 10) {
@@ -95,7 +91,7 @@ app.post('/analisar', async (req, res) => {
 
     for (const lote of lotes) {
       const resultados = await Promise.all(lote.map(catId => buscarJogosCat(catId, data)));
-      
+
       for (const eventos of resultados) {
         for (const ev of eventos) {
           const ligaId = ev.tournament?.uniqueTournament?.id;
@@ -104,6 +100,9 @@ app.post('/analisar', async (req, res) => {
 
           const ts = ev.startTimestamp;
           if (!ts) continue;
+
+          // Verificar se está dentro do dia de Brasília
+          if (ts < inicioDiaBrasilia || ts >= fimDiaBrasilia) continue;
 
           // Converter para horário Brasília (UTC-3)
           const dt = new Date(ts * 1000);
@@ -129,7 +128,6 @@ app.post('/analisar', async (req, res) => {
       }
     }
 
-    // Ordenar por prioridade e horário
     const jogos = Array.from(jogosEncontrados.values())
       .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario))
       .slice(0, metaJogos);
@@ -141,7 +139,6 @@ app.post('/analisar', async (req, res) => {
       return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado nas ligas prioritárias.' });
     }
 
-    // PASSO 3: IA analisa os jogos validados
     const [ano, mes, dia] = data.split('-');
     const df = `${dia}/${mes}/${ano}`;
     const listaJogos = jogos.map((j, i) =>
@@ -150,45 +147,68 @@ app.post('/analisar', async (req, res) => {
 
     console.log('\nEnviando para IA...');
 
-    const prompt = `Você é um analista de apostas esportivas especializado. Analise os seguintes jogos CONFIRMADOS pela API do Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
+    const prompt = `Você é um analista de apostas esportivas especializado. Analise os jogos CONFIRMADOS pela API Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
 
 JOGOS VALIDADOS:
 ${listaJogos}
 
-REGRAS OBRIGATÓRIAS:
-- Série A e Série B: análise obrigatória para TODOS os jogos listados
-- Para cada jogo analise: últimos 10 jogos de cada time (gols, escanteios, vitórias, fase, tabela, cartões) e confronto direto do último ano
-- 1 aposta por jogo com mercado definido pelos dados: Over/Under gols, escanteios, cartões ou resultado
+REGRAS:
+- Série A e Série B: análise OBRIGATÓRIA para todos
+- Analise: últimos 10 jogos de cada time (gols, escanteios, vitórias, fase, tabela, cartões) + confronto direto último ano
+- 1 aposta por jogo, mercado definido pelos dados: Over/Under gols, escanteios, cartões ou resultado
 
-Retorne SOMENTE JSON válido sem texto extra:
-{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"Time A","time_fora":"Time B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"3-4 linhas com os dados que embasam a aposta."}]}
+Retorne SOMENTE JSON válido:
+{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"Time A","time_fora":"Time B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"3-4 linhas com dados que embasam a aposta."}]}
 
-tipo_liga: a=Série A, b=Série B, it=Serie A italiana, es=La Liga, eu=outras europeias, copa=copas.
-mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
+tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
 
-    const iaRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
+    // Tentar modelos em sequência até um funcionar
+    const modelos = [
+      'claude-3-5-sonnet-20241022',
+      'claude-3-haiku-20240307',
+      'claude-3-sonnet-20240229',
+      'claude-3-opus-20240229'
+    ];
 
-    const iaJson = await iaRes.json();
-    if (iaJson.error) return res.status(500).json({ error: iaJson.error.message });
+    let iaJson = null;
+    let modeloUsado = null;
+
+    for (const modelo of modelos) {
+      try {
+        const iaRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: modelo,
+            max_tokens: 4000,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        const json = await iaRes.json();
+        if (!json.error) {
+          iaJson = json;
+          modeloUsado = modelo;
+          console.log(`Modelo usado: ${modelo}`);
+          break;
+        }
+        console.log(`Modelo ${modelo} falhou: ${json.error.message}`);
+      } catch(e) {
+        console.log(`Modelo ${modelo} erro: ${e.message}`);
+      }
+    }
+
+    if (!iaJson) return res.status(500).json({ error: 'Nenhum modelo de IA disponível.' });
 
     const txt = (iaJson.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
     if (s === -1 || e === -1) return res.status(500).json({ error: 'Resposta inválida da IA.' });
 
     const parsed = JSON.parse(txt.slice(s, e + 1));
-    console.log(`Apostas geradas: ${parsed.jogos?.length}`);
+    console.log(`Apostas geradas: ${parsed.jogos?.length} com modelo ${modeloUsado}`);
     res.json(parsed);
 
   } catch (err) {
