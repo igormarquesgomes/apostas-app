@@ -14,7 +14,6 @@ const HEADERS = () => ({
   'x-rapidapi-host': 'sofascore.p.rapidapi.com'
 });
 
-// categoryIds confirmados via API
 const CATEGORIAS = [
   { id: 13,   nome: 'Brasil' },
   { id: 31,   nome: 'Itália' },
@@ -28,7 +27,6 @@ const CATEGORIAS = [
   { id: 1468, nome: 'Mundial' },
 ];
 
-// uniqueTournament.id confirmados
 const LIGAS = {
   325:  { nome:'Série A',          tipo:'a',    pri:1 },
   390:  { nome:'Série B',          tipo:'b',    pri:2 },
@@ -58,7 +56,74 @@ async function buscarJogosCat(catId, data) {
   }
 }
 
+async function chamarIA(prompt) {
+  // Modelos em ordem de preferência — nomes corretos para Nível 1
+  const modelos = [
+    'claude-haiku-4-5',
+    'claude-sonnet-4-5',
+    'claude-haiku-4-20250307',
+    'claude-3-5-haiku-20241022',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-haiku-20240307',
+  ];
+
+  for (const modelo of modelos) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: modelo,
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const json = await res.json();
+      if (!json.error) {
+        console.log(`✅ Modelo usado: ${modelo}`);
+        return json;
+      }
+      console.log(`❌ ${modelo}: ${json.error.message}`);
+    } catch(e) {
+      console.log(`❌ ${modelo}: ${e.message}`);
+    }
+  }
+  return null;
+}
+
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+app.post('/modelos', async (req, res) => {
+  // Endpoint para testar quais modelos estão disponíveis
+  const resultados = [];
+  const modelos = [
+    'claude-haiku-4-5',
+    'claude-sonnet-4-5',
+    'claude-haiku-4-20250307',
+    'claude-3-5-haiku-20241022',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-haiku-20240307',
+    'claude-3-sonnet-20240229',
+  ];
+  for (const modelo of modelos) {
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: modelo, max_tokens: 10, messages: [{ role: 'user', content: 'oi' }] })
+      });
+      const j = await r.json();
+      resultados.push({ modelo, ok: !j.error, erro: j.error?.message });
+    } catch(e) {
+      resultados.push({ modelo, ok: false, erro: e.message });
+    }
+  }
+  res.json(resultados);
+});
 
 app.post('/analisar', async (req, res) => {
   const { data, hora, meta } = req.body;
@@ -72,7 +137,6 @@ app.post('/analisar', async (req, res) => {
   const [hM, mM] = horaMin.split(':').map(Number);
   const minMinutos = hM * 60 + mM;
 
-  // Janela do dia em Brasília (UTC-3): dia começa às 03:00 UTC
   const inicioDia = new Date(data + 'T03:00:00Z').getTime() / 1000;
   const fimDia = inicioDia + 86400;
 
@@ -80,11 +144,7 @@ app.post('/analisar', async (req, res) => {
     console.log(`\n=== Buscando jogos para ${data} ===`);
 
     const jogosMap = new Map();
-
-    // Buscar todas as categorias em paralelo
-    const resultados = await Promise.all(
-      CATEGORIAS.map(cat => buscarJogosCat(cat.id, data))
-    );
+    const resultados = await Promise.all(CATEGORIAS.map(cat => buscarJogosCat(cat.id, data)));
 
     for (const eventos of resultados) {
       for (const ev of eventos) {
@@ -93,29 +153,20 @@ app.post('/analisar', async (req, res) => {
         if (!liga) continue;
 
         const ts = ev.startTimestamp;
-        if (!ts) continue;
+        if (!ts || ts < inicioDia || ts >= fimDia) continue;
 
-        // Verificar se é no dia correto (horário Brasília)
-        if (ts < inicioDia || ts >= fimDia) continue;
-
-        // Converter para horário Brasília (UTC-3)
         const dt = new Date(ts * 1000);
         const hBR = dt.getUTCHours() - 3;
         const mBR = dt.getUTCMinutes();
-        const totalMin = hBR * 60 + mBR;
-        if (totalMin < minMinutos) continue;
+        if (hBR * 60 + mBR < minMinutos) continue;
 
         const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
         const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
 
         if (!jogosMap.has(key)) {
           jogosMap.set(key, {
-            liga: liga.nome,
-            tipo: liga.tipo,
-            pri: liga.pri,
-            timeCasa: ev.homeTeam?.name,
-            timeFora: ev.awayTeam?.name,
-            horario: hStr
+            liga: liga.nome, tipo: liga.tipo, pri: liga.pri,
+            timeCasa: ev.homeTeam?.name, timeFora: ev.awayTeam?.name, horario: hStr
           });
         }
       }
@@ -128,64 +179,33 @@ app.post('/analisar', async (req, res) => {
     console.log(`Jogos encontrados: ${jogos.length}`);
     jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
 
-    if (!jogos.length) {
-      return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
-    }
+    if (!jogos.length) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
 
     const [ano, mes, dia] = data.split('-');
     const df = `${dia}/${mes}/${ano}`;
-    const listaJogos = jogos.map((j, i) =>
-      `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`
-    ).join('\n');
+    const listaJogos = jogos.map((j, i) => `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`).join('\n');
 
-    console.log('\nEnviando para IA...');
-
-    const prompt = `Você é um analista de apostas esportivas especializado. Analise os jogos CONFIRMADOS pela API Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
+    const prompt = `Você é um analista de apostas esportivas. Analise os jogos CONFIRMADOS pela API Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
 
 JOGOS VALIDADOS:
 ${listaJogos}
 
-REGRAS:
-- Série A e Série B: análise OBRIGATÓRIA para todos os jogos
-- Analise: últimos 10 jogos de cada time (gols, escanteios, vitórias, fase, tabela, cartões) + confronto direto último ano
-- 1 aposta por jogo, mercado definido pelos dados: Over/Under gols, escanteios, cartões ou resultado
+REGRAS: Série A e Série B têm análise OBRIGATÓRIA. Analise últimos 10 jogos de cada time (gols, escanteios, vitórias, fase, tabela, cartões) + confronto direto último ano. 1 aposta por jogo com mercado definido pelos dados.
 
 Retorne SOMENTE JSON válido:
 {"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"Time A","time_fora":"Time B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"3-4 linhas com dados que embasam a aposta."}]}
 
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
 
-    // Tentar modelos em sequência
-    const modelos = ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'];
-    let iaJson = null, modeloUsado = null;
-
-    for (const modelo of modelos) {
-      try {
-        const iaRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({ model: modelo, max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
-        });
-        const json = await iaRes.json();
-        if (!json.error) { iaJson = json; modeloUsado = modelo; break; }
-        console.log(`Modelo ${modelo} falhou: ${json.error.message}`);
-      } catch(e) {
-        console.log(`Modelo ${modelo} erro: ${e.message}`);
-      }
-    }
-
-    if (!iaJson) return res.status(500).json({ error: 'Nenhum modelo de IA disponível.' });
+    const iaJson = await chamarIA(prompt);
+    if (!iaJson) return res.status(500).json({ error: 'Nenhum modelo de IA disponível. Verifique sua chave API.' });
 
     const txt = (iaJson.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
     if (s === -1 || e === -1) return res.status(500).json({ error: 'Resposta inválida da IA.' });
 
     const parsed = JSON.parse(txt.slice(s, e + 1));
-    console.log(`✅ ${parsed.jogos?.length} apostas geradas com ${modeloUsado}`);
+    console.log(`✅ ${parsed.jogos?.length} apostas geradas`);
     res.json(parsed);
 
   } catch (err) {
