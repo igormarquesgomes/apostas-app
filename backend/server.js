@@ -14,6 +14,21 @@ const HEADERS = () => ({
   'x-rapidapi-host': 'sofascore.p.rapidapi.com'
 });
 
+// categoryIds confirmados via API
+const CATEGORIAS = [
+  { id: 13,   nome: 'Brasil' },
+  { id: 31,   nome: 'Itália' },
+  { id: 32,   nome: 'Espanha' },
+  { id: 1,    nome: 'Inglaterra' },
+  { id: 30,   nome: 'Alemanha' },
+  { id: 7,    nome: 'França' },
+  { id: 44,   nome: 'Portugal' },
+  { id: 1470, nome: 'América do Sul' },
+  { id: 1465, nome: 'Europa' },
+  { id: 1468, nome: 'Mundial' },
+];
+
+// uniqueTournament.id confirmados
 const LIGAS = {
   325:  { nome:'Série A',          tipo:'a',    pri:1 },
   390:  { nome:'Série B',          tipo:'b',    pri:2 },
@@ -29,27 +44,14 @@ const LIGAS = {
   7:    { nome:'Champions League', tipo:'copa', pri:7 },
 };
 
-async function fetchJSON(url) {
-  const res = await fetch(url, { headers: HEADERS() });
-  if (!res.ok) throw new Error(`HTTP ${res.status} em ${url}`);
-  return res.json();
-}
-
-async function buscarCategorias() {
-  try {
-    const json = await fetchJSON('https://sofascore.p.rapidapi.com/categories/list?sport=football');
-    return (json.categories || []).map(c => c.id).filter(Boolean);
-  } catch(e) {
-    console.error('Erro categorias:', e.message);
-    return [32, 35, 9, 1, 8, 4, 38, 108, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-  }
-}
-
 async function buscarJogosCat(catId, data) {
   try {
-    const json = await fetchJSON(
-      `https://sofascore.p.rapidapi.com/tournaments/get-scheduled-events?categoryId=${catId}&date=${data}`
+    const res = await fetch(
+      `https://sofascore.p.rapidapi.com/tournaments/get-scheduled-events?categoryId=${catId}&date=${data}`,
+      { headers: HEADERS() }
     );
+    if (!res.ok) return [];
+    const json = await res.json();
     return json.events || [];
   } catch(e) {
     return [];
@@ -70,73 +72,64 @@ app.post('/analisar', async (req, res) => {
   const [hM, mM] = horaMin.split(':').map(Number);
   const minMinutos = hM * 60 + mM;
 
-  // Limites do dia em Brasília convertidos para UTC
-  // Brasília = UTC-3, então início do dia Brasília = data 03:00 UTC
-  const inicioDiaBrasilia = new Date(data + 'T03:00:00Z').getTime() / 1000;
-  const fimDiaBrasilia = inicioDiaBrasilia + 86400;
+  // Janela do dia em Brasília (UTC-3): dia começa às 03:00 UTC
+  const inicioDia = new Date(data + 'T03:00:00Z').getTime() / 1000;
+  const fimDia = inicioDia + 86400;
 
   try {
-    console.log(`\n=== Buscando jogos para ${data} (Brasília) ===`);
-    console.log(`Janela UTC: ${new Date(inicioDiaBrasilia*1000).toISOString()} até ${new Date(fimDiaBrasilia*1000).toISOString()}`);
+    console.log(`\n=== Buscando jogos para ${data} ===`);
 
-    const categorias = await buscarCategorias();
-    console.log(`${categorias.length} categorias encontradas`);
+    const jogosMap = new Map();
 
-    const jogosEncontrados = new Map();
+    // Buscar todas as categorias em paralelo
+    const resultados = await Promise.all(
+      CATEGORIAS.map(cat => buscarJogosCat(cat.id, data))
+    );
 
-    const lotes = [];
-    for (let i = 0; i < categorias.length; i += 10) {
-      lotes.push(categorias.slice(i, i + 10));
-    }
+    for (const eventos of resultados) {
+      for (const ev of eventos) {
+        const ligaId = ev.tournament?.uniqueTournament?.id;
+        const liga = LIGAS[ligaId];
+        if (!liga) continue;
 
-    for (const lote of lotes) {
-      const resultados = await Promise.all(lote.map(catId => buscarJogosCat(catId, data)));
+        const ts = ev.startTimestamp;
+        if (!ts) continue;
 
-      for (const eventos of resultados) {
-        for (const ev of eventos) {
-          const ligaId = ev.tournament?.uniqueTournament?.id;
-          const liga = LIGAS[ligaId];
-          if (!liga) continue;
+        // Verificar se é no dia correto (horário Brasília)
+        if (ts < inicioDia || ts >= fimDia) continue;
 
-          const ts = ev.startTimestamp;
-          if (!ts) continue;
+        // Converter para horário Brasília (UTC-3)
+        const dt = new Date(ts * 1000);
+        const hBR = dt.getUTCHours() - 3;
+        const mBR = dt.getUTCMinutes();
+        const totalMin = hBR * 60 + mBR;
+        if (totalMin < minMinutos) continue;
 
-          // Verificar se está dentro do dia de Brasília
-          if (ts < inicioDiaBrasilia || ts >= fimDiaBrasilia) continue;
+        const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
+        const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
 
-          // Converter para horário Brasília (UTC-3)
-          const dt = new Date(ts * 1000);
-          const hBR = dt.getUTCHours() - 3;
-          const mBR = dt.getUTCMinutes();
-          const totalMin = hBR * 60 + mBR;
-          if (totalMin < minMinutos) continue;
-
-          const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
-          const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
-
-          if (!jogosEncontrados.has(key)) {
-            jogosEncontrados.set(key, {
-              liga: liga.nome,
-              tipo: liga.tipo,
-              pri: liga.pri,
-              timeCasa: ev.homeTeam?.name,
-              timeFora: ev.awayTeam?.name,
-              horario: hStr
-            });
-          }
+        if (!jogosMap.has(key)) {
+          jogosMap.set(key, {
+            liga: liga.nome,
+            tipo: liga.tipo,
+            pri: liga.pri,
+            timeCasa: ev.homeTeam?.name,
+            timeFora: ev.awayTeam?.name,
+            horario: hStr
+          });
         }
       }
     }
 
-    const jogos = Array.from(jogosEncontrados.values())
+    const jogos = Array.from(jogosMap.values())
       .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario))
       .slice(0, metaJogos);
 
-    console.log(`\nJogos selecionados: ${jogos.length}`);
+    console.log(`Jogos encontrados: ${jogos.length}`);
     jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
 
     if (!jogos.length) {
-      return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado nas ligas prioritárias.' });
+      return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
     }
 
     const [ano, mes, dia] = data.split('-');
@@ -153,7 +146,7 @@ JOGOS VALIDADOS:
 ${listaJogos}
 
 REGRAS:
-- Série A e Série B: análise OBRIGATÓRIA para todos
+- Série A e Série B: análise OBRIGATÓRIA para todos os jogos
 - Analise: últimos 10 jogos de cada time (gols, escanteios, vitórias, fase, tabela, cartões) + confronto direto último ano
 - 1 aposta por jogo, mercado definido pelos dados: Over/Under gols, escanteios, cartões ou resultado
 
@@ -162,16 +155,9 @@ Retorne SOMENTE JSON válido:
 
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
 
-    // Tentar modelos em sequência até um funcionar
-    const modelos = [
-      'claude-3-5-sonnet-20241022',
-      'claude-3-haiku-20240307',
-      'claude-3-sonnet-20240229',
-      'claude-3-opus-20240229'
-    ];
-
-    let iaJson = null;
-    let modeloUsado = null;
+    // Tentar modelos em sequência
+    const modelos = ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'];
+    let iaJson = null, modeloUsado = null;
 
     for (const modelo of modelos) {
       try {
@@ -182,19 +168,10 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
             'x-api-key': ANTHROPIC_API_KEY,
             'anthropic-version': '2023-06-01'
           },
-          body: JSON.stringify({
-            model: modelo,
-            max_tokens: 4000,
-            messages: [{ role: 'user', content: prompt }]
-          })
+          body: JSON.stringify({ model: modelo, max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
         });
         const json = await iaRes.json();
-        if (!json.error) {
-          iaJson = json;
-          modeloUsado = modelo;
-          console.log(`Modelo usado: ${modelo}`);
-          break;
-        }
+        if (!json.error) { iaJson = json; modeloUsado = modelo; break; }
         console.log(`Modelo ${modelo} falhou: ${json.error.message}`);
       } catch(e) {
         console.log(`Modelo ${modelo} erro: ${e.message}`);
@@ -208,11 +185,11 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
     if (s === -1 || e === -1) return res.status(500).json({ error: 'Resposta inválida da IA.' });
 
     const parsed = JSON.parse(txt.slice(s, e + 1));
-    console.log(`Apostas geradas: ${parsed.jogos?.length} com modelo ${modeloUsado}`);
+    console.log(`✅ ${parsed.jogos?.length} apostas geradas com ${modeloUsado}`);
     res.json(parsed);
 
   } catch (err) {
-    console.error('Erro geral:', err.message);
+    console.error('Erro:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
