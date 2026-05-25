@@ -31,18 +31,40 @@ const LIGAS = {
   7:    { nome:'Champions League', tipo:'copa', pri:7 },
 };
 
-// Retorna data anterior no formato yyyy-mm-dd
-function dataAnterior(dataStr) {
-  const partes = dataStr.split('-');
-  const ano = parseInt(partes[0]);
-  const mes = parseInt(partes[1]) - 1;
-  const dia = parseInt(partes[2]);
-  const d = new Date(Date.UTC(ano, mes, dia));
-  d.setUTCDate(d.getUTCDate() - 1);
-  const a = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${a}-${m}-${dd}`;
+// Garante formato yyyy-mm-dd independente do que chegar
+function normalizarData(data) {
+  if (!data) return null;
+  // Se vier dd/mm/yyyy, converter
+  if (data.includes('/')) {
+    const p = data.split('/');
+    if (p.length === 3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+  }
+  // Se vier yyyy-mm-dd, já está certo
+  return data;
+}
+
+// Retorna o dia anterior no formato yyyy-mm-dd sem usar Date()
+function diaAnterior(dataStr) {
+  // dataStr = yyyy-mm-dd
+  const ano = parseInt(dataStr.substring(0,4));
+  const mes = parseInt(dataStr.substring(5,7));
+  const dia = parseInt(dataStr.substring(8,10));
+  
+  let nDia = dia - 1;
+  let nMes = mes;
+  let nAno = ano;
+  
+  if (nDia < 1) {
+    nMes--;
+    if (nMes < 1) { nMes = 12; nAno--; }
+    const diasNoMes = [0,31,28,31,30,31,30,31,31,30,31,30,31];
+    if (nMes === 2 && ((nAno % 4 === 0 && nAno % 100 !== 0) || nAno % 400 === 0)) {
+      nDia = 29;
+    } else {
+      nDia = diasNoMes[nMes];
+    }
+  }
+  return `${nAno}-${String(nMes).padStart(2,'0')}-${String(nDia).padStart(2,'0')}`;
 }
 
 async function buscarJogosCat(catId, data) {
@@ -91,10 +113,15 @@ async function chamarIA(prompt) {
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.post('/analisar', async (req, res) => {
-  const { data, hora, meta } = req.body;
+  let { data, hora, meta } = req.body;
+
   if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada.' });
   if (!RAPIDAPI_KEY) return res.status(500).json({ error: 'RAPIDAPI_KEY não configurada.' });
   if (!data) return res.status(400).json({ error: 'Data é obrigatória.' });
+
+  // Normalizar data para yyyy-mm-dd
+  data = normalizarData(data);
+  if (!data) return res.status(400).json({ error: 'Formato de data inválido.' });
 
   const horaMin = hora || '13:00';
   const metaJogos = parseInt(meta) || 15;
@@ -102,21 +129,22 @@ app.post('/analisar', async (req, res) => {
   const minMinutos = hM * 60 + mM;
 
   // Janela do dia em Brasília (UTC-3)
-  const partes = data.split('-');
-  const inicioDia = Date.UTC(parseInt(partes[0]), parseInt(partes[1])-1, parseInt(partes[2]), 3, 0, 0) / 1000;
+  // Dia Brasília começa às 03:00 UTC e termina às 03:00 UTC do dia seguinte
+  const ano = parseInt(data.substring(0,4));
+  const mes = parseInt(data.substring(5,7)) - 1;
+  const dia = parseInt(data.substring(8,10));
+  const inicioDia = Math.floor(Date.UTC(ano, mes, dia, 3, 0, 0) / 1000);
   const fimDia = inicioDia + 86400;
 
-  // Buscar dia anterior e o próprio dia para cobrir todos os fusos
-  const diaAnterior = dataAnterior(data);
-  const datasParaBuscar = [diaAnterior, data];
+  const anterior = diaAnterior(data);
+  const datasParaBuscar = [anterior, data];
 
   try {
-    console.log(`\n=== Buscando jogos para ${data} (Brasília) ===`);
-    console.log(`Janela UTC: ${new Date(inicioDia*1000).toISOString()} → ${new Date(fimDia*1000).toISOString()}`);
-    console.log(`Datas buscadas na API: ${datasParaBuscar.join(', ')}`);
+    console.log(`\n=== ${data} (Brasília) ===`);
+    console.log(`Janela: ${new Date(inicioDia*1000).toISOString()} → ${new Date(fimDia*1000).toISOString()}`);
+    console.log(`APIs: ${datasParaBuscar.join(' + ')}`);
 
     const jogosMap = new Map();
-
     const buscas = [];
     for (const catId of CATEGORIAS) {
       for (const d of datasParaBuscar) {
@@ -130,18 +158,14 @@ app.post('/analisar', async (req, res) => {
         const ligaId = ev.tournament?.uniqueTournament?.id;
         const liga = LIGAS[ligaId];
         if (!liga) continue;
-
         const ts = ev.startTimestamp;
         if (!ts || ts < inicioDia || ts >= fimDia) continue;
-
-        const dt = new Date(ts * 1000);
-        const hBR = dt.getUTCHours() - 3;
-        const mBR = dt.getUTCMinutes();
-        if (hBR * 60 + mBR < minMinutos) continue;
-
-        const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
+        const hBR = Math.floor((ts - inicioDia) / 3600) % 24;
+        const mBR = Math.floor((ts % 3600) / 60);
+        const totalMin = ((ts - inicioDia) / 60) % (24*60);
+        if (totalMin < minMinutos) continue;
+        const hStr = `${String(Math.floor(totalMin/60)).padStart(2,'0')}:${String(Math.floor(totalMin%60)).padStart(2,'0')}`;
         const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
-
         if (!jogosMap.has(key)) {
           jogosMap.set(key, {
             liga: liga.nome, tipo: liga.tipo, pri: liga.pri,
@@ -155,18 +179,15 @@ app.post('/analisar', async (req, res) => {
       .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario))
       .slice(0, metaJogos);
 
-    console.log(`\nJogos encontrados: ${jogos.length}`);
+    console.log(`Jogos: ${jogos.length}`);
     jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
 
     if (!jogos.length) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
 
-    const [ano, mes, dia] = data.split('-');
-    const df = `${dia}/${mes}/${ano}`;
+    const df = `${String(dia).padStart(2,'0')}/${String(mes+1).padStart(2,'0')}/${ano}`;
     const listaJogos = jogos.map((j, i) =>
       `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`
     ).join('\n');
-
-    console.log('\nEnviando para IA...');
 
     const prompt = `Você é um analista de apostas esportivas. Analise os jogos CONFIRMADOS pela API Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
 
