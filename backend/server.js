@@ -31,6 +31,8 @@ const LIGAS = {
   7:    { nome:'Champions League', tipo:'copa', pri:7 },
 };
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 function normalizarData(data) {
   if (!data) return null;
   if (data.includes('/')) {
@@ -40,19 +42,13 @@ function normalizarData(data) {
   return data;
 }
 
-function diaAnterior(dataStr) {
+function diaOffset(dataStr, offset) {
   const ano = parseInt(dataStr.substring(0,4));
   const mes = parseInt(dataStr.substring(5,7));
   const dia = parseInt(dataStr.substring(8,10));
-  let nDia = dia - 1, nMes = mes, nAno = ano;
-  if (nDia < 1) {
-    nMes--;
-    if (nMes < 1) { nMes = 12; nAno--; }
-    const dim = [0,31,28,31,30,31,30,31,31,30,31,30,31];
-    if (nMes === 2 && ((nAno%4===0&&nAno%100!==0)||nAno%400===0)) nDia = 29;
-    else nDia = dim[nMes];
-  }
-  return `${nAno}-${String(nMes).padStart(2,'0')}-${String(nDia).padStart(2,'0')}`;
+  const d = new Date(Date.UTC(ano, mes-1, dia));
+  d.setUTCDate(d.getUTCDate() + offset);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
 }
 
 async function buscarJogosCat(catId, data) {
@@ -62,21 +58,22 @@ async function buscarJogosCat(catId, data) {
       { headers: HEADERS() }
     );
     if (!res.ok) {
-      console.log(`  Cat ${catId}/${data}: HTTP ${res.status}`);
+      if (res.status === 429) {
+        console.log(`  Rate limit em cat ${catId}/${data}, aguardando...`);
+        await sleep(2000);
+        const res2 = await fetch(
+          `https://sofascore.p.rapidapi.com/tournaments/get-scheduled-events?categoryId=${catId}&date=${data}`,
+          { headers: HEADERS() }
+        );
+        if (!res2.ok) return [];
+        const j2 = await res2.json();
+        return j2.events || [];
+      }
       return [];
     }
     const json = await res.json();
-    const eventos = json.events || [];
-    if (eventos.length > 0) {
-      console.log(`  Cat ${catId}/${data}: ${eventos.length} eventos`);
-      // Log das ligas encontradas para debug
-      const ligas = [...new Set(eventos.map(e => e.tournament?.uniqueTournament?.id))];
-      const ligasPri = ligas.filter(id => LIGAS[id]);
-      if (ligasPri.length > 0) console.log(`    Ligas prioritárias: ${ligasPri.map(id => LIGAS[id].nome).join(', ')}`);
-    }
-    return eventos;
+    return json.events || [];
   } catch(e) {
-    console.log(`  Cat ${catId}/${data}: erro ${e.message}`);
     return [];
   }
 }
@@ -120,63 +117,56 @@ app.post('/analisar', async (req, res) => {
   const inicioDia = Math.floor(Date.UTC(ano, mes, dia, 3, 0, 0) / 1000);
   const fimDia = inicioDia + 86400;
 
-  const anterior = diaAnterior(data);
-  const datasParaBuscar = [anterior, data];
+  // Buscar dia anterior, o próprio dia e o seguinte para cobrir todos os fusos
+  const datasParaBuscar = [diaOffset(data,-1), data, diaOffset(data,1)];
 
   try {
     console.log(`\n=== ${data} (Brasília) ===`);
     console.log(`Janela: ${new Date(inicioDia*1000).toISOString()} → ${new Date(fimDia*1000).toISOString()}`);
-    console.log(`APIs: ${datasParaBuscar.join(' + ')}`);
 
     const jogosMap = new Map();
-    let totalEventosBrutos = 0;
-    let totalNaJanela = 0;
+    let totalBrutos = 0, totalJanela = 0;
 
-    const buscas = [];
+    // Buscar em série com pequeno delay para evitar 429
     for (const catId of CATEGORIAS) {
       for (const d of datasParaBuscar) {
-        buscas.push(buscarJogosCat(catId, d));
-      }
-    }
-    const resultados = await Promise.all(buscas);
+        const eventos = await buscarJogosCat(catId, d);
+        await sleep(200); // 200ms entre chamadas
+        totalBrutos += eventos.length;
 
-    for (const eventos of resultados) {
-      totalEventosBrutos += eventos.length;
-      for (const ev of eventos) {
-        const ts = ev.startTimestamp;
-        if (!ts) continue;
-        if (ts >= inicioDia && ts < fimDia) totalNaJanela++;
+        for (const ev of eventos) {
+          const ligaId = ev.tournament?.uniqueTournament?.id;
+          const liga = LIGAS[ligaId];
+          if (!liga) continue;
 
-        const ligaId = ev.tournament?.uniqueTournament?.id;
-        const liga = LIGAS[ligaId];
-        if (!liga) continue;
-        if (ts < inicioDia || ts >= fimDia) continue;
+          const ts = ev.startTimestamp;
+          if (!ts || ts < inicioDia || ts >= fimDia) continue;
+          totalJanela++;
 
-        // Calcular horário Brasília
-        const segundosNoDia = ts - inicioDia;
-        const hBR = Math.floor(segundosNoDia / 3600);
-        const mBR = Math.floor((segundosNoDia % 3600) / 60);
-        const totalMin = hBR * 60 + mBR;
-        if (totalMin < minMinutos) continue;
+          const segundosNoDia = ts - inicioDia;
+          const hBR = Math.floor(segundosNoDia / 3600);
+          const mBR = Math.floor((segundosNoDia % 3600) / 60);
+          const totalMin = hBR * 60 + mBR;
+          if (totalMin < minMinutos) continue;
 
-        const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
-        const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
-        if (!jogosMap.has(key)) {
-          jogosMap.set(key, {
-            liga: liga.nome, tipo: liga.tipo, pri: liga.pri,
-            timeCasa: ev.homeTeam?.name, timeFora: ev.awayTeam?.name, horario: hStr
-          });
+          const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
+          const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
+          if (!jogosMap.has(key)) {
+            jogosMap.set(key, {
+              liga: liga.nome, tipo: liga.tipo, pri: liga.pri,
+              timeCasa: ev.homeTeam?.name, timeFora: ev.awayTeam?.name, horario: hStr
+            });
+          }
         }
       }
     }
 
-    console.log(`\nDebug: ${totalEventosBrutos} eventos brutos, ${totalNaJanela} na janela Brasília`);
+    console.log(`Brutos: ${totalBrutos} | Na janela Brasília: ${totalJanela} | Prioritários ≥${horaMin}: ${jogosMap.size}`);
 
     const jogos = Array.from(jogosMap.values())
       .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario))
       .slice(0, metaJogos);
 
-    console.log(`Jogos prioritários encontrados: ${jogos.length}`);
     jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
 
     if (!jogos.length) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado nas ligas prioritárias.' });
