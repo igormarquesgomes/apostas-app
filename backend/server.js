@@ -31,38 +31,26 @@ const LIGAS = {
   7:    { nome:'Champions League', tipo:'copa', pri:7 },
 };
 
-// Garante formato yyyy-mm-dd independente do que chegar
 function normalizarData(data) {
   if (!data) return null;
-  // Se vier dd/mm/yyyy, converter
   if (data.includes('/')) {
     const p = data.split('/');
     if (p.length === 3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
   }
-  // Se vier yyyy-mm-dd, já está certo
   return data;
 }
 
-// Retorna o dia anterior no formato yyyy-mm-dd sem usar Date()
 function diaAnterior(dataStr) {
-  // dataStr = yyyy-mm-dd
   const ano = parseInt(dataStr.substring(0,4));
   const mes = parseInt(dataStr.substring(5,7));
   const dia = parseInt(dataStr.substring(8,10));
-  
-  let nDia = dia - 1;
-  let nMes = mes;
-  let nAno = ano;
-  
+  let nDia = dia - 1, nMes = mes, nAno = ano;
   if (nDia < 1) {
     nMes--;
     if (nMes < 1) { nMes = 12; nAno--; }
-    const diasNoMes = [0,31,28,31,30,31,30,31,31,30,31,30,31];
-    if (nMes === 2 && ((nAno % 4 === 0 && nAno % 100 !== 0) || nAno % 400 === 0)) {
-      nDia = 29;
-    } else {
-      nDia = diasNoMes[nMes];
-    }
+    const dim = [0,31,28,31,30,31,30,31,31,30,31,30,31];
+    if (nMes === 2 && ((nAno%4===0&&nAno%100!==0)||nAno%400===0)) nDia = 29;
+    else nDia = dim[nMes];
   }
   return `${nAno}-${String(nMes).padStart(2,'0')}-${String(nDia).padStart(2,'0')}`;
 }
@@ -73,39 +61,39 @@ async function buscarJogosCat(catId, data) {
       `https://sofascore.p.rapidapi.com/tournaments/get-scheduled-events?categoryId=${catId}&date=${data}`,
       { headers: HEADERS() }
     );
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.log(`  Cat ${catId}/${data}: HTTP ${res.status}`);
+      return [];
+    }
     const json = await res.json();
-    return json.events || [];
+    const eventos = json.events || [];
+    if (eventos.length > 0) {
+      console.log(`  Cat ${catId}/${data}: ${eventos.length} eventos`);
+      // Log das ligas encontradas para debug
+      const ligas = [...new Set(eventos.map(e => e.tournament?.uniqueTournament?.id))];
+      const ligasPri = ligas.filter(id => LIGAS[id]);
+      if (ligasPri.length > 0) console.log(`    Ligas prioritárias: ${ligasPri.map(id => LIGAS[id].nome).join(', ')}`);
+    }
+    return eventos;
   } catch(e) {
+    console.log(`  Cat ${catId}/${data}: erro ${e.message}`);
     return [];
   }
 }
 
 async function chamarIA(prompt) {
-  const modelos = [
-    'claude-haiku-4-5',
-    'claude-sonnet-4-5',
-    'claude-3-5-haiku-20241022',
-    'claude-3-5-sonnet-20241022',
-    'claude-3-haiku-20240307',
-  ];
+  const modelos = ['claude-haiku-4-5','claude-sonnet-4-5','claude-3-5-haiku-20241022','claude-3-5-sonnet-20241022','claude-3-haiku-20240307'];
   for (const modelo of modelos) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({ model: modelo, max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
       });
       const json = await res.json();
       if (!json.error) { console.log(`✅ Modelo: ${modelo}`); return json; }
       console.log(`❌ ${modelo}: ${json.error.message}`);
-    } catch(e) {
-      console.log(`❌ ${modelo}: ${e.message}`);
-    }
+    } catch(e) { console.log(`❌ ${modelo}: ${e.message}`); }
   }
   return null;
 }
@@ -114,12 +102,10 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.post('/analisar', async (req, res) => {
   let { data, hora, meta } = req.body;
-
   if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada.' });
   if (!RAPIDAPI_KEY) return res.status(500).json({ error: 'RAPIDAPI_KEY não configurada.' });
   if (!data) return res.status(400).json({ error: 'Data é obrigatória.' });
 
-  // Normalizar data para yyyy-mm-dd
   data = normalizarData(data);
   if (!data) return res.status(400).json({ error: 'Formato de data inválido.' });
 
@@ -128,8 +114,6 @@ app.post('/analisar', async (req, res) => {
   const [hM, mM] = horaMin.split(':').map(Number);
   const minMinutos = hM * 60 + mM;
 
-  // Janela do dia em Brasília (UTC-3)
-  // Dia Brasília começa às 03:00 UTC e termina às 03:00 UTC do dia seguinte
   const ano = parseInt(data.substring(0,4));
   const mes = parseInt(data.substring(5,7)) - 1;
   const dia = parseInt(data.substring(8,10));
@@ -145,6 +129,9 @@ app.post('/analisar', async (req, res) => {
     console.log(`APIs: ${datasParaBuscar.join(' + ')}`);
 
     const jogosMap = new Map();
+    let totalEventosBrutos = 0;
+    let totalNaJanela = 0;
+
     const buscas = [];
     for (const catId of CATEGORIAS) {
       for (const d of datasParaBuscar) {
@@ -154,17 +141,25 @@ app.post('/analisar', async (req, res) => {
     const resultados = await Promise.all(buscas);
 
     for (const eventos of resultados) {
+      totalEventosBrutos += eventos.length;
       for (const ev of eventos) {
+        const ts = ev.startTimestamp;
+        if (!ts) continue;
+        if (ts >= inicioDia && ts < fimDia) totalNaJanela++;
+
         const ligaId = ev.tournament?.uniqueTournament?.id;
         const liga = LIGAS[ligaId];
         if (!liga) continue;
-        const ts = ev.startTimestamp;
-        if (!ts || ts < inicioDia || ts >= fimDia) continue;
-        const hBR = Math.floor((ts - inicioDia) / 3600) % 24;
-        const mBR = Math.floor((ts % 3600) / 60);
-        const totalMin = ((ts - inicioDia) / 60) % (24*60);
+        if (ts < inicioDia || ts >= fimDia) continue;
+
+        // Calcular horário Brasília
+        const segundosNoDia = ts - inicioDia;
+        const hBR = Math.floor(segundosNoDia / 3600);
+        const mBR = Math.floor((segundosNoDia % 3600) / 60);
+        const totalMin = hBR * 60 + mBR;
         if (totalMin < minMinutos) continue;
-        const hStr = `${String(Math.floor(totalMin/60)).padStart(2,'0')}:${String(Math.floor(totalMin%60)).padStart(2,'0')}`;
+
+        const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
         const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
         if (!jogosMap.has(key)) {
           jogosMap.set(key, {
@@ -175,19 +170,19 @@ app.post('/analisar', async (req, res) => {
       }
     }
 
+    console.log(`\nDebug: ${totalEventosBrutos} eventos brutos, ${totalNaJanela} na janela Brasília`);
+
     const jogos = Array.from(jogosMap.values())
       .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario))
       .slice(0, metaJogos);
 
-    console.log(`Jogos: ${jogos.length}`);
+    console.log(`Jogos prioritários encontrados: ${jogos.length}`);
     jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
 
-    if (!jogos.length) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
+    if (!jogos.length) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado nas ligas prioritárias.' });
 
     const df = `${String(dia).padStart(2,'0')}/${String(mes+1).padStart(2,'0')}/${ano}`;
-    const listaJogos = jogos.map((j, i) =>
-      `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`
-    ).join('\n');
+    const listaJogos = jogos.map((j, i) => `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`).join('\n');
 
     const prompt = `Você é um analista de apostas esportivas. Analise os jogos CONFIRMADOS pela API Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
 
