@@ -26,10 +26,9 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
-
   .app { max-width: 1120px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
 
-  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
   .logo { display: flex; align-items: center; gap: 12px; }
   .logo-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
   .logo-icon svg { width: 18px; height: 18px; color: #0d0f12; }
@@ -37,45 +36,41 @@
   header h1 span { color: var(--accent); }
   .badge { font-size: 11px; font-family: var(--mono); background: rgba(110,231,183,0.08); color: var(--accent); border: 1px solid rgba(110,231,183,0.18); padding: 5px 12px; border-radius: 20px; }
 
-  .controls { display: grid; grid-template-columns: 200px 140px 90px 1fr; gap: 12px; align-items: end; margin-bottom: 2rem; }
+  /* Navegação de dias */
+  .nav-dias { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .nav-btn { font-family: var(--mono); font-size: 12px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border2); background: var(--surface); color: var(--text2); cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn.active { border-color: var(--accent); background: rgba(110,231,183,0.08); color: var(--accent); }
+  .nav-btn .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+  .nav-btn .nav-date { font-size: 13px; font-weight: 500; color: inherit; }
+  .nav-btn.active .nav-date { color: var(--accent); }
+
+  /* Controles */
+  .controls { display: grid; grid-template-columns: 200px 140px 90px 1fr; gap: 12px; align-items: end; margin-bottom: 1.5rem; }
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field label { font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
-  input[type="date"], input[type="time"], input[type="number"] {
-    background: var(--surface); border: 1px solid var(--border2); color: var(--text);
-    font-family: var(--mono); font-size: 13px; padding: 10px 12px; border-radius: 8px;
-    width: 100%; outline: none; transition: border-color 0.2s;
-  }
+  input[type="date"], input[type="time"], input[type="number"] { background: var(--surface); border: 1px solid var(--border2); color: var(--text); font-family: var(--mono); font-size: 13px; padding: 10px 12px; border-radius: 8px; width: 100%; outline: none; transition: border-color 0.2s; }
   input:focus { border-color: var(--accent); }
-  input[type="number"] { width: 80px; }
-  input[type="date"]::-webkit-calendar-picker-indicator,
-  input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
-
-  .btn { background: var(--accent); color: #0d0f12; font-family: var(--sans); font-size: 14px;
-    font-weight: 600; padding: 11px 22px; border: none; border-radius: 8px; cursor: pointer;
-    transition: all 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center; }
+  input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
+  .btn { background: var(--accent); color: #0d0f12; font-family: var(--sans); font-size: 14px; font-weight: 600; padding: 11px 22px; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center; }
   .btn:hover { background: var(--accent2); transform: translateY(-1px); }
-  .btn:active { transform: translateY(0); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 2rem; }
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
   .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
   .stat .sl { font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
   .stat .sv { font-size: 24px; font-weight: 600; }
 
+  /* Tabela */
   .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-  thead th { padding: 10px 12px; text-align: left; font-size: 10px; font-family: var(--mono);
-    color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em;
-    background: var(--surface2); border-bottom: 1px solid var(--border); font-weight: 400; }
-  th:nth-child(1){width:22%} th:nth-child(2){width:10%} th:nth-child(3){width:7%}
-  th:nth-child(4){width:22%} th:nth-child(5){width:12%} th:nth-child(6){width:12%}
-  th:nth-child(7){width:9%} th:nth-child(8){width:6%}
-
+  thead th { padding: 10px 12px; text-align: left; font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; background: var(--surface2); border-bottom: 1px solid var(--border); font-weight: 400; }
+  th:nth-child(1){width:22%} th:nth-child(2){width:10%} th:nth-child(3){width:7%} th:nth-child(4){width:22%} th:nth-child(5){width:12%} th:nth-child(6){width:12%} th:nth-child(7){width:9%} th:nth-child(8){width:6%}
   tbody tr.dr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
   tbody tr.dr:hover, tbody tr.dr.open { background: var(--surface2); }
   td { padding: 10px 12px; vertical-align: middle; }
-  .jn { font-weight: 500; font-size: 13px; color: var(--text); }
+  .jn { font-weight: 500; font-size: 13px; }
   .jh { font-size: 10px; font-family: var(--mono); color: var(--text3); margin-top: 2px; }
 
   .pill { font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 20px; display: inline-block; white-space: nowrap; font-weight: 500; }
@@ -92,45 +87,35 @@
 
   .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
   .d-a { background: #34d399; } .d-m { background: #fbbf24; } .d-b { background: #f87171; }
-  .c-a { color: #6ee7b7; font-size: 11px; font-family: var(--mono); }
-  .c-m { color: #fbbf24; font-size: 11px; font-family: var(--mono); }
-  .c-b { color: #f87171; font-size: 11px; font-family: var(--mono); }
-  .odd-v { font-family: var(--mono); font-weight: 500; color: var(--text); font-size: 13px; }
+  .c-a { color: #6ee7b7; } .c-m { color: #fbbf24; } .c-b { color: #f87171; }
+  .odd-v { font-family: var(--mono); font-weight: 500; }
   .chev { color: var(--text3); font-size: 13px; transition: transform 0.2s; display: inline-block; }
   .chev.open { transform: rotate(180deg); }
 
-  .sh-row td { padding: 7px 12px; font-size: 10px; font-family: var(--mono); color: var(--text3);
-    text-transform: uppercase; letter-spacing: 0.08em; background: rgba(255,255,255,0.03);
-    border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); }
-
+  .sh-row td { padding: 7px 12px; font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); }
   .er td { padding: 0; }
-  .ei { padding: 16px 16px 20px; border-bottom: 1px solid var(--border); background: #12141a; }
+  .ei { padding: 16px; border-bottom: 1px solid var(--border); background: #12141a; }
   .eg { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
   .ms { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
   .ml2 { font-size: 9px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
-  .mv2 { font-size: 13px; font-weight: 500; font-family: var(--mono); color: var(--text); }
+  .mv2 { font-size: 13px; font-weight: 500; font-family: var(--mono); }
   .jlabel { font-size: 9px; font-family: var(--mono); color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
   .jtxt { font-size: 13px; color: var(--text2); line-height: 1.7; padding: 11px 14px; background: var(--surface); border-left: 2px solid var(--accent2); }
 
   .empty { text-align: center; padding: 5rem 2rem; color: var(--text3); }
   .empty svg { width: 40px; height: 40px; margin-bottom: 14px; display: block; margin-left: auto; margin-right: auto; opacity: 0.3; }
-  .empty p { font-size: 14px; }
   .loading { text-align: center; padding: 5rem 2rem; color: var(--text2); }
   .spin { width: 30px; height: 30px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite; margin: 0 auto 12px; }
   .loading p { font-size: 13px; font-family: var(--mono); color: var(--text3); }
   .loading .step { font-size: 12px; color: var(--accent); margin-top: 6px; font-family: var(--mono); }
   .errmsg { text-align: center; padding: 3rem 2rem; color: var(--red); font-family: var(--mono); font-size: 13px; }
-  .errmsg a { color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .aviso-banco { text-align: center; padding: 3rem 2rem; color: var(--amber); font-family: var(--mono); font-size: 13px; }
   @keyframes sp { to { transform: rotate(360deg); } }
-
-  .config-note { font-size: 12px; font-family: var(--mono); color: var(--text3); text-align: center; margin-top: 1rem; }
-  .config-note span { color: var(--amber); }
 
   @media (max-width: 700px) {
     .controls { grid-template-columns: 1fr 1fr; }
     .stats { grid-template-columns: 1fr 1fr; }
     .eg { grid-template-columns: repeat(3, 1fr); }
-    th:nth-child(6), td:nth-child(6), th:nth-child(7), td:nth-child(7) { display: none; }
   }
 </style>
 </head>
@@ -143,12 +128,16 @@
       </div>
       <div>
         <h1>Análise de <span>Apostas</span></h1>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:2px">busca automática · IA · Estrela Bet</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:2px">Sofascore API · IA · Estrela Bet</div>
       </div>
     </div>
     <span class="badge">Estrela Bet</span>
   </header>
 
+  <!-- Navegação de dias -->
+  <div class="nav-dias" id="nav-dias"></div>
+
+  <!-- Controles -->
   <div class="controls">
     <div class="field">
       <label>Data dos jogos</label>
@@ -163,7 +152,7 @@
       <input type="number" id="q-jogos" value="15" min="5" max="20">
     </div>
     <button class="btn" id="btn-b" onclick="buscar()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       Buscar e analisar
     </button>
   </div>
@@ -172,194 +161,215 @@
     <div class="stat"><div class="sl">Jogos</div><div class="sv" style="color:var(--accent)" id="sj">0</div></div>
     <div class="stat"><div class="sl">Alta confiança</div><div class="sv" style="color:var(--amber)" id="sa2">0</div></div>
     <div class="stat"><div class="sl">Odd média</div><div class="sv" style="color:var(--blue)" id="so">-</div></div>
-    <div class="stat"><div class="sl">Mercados</div><div class="sv" style="color:var(--purple)" id="sm">-</div></div>
+    <div class="stat"><div class="sv" style="color:var(--purple)" id="sm">-</div><div class="sl">Mercados</div></div>
   </div>
 
   <div class="table-wrap" id="tw">
     <div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-      </svg>
-      <p>Selecione a data e clique em "Buscar e analisar"</p>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <p>Selecione a data ou use os atalhos acima</p>
     </div>
   </div>
 
-  <p class="config-note">Backend: <span id="backend-url">configurando...</span></p>
+  <p style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:1rem">
+    Backend: <span style="color:var(--accent)" id="backend-url">carregando...</span>
+  </p>
 </div>
 
 <script>
-  const BACKEND_URL = window.BACKEND_URL || 'https://apostas-app.onrender.com';
-  document.getElementById('backend-url').textContent = BACKEND_URL;
+const BACKEND_URL = window.BACKEND_URL || 'https://apostas-app.onrender.com';
+document.getElementById('backend-url').textContent = BACKEND_URL;
 
-  const amanha = new Date();
-  amanha.setDate(amanha.getDate() + 1);
-  document.getElementById('d-input').value = amanha.toISOString().split('T')[0];
+// ─── Datas ───────────────────────────────────────────────────
+function hoje() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function offsetData(base, n) {
+  const d = new Date(base + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmtData(iso) {
+  const [a,m,d] = iso.split('-');
+  return `${d}/${m}`;
+}
+function fmtDataLong(iso) {
+  const [a,m,d] = iso.split('-');
+  return `${d}/${m}/${a}`;
+}
 
-  let exp = new Set();
-  const mlabel = { gols:'Gols', escanteios:'Escanteios', cartoes:'Cartões', resultado:'Resultado' };
-  const lcMap = { a:'p-a', b:'p-b', eu:'p-eu', it:'p-it', es:'p-es', copa:'p-copa' };
-  const lnMap = { a:'Série A', b:'Série B', eu:'Europa', it:'Serie A 🇮🇹', es:'La Liga 🇪🇸', copa:'Copa' };
-  const mcMap = { gols:'p-gols', escanteios:'p-esc', cartoes:'p-car', resultado:'p-res' };
-  const grupoMap = {
-    a: '🇧🇷 Brasileirão Série A',
-    b: '🇧🇷 Brasileirão Série B',
-    it: '🇮🇹 Serie A Italiana',
-    es: '🇪🇸 La Liga',
-    eu: '🌍 Ligas Europeias',
-    copa: '🏆 Copas'
-  };
+// ─── Navegação ───────────────────────────────────────────────
+const hojeStr = hoje();
+document.getElementById('d-input').value = offsetData(hojeStr, 1);
 
-  const steps = [
-    'Buscando jogos do dia nas ligas prioritárias...',
-    'Validando horários e filtrando a partir das 13h...',
-    'Analisando últimos 10 jogos de cada time...',
-    'Verificando confrontos diretos (último ano)...',
-    'Definindo apostas com base nos dados...',
-    'Montando tabela final...'
+function renderNav() {
+  const nav = document.getElementById('nav-dias');
+  const dias = [
+    { label: 'Ontem', offset: -1 },
+    { label: 'Hoje',  offset:  0 },
+    { label: 'Amanhã', offset: 1 },
   ];
+  nav.innerHTML = dias.map(d => {
+    const data = offsetData(hojeStr, d.offset);
+    return `<button class="nav-btn" data-data="${data}" onclick="carregarDia('${data}', '${d.label}')">
+      <span class="nav-label">${d.label}</span>
+      <span class="nav-date">${fmtData(data)}</span>
+    </button>`;
+  }).join('');
+}
+renderNav();
 
-  async function buscar() {
-    const dv = document.getElementById('d-input').value;
-    const hora = document.getElementById('h-min').value;
-    const meta = parseInt(document.getElementById('q-jogos').value) || 15;
-    if (!dv) return;
+async function carregarDia(data, label) {
+  // Atualizar botão ativo
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-data="${data}"]`)?.classList.add('active');
+  document.getElementById('d-input').value = data;
 
-    const [a, m, d] = dv.split('-');
-    const df = `${d}/${m}/${a}`;
+  document.getElementById('sa').style.display = 'none';
+  document.getElementById('tw').innerHTML = `<div class="loading"><div class="spin"></div><p>Buscando apostas de ${label} (${fmtDataLong(data)})...</p><div class="step">Verificando banco de dados...</div></div>`;
+  document.getElementById('btn-b').disabled = true;
 
-    document.getElementById('btn-b').disabled = true;
-    document.getElementById('sa').style.display = 'none';
-    exp = new Set();
+  try {
+    // Tentar buscar do banco primeiro
+    const periodo = label === 'Ontem' ? 'ontem' : label === 'Hoje' ? 'hoje' : 'amanha';
+    const res = await fetch(`${BACKEND_URL}/apostas/${periodo}`);
+    const json = await res.json();
 
-    let stepIdx = 0;
-    document.getElementById('tw').innerHTML = `
-      <div class="loading">
-        <div class="spin"></div>
-        <p>Analisando jogos de ${df}...</p>
-        <div class="step" id="step-txt">${steps[0]}</div>
-      </div>`;
-
-    const stepInterval = setInterval(() => {
-      stepIdx = (stepIdx + 1) % steps.length;
-      const el = document.getElementById('step-txt');
-      if (el) el.textContent = steps[stepIdx];
-    }, 3000);
-
-    try {
-      const res = await fetch(`${BACKEND_URL}/analisar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: df, hora, meta })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || `Erro ${res.status}`);
-      }
-
-      const parsed = await res.json();
-      render(parsed.jogos || []);
-    } catch (err) {
-      document.getElementById('tw').innerHTML = `
-        <div class="errmsg">
-          <p style="font-size:20px;margin-bottom:10px">⚠</p>
-          <p>${err.message}</p>
-          <p style="margin-top:10px;font-size:11px;color:var(--text3)">Verifique se o backend está online em ${BACKEND_URL}</p>
-        </div>`;
-    } finally {
-      clearInterval(stepInterval);
-      document.getElementById('btn-b').disabled = false;
-    }
-  }
-
-  function render(jogos) {
-    if (!jogos.length) {
-      document.getElementById('tw').innerHTML = '<div class="empty"><p>Nenhum jogo encontrado para os critérios selecionados.</p></div>';
-      return;
-    }
-
-    const alta = jogos.filter(j => j.confianca === 'alta').length;
-    const odds = jogos.map(j => parseFloat(j.odd_sugerida)).filter(Boolean);
-    const om = odds.length ? (odds.reduce((a, b) => a + b, 0) / odds.length).toFixed(2) : '-';
-    const mercs = new Set(jogos.map(j => j.mercado)).size;
-
-    document.getElementById('sj').textContent = jogos.length;
-    document.getElementById('sa2').textContent = alta;
-    document.getElementById('so').textContent = om;
-    document.getElementById('sm').textContent = mercs;
-    document.getElementById('sa').style.display = 'grid';
-
-    const grupos = {};
-    jogos.forEach(j => {
-      const g = j.tipo_liga || 'eu';
-      if (!grupos[g]) grupos[g] = [];
-      grupos[g].push(j);
-    });
-
-    const ordem = ['a', 'b', 'it', 'es', 'eu', 'copa'];
-    let html = '', i = 0;
-
-    ordem.forEach(g => {
-      if (!grupos[g] || !grupos[g].length) return;
-      html += `<tr class="sh-row"><td colspan="8">${grupoMap[g] || g}</td></tr>`;
-      grupos[g].forEach(j => {
-        const dc = j.confianca === 'alta' ? 'd-a' : j.confianca === 'media' ? 'd-m' : 'd-b';
-        const cc = j.confianca === 'alta' ? 'c-a' : j.confianca === 'media' ? 'c-m' : 'c-b';
-        const cl = j.confianca ? j.confianca[0].toUpperCase() + j.confianca.slice(1) : '-';
-        const lc = lcMap[j.tipo_liga] || 'p-eu';
-        const ln = lnMap[j.tipo_liga] || j.liga;
-        const mc = mcMap[j.mercado] || 'p-gols';
-        const ml = mlabel[j.mercado] || j.mercado;
-        html += `
-          <tr class="dr" id="r${i}" onclick="tog(${i})">
-            <td><div class="jn">${j.time_casa} x ${j.time_fora}</div></td>
-            <td><span class="pill ${lc}">${ln}</span></td>
-            <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${j.horario || '-'}</td>
-            <td style="font-weight:500;font-size:13px;color:var(--text)">${j.aposta}</td>
-            <td><span class="pill ${mc}">${ml}</span></td>
-            <td><span class="dot ${dc}"></span><span class="${cc}">${cl}</span></td>
-            <td><span class="odd-v">${j.odd_sugerida || '-'}</span></td>
-            <td><span class="chev" id="cv${i}">▾</span></td>
-          </tr>
-          <tr class="er" id="e${i}" style="display:none">
-            <td colspan="8">
-              <div class="ei">
-                <div class="eg">
-                  <div class="ms"><div class="ml2">Gols casa</div><div class="mv2">${j.media_gols_casa || '-'}</div></div>
-                  <div class="ms"><div class="ml2">Gols fora</div><div class="mv2">${j.media_gols_fora || '-'}</div></div>
-                  <div class="ms"><div class="ml2">Escanteios</div><div class="mv2">${j.media_escanteios || '-'}</div></div>
-                  <div class="ms"><div class="ml2">Cartões</div><div class="mv2">${j.media_cartoes || '-'}</div></div>
-                  <div class="ms"><div class="ml2">Forma casa</div><div class="mv2" style="font-size:10px">${j.forma_casa || '-'}</div></div>
-                  <div class="ms"><div class="ml2">Forma fora</div><div class="mv2" style="font-size:10px">${j.forma_fora || '-'}</div></div>
-                </div>
-                <div class="jlabel">Justificativa da aposta</div>
-                <div class="jtxt">${j.justificativa || 'Sem justificativa disponível.'}</div>
-              </div>
-            </td>
-          </tr>`;
-        i++;
-      });
-    });
-
-    document.getElementById('tw').innerHTML = `<table>
-      <thead><tr>
-        <th>Jogo</th><th>Liga</th><th>Hora</th><th>Aposta</th>
-        <th>Mercado</th><th>Confiança</th><th>Odd</th><th></th>
-      </tr></thead>
-      <tbody>${html}</tbody>
-    </table>`;
-  }
-
-  function tog(i) {
-    const er = document.getElementById('e' + i);
-    const cv = document.getElementById('cv' + i);
-    const rw = document.getElementById('r' + i);
-    if (exp.has(i)) {
-      er.style.display = 'none'; cv.classList.remove('open'); rw.classList.remove('open'); exp.delete(i);
+    if (json.jogos && json.jogos.length > 0) {
+      render(json.jogos);
+    } else if (json.aviso) {
+      document.getElementById('tw').innerHTML = `<div class="aviso-banco">⚠ ${json.aviso}<br><br><small>Use "Buscar e analisar" para gerar as apostas deste dia.</small></div>`;
     } else {
-      er.style.display = 'table-row'; cv.classList.add('open'); rw.classList.add('open'); exp.add(i);
+      document.getElementById('tw').innerHTML = `<div class="aviso-banco">Nenhuma aposta encontrada para ${fmtDataLong(data)}.</div>`;
     }
+  } catch(err) {
+    document.getElementById('tw').innerHTML = `<div class="errmsg">Erro: ${err.message}</div>`;
+  } finally {
+    document.getElementById('btn-b').disabled = false;
   }
+}
+
+// ─── Buscar e gerar ──────────────────────────────────────────
+const steps = [
+  'Buscando jogos na API Sofascore...',
+  'Filtrando por ligas prioritárias...',
+  'Validando horários...',
+  'Analisando estatísticas dos times...',
+  'IA definindo apostas...',
+  'Salvando no banco de dados...'
+];
+
+async function buscar() {
+  const dv = document.getElementById('d-input').value;
+  const hora = document.getElementById('h-min').value;
+  const meta = parseInt(document.getElementById('q-jogos').value) || 15;
+  if (!dv) return;
+
+  document.getElementById('btn-b').disabled = true;
+  document.getElementById('sa').style.display = 'none';
+
+  let stepIdx = 0;
+  document.getElementById('tw').innerHTML = `<div class="loading"><div class="spin"></div><p>Analisando ${fmtDataLong(dv)}...</p><div class="step" id="step-txt">${steps[0]}</div></div>`;
+  const interval = setInterval(() => {
+    stepIdx = (stepIdx + 1) % steps.length;
+    const el = document.getElementById('step-txt');
+    if (el) el.textContent = steps[stepIdx];
+  }, 3000);
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/analisar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: dv, hora, meta })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || `Erro ${res.status}`); }
+    const parsed = await res.json();
+    clearInterval(interval);
+    if (parsed.aviso) {
+      document.getElementById('tw').innerHTML = `<div class="aviso-banco">⚠ ${parsed.aviso}</div>`;
+    } else {
+      render(parsed.jogos || []);
+    }
+  } catch(err) {
+    clearInterval(interval);
+    document.getElementById('tw').innerHTML = `<div class="errmsg">❌ ${err.message}</div>`;
+  } finally {
+    document.getElementById('btn-b').disabled = false;
+  }
+}
+
+// ─── Render tabela ───────────────────────────────────────────
+let exp = new Set();
+const ml = { gols:'Gols', escanteios:'Escanteios', cartoes:'Cartões', resultado:'Resultado' };
+const lc = { a:'p-a', b:'p-b', eu:'p-eu', it:'p-it', es:'p-es', copa:'p-copa' };
+const ln = { a:'Série A', b:'Série B', eu:'Europa', it:'Serie A 🇮🇹', es:'La Liga 🇪🇸', copa:'Copa' };
+const mc = { gols:'p-gols', escanteios:'p-esc', cartoes:'p-car', resultado:'p-res' };
+const gNomes = { a:'🇧🇷 Série A', b:'🇧🇷 Série B', it:'🇮🇹 Serie A Italiana', es:'🇪🇸 La Liga', eu:'🌍 Ligas Europeias', copa:'🏆 Copas' };
+
+function render(jogos) {
+  if (!jogos.length) { document.getElementById('tw').innerHTML='<div class="empty"><p>Nenhum jogo encontrado.</p></div>'; return; }
+
+  const alta = jogos.filter(j=>j.confianca==='alta').length;
+  const odds = jogos.map(j=>parseFloat(j.odd_sugerida)).filter(Boolean);
+  const om = odds.length?(odds.reduce((a,b)=>a+b,0)/odds.length).toFixed(2):'-';
+  const mercs = new Set(jogos.map(j=>j.mercado)).size;
+
+  document.getElementById('sj').textContent=jogos.length;
+  document.getElementById('sa2').textContent=alta;
+  document.getElementById('so').textContent=om;
+  document.getElementById('sm').textContent=mercs;
+  document.getElementById('sa').style.display='grid';
+
+  const grupos={};
+  jogos.forEach(j=>{ const g=j.tipo_liga||'eu'; if(!grupos[g]) grupos[g]=[]; grupos[g].push(j); });
+  const ordem=['a','b','it','es','eu','copa'];
+
+  let html='', i=0;
+  ordem.forEach(g=>{
+    if(!grupos[g]||!grupos[g].length) return;
+    html+=`<tr class="sh-row"><td colspan="8">${gNomes[g]||g}</td></tr>`;
+    grupos[g].forEach(j=>{
+      const dc=j.confianca==='alta'?'d-a':j.confianca==='media'?'d-m':'d-b';
+      const cc=j.confianca==='alta'?'c-a':j.confianca==='media'?'c-m':'c-b';
+      const cl=j.confianca?(j.confianca[0].toUpperCase()+j.confianca.slice(1)):'-';
+      html+=`<tr class="dr" id="r${i}" onclick="tog(${i})">
+        <td><div class="jn">${j.time_casa} x ${j.time_fora}</div><div class="jh">${j.horario||''}</div></td>
+        <td><span class="pill ${lc[j.tipo_liga]||'p-eu'}">${ln[j.tipo_liga]||j.liga}</span></td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${j.horario||'-'}</td>
+        <td style="font-weight:500;font-size:13px">${j.aposta}</td>
+        <td><span class="pill ${mc[j.mercado]||'p-gols'}">${ml[j.mercado]||j.mercado}</span></td>
+        <td><span class="dot ${dc}"></span><span class="${cc}" style="font-size:11px;font-family:var(--mono)">${cl}</span></td>
+        <td><span class="odd-v">${j.odd_sugerida||'-'}</span></td>
+        <td><span class="chev" id="cv${i}">▾</span></td>
+      </tr>
+      <tr class="er" id="e${i}" style="display:none"><td colspan="8"><div class="ei">
+        <div class="eg">
+          <div class="ms"><div class="ml2">Gols casa</div><div class="mv2">${j.media_gols_casa||'-'}</div></div>
+          <div class="ms"><div class="ml2">Gols fora</div><div class="mv2">${j.media_gols_fora||'-'}</div></div>
+          <div class="ms"><div class="ml2">Escanteios</div><div class="mv2">${j.media_escanteios||'-'}</div></div>
+          <div class="ms"><div class="ml2">Cartões</div><div class="mv2">${j.media_cartoes||'-'}</div></div>
+          <div class="ms"><div class="ml2">Forma casa</div><div class="mv2" style="font-size:10px">${j.forma_casa||'-'}</div></div>
+          <div class="ms"><div class="ml2">Forma fora</div><div class="mv2" style="font-size:10px">${j.forma_fora||'-'}</div></div>
+        </div>
+        <div class="jlabel">Justificativa</div>
+        <div class="jtxt">${j.justificativa||'-'}</div>
+      </div></td></tr>`;
+      i++;
+    });
+  });
+
+  document.getElementById('tw').innerHTML=`<table><thead><tr>
+    <th>Jogo</th><th>Liga</th><th>Hora</th><th>Aposta</th><th>Mercado</th><th>Confiança</th><th>Odd</th><th></th>
+  </tr></thead><tbody>${html}</tbody></table>`;
+  exp = new Set();
+}
+
+function tog(i){
+  const er=document.getElementById('e'+i),cv=document.getElementById('cv'+i),rw=document.getElementById('r'+i);
+  if(exp.has(i)){er.style.display='none';cv.classList.remove('open');rw.classList.remove('open');exp.delete(i);}
+  else{er.style.display='table-row';cv.classList.add('open');rw.classList.add('open');exp.add(i);}
+}
 </script>
 </body>
 </html>
