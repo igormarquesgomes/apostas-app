@@ -8,6 +8,8 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 const HEADERS = () => ({
   'x-rapidapi-key': RAPIDAPI_KEY,
@@ -33,6 +35,31 @@ const LIGAS = {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ─── Supabase helpers ────────────────────────────────────────
+async function dbGet(data) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas`,
+    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+  );
+  const rows = await res.json();
+  if (rows && rows.length > 0) return rows[0].apostas;
+  return null;
+}
+
+async function dbSave(data, apostas) {
+  await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({ data, apostas })
+  });
+}
+
+// ─── Utilitários de data ────────────────────────────────────
 function normalizarData(data) {
   if (!data) return null;
   if (data.includes('/')) {
@@ -44,13 +71,14 @@ function normalizarData(data) {
 
 function diaOffset(dataStr, offset) {
   const ano = parseInt(dataStr.substring(0,4));
-  const mes = parseInt(dataStr.substring(5,7));
+  const mes = parseInt(dataStr.substring(5,7)) - 1;
   const dia = parseInt(dataStr.substring(8,10));
-  const d = new Date(Date.UTC(ano, mes-1, dia));
+  const d = new Date(Date.UTC(ano, mes, dia));
   d.setUTCDate(d.getUTCDate() + offset);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
 }
 
+// ─── Sofascore ──────────────────────────────────────────────
 async function buscarJogosCat(catId, data) {
   try {
     const res = await fetch(
@@ -59,7 +87,6 @@ async function buscarJogosCat(catId, data) {
     );
     if (!res.ok) {
       if (res.status === 429) {
-        console.log(`  Rate limit em cat ${catId}/${data}, aguardando...`);
         await sleep(2000);
         const res2 = await fetch(
           `https://sofascore.p.rapidapi.com/tournaments/get-scheduled-events?categoryId=${catId}&date=${data}`,
@@ -73,11 +100,10 @@ async function buscarJogosCat(catId, data) {
     }
     const json = await res.json();
     return json.events || [];
-  } catch(e) {
-    return [];
-  }
+  } catch(e) { return []; }
 }
 
+// ─── IA ─────────────────────────────────────────────────────
 async function chamarIA(prompt) {
   const modelos = ['claude-haiku-4-5','claude-sonnet-4-5','claude-3-5-haiku-20241022','claude-3-5-sonnet-20241022','claude-3-haiku-20240307'];
   for (const modelo of modelos) {
@@ -95,19 +121,8 @@ async function chamarIA(prompt) {
   return null;
 }
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
-
-app.post('/analisar', async (req, res) => {
-  let { data, hora, meta } = req.body;
-  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada.' });
-  if (!RAPIDAPI_KEY) return res.status(500).json({ error: 'RAPIDAPI_KEY não configurada.' });
-  if (!data) return res.status(400).json({ error: 'Data é obrigatória.' });
-
-  data = normalizarData(data);
-  if (!data) return res.status(400).json({ error: 'Formato de data inválido.' });
-
-  const horaMin = hora || '13:00';
-  const metaJogos = parseInt(meta) || 15;
+// ─── Geração de apostas ─────────────────────────────────────
+async function gerarApostas(data, horaMin, metaJogos) {
   const [hM, mM] = horaMin.split(':').map(Number);
   const minMinutos = hM * 60 + mM;
 
@@ -117,64 +132,45 @@ app.post('/analisar', async (req, res) => {
   const inicioDia = Math.floor(Date.UTC(ano, mes, dia, 3, 0, 0) / 1000);
   const fimDia = inicioDia + 86400;
 
-  // Buscar dia anterior, o próprio dia e o seguinte para cobrir todos os fusos
   const datasParaBuscar = [diaOffset(data,-1), data, diaOffset(data,1)];
+  const jogosMap = new Map();
 
-  try {
-    console.log(`\n=== ${data} (Brasília) ===`);
-    console.log(`Janela: ${new Date(inicioDia*1000).toISOString()} → ${new Date(fimDia*1000).toISOString()}`);
-
-    const jogosMap = new Map();
-    let totalBrutos = 0, totalJanela = 0;
-
-    // Buscar em série com pequeno delay para evitar 429
-    for (const catId of CATEGORIAS) {
-      for (const d of datasParaBuscar) {
-        const eventos = await buscarJogosCat(catId, d);
-        await sleep(200); // 200ms entre chamadas
-        totalBrutos += eventos.length;
-
-        for (const ev of eventos) {
-          const ligaId = ev.tournament?.uniqueTournament?.id;
-          const liga = LIGAS[ligaId];
-          if (!liga) continue;
-
-          const ts = ev.startTimestamp;
-          if (!ts || ts < inicioDia || ts >= fimDia) continue;
-          totalJanela++;
-
-          const segundosNoDia = ts - inicioDia;
-          const hBR = Math.floor(segundosNoDia / 3600);
-          const mBR = Math.floor((segundosNoDia % 3600) / 60);
-          const totalMin = hBR * 60 + mBR;
-          if (totalMin < minMinutos) continue;
-
-          const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
-          const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
-          if (!jogosMap.has(key)) {
-            jogosMap.set(key, {
-              liga: liga.nome, tipo: liga.tipo, pri: liga.pri,
-              timeCasa: ev.homeTeam?.name, timeFora: ev.awayTeam?.name, horario: hStr
-            });
-          }
+  for (const catId of CATEGORIAS) {
+    for (const d of datasParaBuscar) {
+      const eventos = await buscarJogosCat(catId, d);
+      await sleep(200);
+      for (const ev of eventos) {
+        const ligaId = ev.tournament?.uniqueTournament?.id;
+        const liga = LIGAS[ligaId];
+        if (!liga) continue;
+        const ts = ev.startTimestamp;
+        if (!ts || ts < inicioDia || ts >= fimDia) continue;
+        const segundosNoDia = ts - inicioDia;
+        const hBR = Math.floor(segundosNoDia / 3600);
+        const mBR = Math.floor((segundosNoDia % 3600) / 60);
+        if (hBR * 60 + mBR < minMinutos) continue;
+        const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
+        const key = `${ev.homeTeam?.name}-${ev.awayTeam?.name}`;
+        if (!jogosMap.has(key)) {
+          jogosMap.set(key, { liga: liga.nome, tipo: liga.tipo, pri: liga.pri, timeCasa: ev.homeTeam?.name, timeFora: ev.awayTeam?.name, horario: hStr });
         }
       }
     }
+  }
 
-    console.log(`Brutos: ${totalBrutos} | Na janela Brasília: ${totalJanela} | Prioritários ≥${horaMin}: ${jogosMap.size}`);
+  const jogos = Array.from(jogosMap.values())
+    .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario))
+    .slice(0, metaJogos);
 
-    const jogos = Array.from(jogosMap.values())
-      .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario))
-      .slice(0, metaJogos);
+  console.log(`Jogos encontrados: ${jogos.length}`);
+  jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
 
-    jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
+  if (!jogos.length) return null;
 
-    if (!jogos.length) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado nas ligas prioritárias.' });
+  const df = `${String(dia).padStart(2,'0')}/${String(mes+1).padStart(2,'0')}/${ano}`;
+  const listaJogos = jogos.map((j, i) => `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`).join('\n');
 
-    const df = `${String(dia).padStart(2,'0')}/${String(mes+1).padStart(2,'0')}/${ano}`;
-    const listaJogos = jogos.map((j, i) => `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`).join('\n');
-
-    const prompt = `Você é um analista de apostas esportivas. Analise os jogos CONFIRMADOS pela API Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
+  const prompt = `Você é um analista de apostas esportivas. Analise os jogos CONFIRMADOS pela API Sofascore para ${df} e gere 1 aposta por jogo para a Estrela Bet.
 
 JOGOS VALIDADOS:
 ${listaJogos}
@@ -186,19 +182,80 @@ Retorne SOMENTE JSON válido:
 
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
 
-    const iaJson = await chamarIA(prompt);
-    if (!iaJson) return res.status(500).json({ error: 'Nenhum modelo de IA disponível.' });
+  const iaJson = await chamarIA(prompt);
+  if (!iaJson) return null;
 
-    const txt = (iaJson.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-    if (s === -1 || e === -1) return res.status(500).json({ error: 'Resposta inválida da IA.' });
+  const txt = (iaJson.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+  if (s === -1 || e === -1) return null;
 
-    const parsed = JSON.parse(txt.slice(s, e + 1));
-    console.log(`✅ ${parsed.jogos?.length} apostas geradas`);
-    res.json(parsed);
+  return JSON.parse(txt.slice(s, e + 1));
+}
 
+// ─── Endpoints ──────────────────────────────────────────────
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// Buscar apostas de uma data (com cache)
+app.post('/analisar', async (req, res) => {
+  let { data, hora, meta } = req.body;
+  if (!data) return res.status(400).json({ error: 'Data é obrigatória.' });
+
+  data = normalizarData(data);
+  if (!data) return res.status(400).json({ error: 'Formato de data inválido.' });
+
+  const horaMin = hora || '13:00';
+  const metaJogos = parseInt(meta) || 15;
+
+  try {
+    // 1. Verificar cache no Supabase
+    console.log(`\n=== Buscando apostas para ${data} ===`);
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      const cached = await dbGet(data);
+      if (cached) {
+        console.log(`✅ Cache hit para ${data}`);
+        return res.json(cached);
+      }
+      console.log(`Cache miss para ${data} — gerando apostas...`);
+    }
+
+    // 2. Gerar apostas
+    const resultado = await gerarApostas(data, horaMin, metaJogos);
+    if (!resultado) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
+
+    // 3. Salvar no Supabase
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      await dbSave(data, resultado);
+      console.log(`✅ Apostas salvas no banco para ${data}`);
+    }
+
+    res.json(resultado);
   } catch (err) {
     console.error('Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Buscar apostas por período (ontem/hoje/amanhã) — só lê do banco
+app.get('/apostas/:periodo', async (req, res) => {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Banco não configurado.' });
+  }
+
+  const { periodo } = req.params;
+  const hoje = new Date();
+  const hojeStr = `${hoje.getUTCFullYear()}-${String(hoje.getUTCMonth()+1).padStart(2,'0')}-${String(hoje.getUTCDate()).padStart(2,'0')}`;
+
+  let dataConsulta;
+  if (periodo === 'ontem')  dataConsulta = diaOffset(hojeStr, -1);
+  else if (periodo === 'hoje') dataConsulta = hojeStr;
+  else if (periodo === 'amanha') dataConsulta = diaOffset(hojeStr, 1);
+  else return res.status(400).json({ error: 'Período inválido. Use: ontem, hoje ou amanha.' });
+
+  try {
+    const cached = await dbGet(dataConsulta);
+    if (cached) return res.json({ data: dataConsulta, ...cached });
+    return res.json({ data: dataConsulta, jogos: [], aviso: `Apostas para ${dataConsulta} ainda não foram geradas.` });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
