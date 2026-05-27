@@ -233,6 +233,19 @@ async function gerarApostas(data, horaMin, metaJogos) {
     // Só jogos não iniciados
     if (status !== 'NS') continue;
 
+    // Filtrar jogos Sub (U17, U18, U20, U21, U23, etc.)
+    const subRegex = /\bU\d{2}\b/i;
+    const ligaNomeCheck = f.league?.name || '';
+    if (subRegex.test(timeCasa) || subRegex.test(timeFora) || subRegex.test(ligaNomeCheck)) continue;
+
+    // Filtrar ligas amadoras e de base irrelevantes
+    const ligaLower = ligaNomeCheck.toLowerCase();
+    if (
+      ligaLower.includes("amateur") || ligaLower.includes("amador") ||
+      ligaLower.includes("reserve") || ligaLower.includes("reserva") ||
+      ligaLower.includes("youth") || ligaLower.includes("juvenil")
+    ) continue;
+
     // Converter timestamp para minutos do dia em Brasília (UTC-3)
     const dt = new Date(ts * 1000);
     const hBR = dt.getUTCHours() - 3;
