@@ -150,19 +150,76 @@ async function dbGetCalibracoes(tipo, limit) {
 }
 
 // ─── API-Football ─────────────────────────────────────────────
+// Rastreia erros para não fazer chamadas desnecessárias
+let apiSuspensa = false;
+let apiErrorMsg = '';
+
+async function verificarStatusAPI() {
+  try {
+    const res = await fetch('https://v3.football.api-sports.io/status', { headers: HEADERS_AF() });
+    const json = await res.json();
+    if (json.errors && Object.keys(json.errors).length > 0) {
+      const erros = JSON.stringify(json.errors);
+      console.error(`❌ API-Football status: ${erros}`);
+      apiSuspensa = true;
+      apiErrorMsg = erros;
+      return false;
+    }
+    const conta = json.response;
+    console.log(`✅ API-Football OK — Plano: ${conta?.subscription?.plan}, Requests hoje: ${conta?.requests?.current}/${conta?.requests?.limit_day}`);
+    apiSuspensa = false;
+    apiErrorMsg = '';
+    return true;
+  } catch(e) {
+    console.error('Erro ao verificar status API:', e.message);
+    return false;
+  }
+}
+
 async function buscarFixturesPorData(data) {
+  // Verificar se API está suspensa antes de chamar
+  if (apiSuspensa) {
+    console.error(`❌ API suspensa — não fazendo chamada. Motivo: ${apiErrorMsg}`);
+    return [];
+  }
+
   try {
     const url = `https://v3.football.api-sports.io/fixtures?date=${data}&timezone=America/Sao_Paulo`;
     const res = await fetch(url, { headers: HEADERS_AF() });
+
+    // Tratar erros de autenticação/suspensão
+    if (res.status === 401 || res.status === 403) {
+      apiSuspensa = true;
+      apiErrorMsg = `HTTP ${res.status} — chave inválida ou conta suspensa`;
+      console.error(`❌ ${apiErrorMsg}`);
+      return [];
+    }
+
     if (!res.ok) {
-      console.log(`API-Football erro ${res.status}`);
+      console.log(`⚠️ API-Football erro HTTP ${res.status}`);
       return [];
     }
+
     const json = await res.json();
+
+    // Verificar erros na resposta JSON
     if (json.errors && Object.keys(json.errors).length > 0) {
-      console.log('API-Football errors:', JSON.stringify(json.errors));
+      const erros = JSON.stringify(json.errors);
+      console.error(`❌ API-Football errors: ${erros}`);
+      // Se erro de autenticação/cota, marcar como suspensa
+      if (erros.includes('token') || erros.includes('subscription') || erros.includes('requests')) {
+        apiSuspensa = true;
+        apiErrorMsg = erros;
+      }
       return [];
     }
+
+    // Log de uso da API
+    const requests = json.parameters?.requests;
+    if (json.results !== undefined) {
+      console.log(`📊 API-Football: ${json.results} fixtures | Requisições: usadas hoje`);
+    }
+
     return json.response || [];
   } catch(e) {
     console.error('Erro buscarFixtures:', e.message);
@@ -496,7 +553,12 @@ async function rotinaNoturna() {
 }
 
 // ─── Endpoints ───────────────────────────────────────────────
-app.get('/health', (req, res) => res.json({ status: 'ok', api: 'API-Football v3' }));
+app.get('/health', (req, res) => res.json({ status: 'ok', api: 'API-Football v3', api_suspensa: apiSuspensa, api_erro: apiErrorMsg || null }));
+
+app.get('/api-status', async (req, res) => {
+  const ok = await verificarStatusAPI();
+  res.json({ ok, suspensa: apiSuspensa, erro: apiErrorMsg || null });
+});
 
 app.post('/analisar', async (req, res) => {
   let { data, hora, meta } = req.body;
@@ -576,5 +638,7 @@ function agendarRotina() {
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
+  // Verificar status da API no startup
+  setTimeout(() => verificarStatusAPI(), 3000);
   agendarRotina();
 });
