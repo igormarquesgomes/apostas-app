@@ -243,6 +243,12 @@ async function buscarFixturesPorData(data) {
               .map(f => `ID:${f.league?.id} — ${f.league?.name}`)
     )];
     if (ligasBR.length) console.log(`🇧🇷 Ligas Brasil:\n  ${ligasBR.join('\n  ')}`);
+    // Log detalhado jogos brasileiros NS
+    const jogosBR = fixtures.filter(f => f.league?.country === "Brazil" && f.fixture?.status?.short === "NS");
+    if (jogosBR.length) {
+      console.log("🇧🇷 Jogos BR não iniciados:");
+      jogosBR.forEach(f => console.log(`  LigaID:${f.league?.id} [${f.league?.name}] ${f.teams?.home?.name} x ${f.teams?.away?.name}`));
+    }
 
     return fixtures;
   } catch(e) {
