@@ -32,12 +32,12 @@ const LIGAS_PRIORITY = {
 
 // Nomes de liga para identificar pelo nome quando o ID falhar
 const NOMES_PRIORITY = [
-  { regex: /série a|serie a|brasileirao.*a/i,   nome:'Série A',   tipo:'a',    pri:1, pais:'Brazil' },
-  { regex: /série b|serie b|brasileirao.*b/i,   nome:'Série B',   tipo:'b',    pri:2, pais:'Brazil' },
-  { regex: /libertadores/i,                      nome:'Libertadores',     tipo:'copa', pri:7 },
-  { regex: /sul.americana|sudamericana/i,        nome:'Sul-Americana',    tipo:'copa', pri:7 },
-  { regex: /champions league/i,                  nome:'Champions League', tipo:'copa', pri:7 },
-  { regex: /europa league/i,                     nome:'Europa League',    tipo:'copa', pri:7 },
+  { regex: /série a superbet|serie a.*brazil|brasileir.*série a|brasileir.*serie a/i, nome:'Série A', tipo:'a', pri:1, pais:'Brazil' },
+  { regex: /série b superbet|serie b.*brazil|brasileir.*série b|brasileir.*serie b/i, nome:'Série B', tipo:'b', pri:2, pais:'Brazil' },
+  { regex: /libertadores/i,  nome:'Libertadores',     tipo:'copa', pri:7 },
+  { regex: /sul.americana|sudamericana/i, nome:'Sul-Americana', tipo:'copa', pri:7 },
+  { regex: /champions league/i, nome:'Champions League', tipo:'copa', pri:7 },
+  { regex: /europa league/i,    nome:'Europa League',   tipo:'copa', pri:7 },
 ];
 
 // Proteção de cota
@@ -45,8 +45,8 @@ let apiSuspensa = false;
 let apiErrorMsg = '';
 let reqHoje = 0;
 let reqDia = '';
-const LIMITE_SEGURO = 50;
-const LIMITE_ALERTA = 30;
+const LIMITE_SEGURO = 200;
+const LIMITE_ALERTA = 150;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -251,6 +251,96 @@ async function buscarFixturesPorData(data) {
   }
 }
 
+// ─── Estatísticas da API-Football ────────────────────────────
+async function buscarUltimosJogos(teamId, qtd = 10) {
+  if (!contarRequisicao()) return [];
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures?team=${teamId}&last=${qtd}&status=FT`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const json = await res.json();
+    return json.response || [];
+  } catch(e) { return []; }
+}
+
+async function buscarH2H(teamId1, teamId2) {
+  if (!contarRequisicao()) return [];
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures/headtohead?h2h=${teamId1}-${teamId2}&last=5`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const json = await res.json();
+    return json.response || [];
+  } catch(e) { return []; }
+}
+
+async function buscarEstatisticasTime(teamId, ligaId, season = 2026) {
+  if (!contarRequisicao()) return null;
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/teams/statistics?team=${teamId}&league=${ligaId}&season=${season}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const json = await res.json();
+    return json.response || null;
+  } catch(e) { return null; }
+}
+
+function formatarForma(jogos, teamId) {
+  return jogos.slice(0, 5).map(f => {
+    const gh = f.goals?.home, ga = f.goals?.away;
+    const home = f.teams?.home?.id === teamId;
+    const gF = home ? gh : ga, gC = home ? ga : gh;
+    if (gF > gC) return 'V';
+    if (gF < gC) return 'D';
+    return 'E';
+  }).join(' ');
+}
+
+function calcularMediaGols(jogos, teamId) {
+  if (!jogos.length) return '-';
+  const total = jogos.reduce((s, f) => {
+    const home = f.teams?.home?.id === teamId;
+    return s + (home ? (f.goals?.home || 0) : (f.goals?.away || 0));
+  }, 0);
+  return (total / jogos.length).toFixed(1);
+}
+
+async function coletarEstatisticas(teamId, teamNome, ligaId, oponenteId) {
+  const [ultimosJogos, h2h] = await Promise.all([
+    buscarUltimosJogos(teamId, 10),
+    buscarH2H(teamId, oponenteId)
+  ]);
+  await sleep(200);
+
+  const forma = formatarForma(ultimosJogos, teamId);
+  const mediaGols = calcularMediaGols(ultimosJogos, teamId);
+
+  // Calcular média de escanteios e cartões dos últimos jogos
+  let totalEscanteios = 0, totalCartoes = 0, countStats = 0;
+  for (const f of ultimosJogos) {
+    if (f.statistics) {
+      const statsTime = f.statistics.find(s => s.team?.id === teamId);
+      if (statsTime) {
+        const esc = statsTime.statistics?.find(s => s.type === 'Corner Kicks')?.value;
+        const cart = statsTime.statistics?.find(s => s.type === 'Yellow Cards')?.value;
+        if (esc) { totalEscanteios += parseInt(esc) || 0; countStats++; }
+        if (cart) totalCartoes += parseInt(cart) || 0;
+      }
+    }
+  }
+
+  return {
+    forma,
+    mediaGols,
+    mediaEscanteios: countStats > 0 ? (totalEscanteios / countStats).toFixed(1) : '-',
+    mediaCartoes: countStats > 0 ? (totalCartoes / countStats).toFixed(1) : '-',
+    h2hTexto: h2h.slice(0,3).map(f => `${f.teams?.home?.name} ${f.goals?.home}-${f.goals?.away} ${f.teams?.away?.name}`).join(' | ') || 'Sem H2H'
+  };
+}
+
 // ─── IA ──────────────────────────────────────────────────────
 async function chamarIA(prompt, maxTokens = 8000) {
   const modelos = ['claude-haiku-4-5','claude-sonnet-4-5','claude-3-5-haiku-20241022','claude-3-5-sonnet-20241022'];
@@ -267,6 +357,34 @@ async function chamarIA(prompt, maxTokens = 8000) {
     } catch(e) { console.log(`❌ ${modelo}: ${e.message}`); }
   }
   return null;
+}
+
+// ─── IA com busca web (para estatísticas reais) ─────────────
+async function chamarIAComBusca(prompt, maxTokens = 16000) {
+  const modelos = ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-3-5-sonnet-20241022'];
+  for (const modelo of modelos) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: modelo,
+          max_tokens: maxTokens,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const json = await res.json();
+      if (!json.error) {
+        console.log(`✅ Modelo com busca: ${modelo}`);
+        const txt = (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+        return txt;
+      }
+      console.log(`❌ ${modelo}: ${json.error.message}`);
+    } catch(e) { console.log(`❌ ${modelo} busca: ${e.message}`); }
+  }
+  // Fallback sem busca
+  return chamarIA(prompt, maxTokens);
 }
 
 // ─── Memória de calibração ────────────────────────────────────
@@ -369,27 +487,68 @@ async function gerarApostas(data, horaMin, metaJogos) {
 
   if (!jogos.length) return null;
 
+  // Coletar estatísticas reais da API para cada jogo
+  console.log('\n📊 Coletando estatísticas reais da API-Football...');
+  const statsCache = {};
+  const jogosComStats = [];
+
+  for (const f of fixtures) {
+    const tCasaId = f.teams?.home?.id;
+    const tForaId = f.teams?.away?.id;
+    const tCasaNome = f.teams?.home?.name;
+    const tForaNome = f.teams?.away?.name;
+    const jogo = jogos.find(j => j.timeCasa === tCasaNome && j.timeFora === tForaNome);
+    if (!jogo || jogo._stats) continue;
+
+    const ligaId = f.league?.id;
+    const [statsCasa, statsFora] = await Promise.all([
+      coletarEstatisticas(tCasaId, tCasaNome, ligaId, tForaId),
+      coletarEstatisticas(tForaId, tForaNome, ligaId, tCasaId)
+    ]);
+    await sleep(300);
+
+    jogo._stats = { tCasaId, tForaId, statsCasa, statsFora };
+    console.log(`  ✅ Stats: ${tCasaNome} vs ${tForaNome}`);
+  }
+
   const ano = parseInt(data.substring(0,4));
   const mes = parseInt(data.substring(5,7));
   const dia = parseInt(data.substring(8,10));
   const df = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano}`;
-  const listaJogos = jogos.map((j,i) => `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`).join('\n');
+
+  // Montar lista de jogos com estatísticas para o prompt
+  const listaJogos = jogos.map((j, i) => {
+    const s = j._stats;
+    const sc = s?.statsCasa, sf = s?.statsFora;
+    return `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}
+   Casa: forma=${sc?.forma||'?'} gols/jogo=${sc?.mediaGols||'?'} esc=${sc?.mediaEscanteios||'?'} cart=${sc?.mediaCartoes||'?'}
+   Fora: forma=${sf?.forma||'?'} gols/jogo=${sf?.mediaGols||'?'} esc=${sf?.mediaEscanteios||'?'} cart=${sf?.mediaCartoes||'?'}
+   H2H: ${sc?.h2hTexto||'sem dados'}`;
+  }).join('\n');
+
   const memoria = await buscarMemoria();
   const blocoMem = memoria ? `\nHISTÓRICO:\n${memoria}\n` : '';
 
-  const prompt = `Você é um analista de apostas esportivas em constante aprendizado. Analise os jogos confirmados para ${df} e gere 1 aposta por jogo para a Estrela Bet.
+  const prompt = `Você é um analista de apostas esportivas especializado. Analise os jogos abaixo com as estatísticas reais já coletadas da API-Football e gere 1 aposta por jogo para a Estrela Bet.
+
+DATA: ${df}
 ${blocoMem}
-JOGOS:
+JOGOS COM ESTATÍSTICAS REAIS (últimos 5 jogos de cada time):
 ${listaJogos}
 
-REGRAS: Série A e Série B OBRIGATÓRIOS. Analise últimos 10 jogos + H2H. Use histórico para evitar padrões que erram. 1 aposta por jogo.
+INSTRUÇÕES:
+- Série A e Série B têm análise OBRIGATÓRIA
+- Use os dados fornecidos (forma, gols/jogo, escanteios, cartões, H2H) para fundamentar cada aposta
+- Pode usar web_search para confirmar ou complementar informações específicas (lesões, escalações, clima)
+- Use o histórico de calibração para evitar padrões que historicamente erram
+- Preencha TODOS os campos com valores numéricos reais — nunca use "-"
 
-JSON:
-{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"3-4 linhas."}]}
+Retorne SOMENTE JSON válido:
+{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"Casa marca 1.8 gols/jogo, fora sofre 1.2. H2H último ano: 3 jogos com Over 2.5. Forma recente favorece ataque."}]}
 
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
 
-  const txt = await chamarIA(prompt);
+  const txt = await chamarIAComBusca(prompt);
   if (!txt) return null;
   const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
   if (s === -1 || e === -1) return null;
