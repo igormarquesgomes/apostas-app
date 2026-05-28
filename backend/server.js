@@ -17,18 +17,21 @@ const HEADERS_AF = () => ({
 
 // IDs de liga na API-Football (api-sports.io)
 const LIGAS_PRIORITY = {
-  71:  { nome:'Série A',          tipo:'a',    pri:1 },
-  72:  { nome:'Série B',          tipo:'b',    pri:2 },
-  135: { nome:'Serie A 🇮🇹',      tipo:'it',   pri:3 },
-  140: { nome:'La Liga 🇪🇸',       tipo:'es',   pri:4 },
-  39:  { nome:'Premier League',   tipo:'eu',   pri:5 },
-  78:  { nome:'Bundesliga',       tipo:'eu',   pri:6 },
-  61:  { nome:'Ligue 1',          tipo:'eu',   pri:6 },
-  94:  { nome:'Liga Portugal',    tipo:'eu',   pri:6 },
-  13:  { nome:'Libertadores',     tipo:'copa', pri:7 },
-  11:  { nome:'Sul-Americana',    tipo:'copa', pri:7 },
-  3:   { nome:'Europa League',    tipo:'copa', pri:7 },
-  2:   { nome:'Champions League', tipo:'copa', pri:7 },
+  71:   { nome:"Série A",          tipo:"a",    pri:1 },
+  72:   { nome:"Série B",          tipo:"b",    pri:2 },
+  73:   { nome:"Série B",          tipo:"b",    pri:2 },
+  75:   { nome:"Série A",          tipo:"a",    pri:1 },
+  76:   { nome:"Série B",          tipo:"b",    pri:2 },
+  135:  { nome:"Serie A IT",       tipo:"it",   pri:3 },
+  140:  { nome:"La Liga",          tipo:"es",   pri:4 },
+  39:   { nome:"Premier League",   tipo:"eu",   pri:5 },
+  78:   { nome:"Bundesliga",       tipo:"eu",   pri:6 },
+  61:   { nome:"Ligue 1",          tipo:"eu",   pri:6 },
+  94:   { nome:"Liga Portugal",    tipo:"eu",   pri:6 },
+  13:   { nome:"Libertadores",     tipo:"copa", pri:7 },
+  11:   { nome:"Sul-Americana",    tipo:"copa", pri:7 },
+  3:    { nome:"Europa League",    tipo:"copa", pri:7 },
+  2:    { nome:"Champions League", tipo:"copa", pri:7 },
 };
 
 // Ligas complementares
@@ -292,6 +295,10 @@ async function gerarApostas(data, horaMin, metaJogos) {
   console.log(`Buscando fixtures para ${data} na API-Football...`);
   const fixtures = await buscarFixturesPorData(data);
   console.log(`Total de fixtures recebidos: ${fixtures.length}`);
+  // Log temporário: mostrar ligas brasileiras disponíveis
+  const ligasBR = [...new Set(fixtures.filter(f => f.league?.country === "Brazil").map(f => `ID:${f.league?.id} — ${f.league?.name}`))];
+  if (ligasBR.length) console.log(`🇧🇷 Ligas Brasil encontradas:\n  ${ligasBR.join("\n  ")}`);
+
 
   // Filtrar por horário e status (apenas jogos não iniciados)
   const agora = Math.floor(Date.now() / 1000);
@@ -348,10 +355,21 @@ async function gerarApostas(data, horaMin, metaJogos) {
   }
 
   // Combinar prioritários + complementares até meta
+  // Limitar complementares a máximo 4 apenas no horário 13:00
   let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
 
   if (jogos.length < metaJogos) {
-    const comp = Array.from(jogosComp.values()).slice(0, metaJogos - jogos.length);
+    let cont13h = 0;
+    const compFiltrado = [];
+    for (const j of Array.from(jogosComp.values())) {
+      if (j.horario === "13:00") {
+        cont13h++;
+        if (cont13h <= 4) compFiltrado.push(j);
+      } else {
+        compFiltrado.push(j);
+      }
+    }
+    const comp = compFiltrado.slice(0, metaJogos - jogos.length);
     jogos = [...jogos, ...comp];
   }
 
