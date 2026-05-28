@@ -30,6 +30,16 @@ const LIGAS_PRIORITY = {
   2:   { nome:'Champions League', tipo:'copa', pri:7 },
 };
 
+// Nomes de liga para identificar pelo nome quando o ID falhar
+const NOMES_PRIORITY = [
+  { regex: /série a|serie a|brasileirao.*a/i,   nome:'Série A',   tipo:'a',    pri:1, pais:'Brazil' },
+  { regex: /série b|serie b|brasileirao.*b/i,   nome:'Série B',   tipo:'b',    pri:2, pais:'Brazil' },
+  { regex: /libertadores/i,                      nome:'Libertadores',     tipo:'copa', pri:7 },
+  { regex: /sul.americana|sudamericana/i,        nome:'Sul-Americana',    tipo:'copa', pri:7 },
+  { regex: /champions league/i,                  nome:'Champions League', tipo:'copa', pri:7 },
+  { regex: /europa league/i,                     nome:'Europa League',    tipo:'copa', pri:7 },
+];
+
 // Proteção de cota
 let apiSuspensa = false;
 let apiErrorMsg = '';
@@ -312,23 +322,37 @@ async function gerarApostas(data, horaMin, metaJogos) {
     const key = `${timeCasa}-${timeFora}`;
     const pais = f.league?.country || '';
 
-    if (LIGAS_PRIORITY[ligaId]) {
-      const liga = LIGAS_PRIORITY[ligaId];
+    // Identificar liga por ID ou por nome (fallback)
+    let ligaMatch = LIGAS_PRIORITY[ligaId];
+    if (!ligaMatch) {
+      const nomeMatch = NOMES_PRIORITY.find(n => n.regex.test(ligaNome) && (!n.pais || n.pais === pais));
+      if (nomeMatch) ligaMatch = nomeMatch;
+    }
+
+    if (ligaMatch) {
       if (!jogosMap.has(key))
-        jogosMap.set(key, { liga: liga.nome, tipo: liga.tipo, pri: liga.pri, timeCasa, timeFora, horario: hStr });
+        jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: ligaMatch.pri, timeCasa, timeFora, horario: hStr });
     } else {
+      const paisLower = pais.toLowerCase();
+      let priComp = 20;
+      if (["brazil","argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"].includes(paisLower)) priComp = 9;
+      else if (["egypt","morocco","algeria","saudi-arabia","uae","qatar","kuwait"].includes(paisLower)) priComp = 10;
+      else if (["turkey","netherlands","belgium","scotland","greece","russia","ukraine"].includes(paisLower)) priComp = 11;
+      else if (["austria","czech-republic","poland","norway","finland","sweden","denmark"].includes(paisLower)) priComp = 18;
       if (!jogosComp.has(key))
-        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: 'eu', pri: 8, timeCasa, timeFora, horario: hStr });
+        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: 'eu', pri: priComp, timeCasa, timeFora, horario: hStr });
     }
   }
 
-  // Combinar prioritários + complementares com limite de 4 apenas às 13:00
+  // Combinar prioritários + complementares ordenados por prioridade
+  // Limite de 4 apenas às 13:00
   let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
 
   if (jogos.length < metaJogos) {
+    const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
     let cont13h = 0;
     const compFiltrado = [];
-    for (const j of Array.from(jogosComp.values())) {
+    for (const j of compOrdenado) {
       if (j.horario === '13:00') {
         cont13h++;
         if (cont13h <= 4) compFiltrado.push(j);
