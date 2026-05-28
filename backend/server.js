@@ -150,9 +150,28 @@ async function dbGetCalibracoes(tipo, limit) {
 }
 
 // ─── API-Football ─────────────────────────────────────────────
-// Rastreia erros para não fazer chamadas desnecessárias
+// Proteções para não suspender a conta
 let apiSuspensa = false;
 let apiErrorMsg = '';
+let reqHoje = 0;
+let reqDia = '';
+const LIMITE_SEGURO = 50;
+const LIMITE_ALERTA = 30;
+
+function contarRequisicao() {
+  const hoje = hojeStr();
+  if (reqDia !== hoje) { reqDia = hoje; reqHoje = 0; }
+  reqHoje++;
+  console.log(`📊 Req API hoje: ${reqHoje}/${LIMITE_SEGURO}`);
+  if (reqHoje >= LIMITE_ALERTA) console.warn(`⚠️ ATENÇÃO: ${reqHoje} req hoje — limite: ${LIMITE_SEGURO}`);
+  if (reqHoje >= LIMITE_SEGURO) {
+    apiSuspensa = true;
+    apiErrorMsg = `Limite de ${LIMITE_SEGURO} req/dia atingido. Reset amanhã.`;
+    console.error(`🛑 LIMITE ATINGIDO — bloqueando chamadas`);
+    return false;
+  }
+  return true;
+}
 
 async function verificarStatusAPI() {
   try {
@@ -177,11 +196,12 @@ async function verificarStatusAPI() {
 }
 
 async function buscarFixturesPorData(data) {
-  // Verificar se API está suspensa antes de chamar
   if (apiSuspensa) {
-    console.error(`❌ API suspensa — não fazendo chamada. Motivo: ${apiErrorMsg}`);
+    console.error(`❌ API bloqueada: ${apiErrorMsg}`);
     return [];
   }
+  if (!contarRequisicao()) return [];
+
 
   try {
     const url = `https://v3.football.api-sports.io/fixtures?date=${data}&timezone=America/Sao_Paulo`;
@@ -550,12 +570,29 @@ async function rotinaNoturna() {
   if (mensais.length >= 6) await agentSemestral();
 
   console.log('✅ Rotina noturna concluída');
+  // Reset do bloqueio de API a cada meia-noite
+  if (apiSuspensa && apiErrorMsg.includes("Limite")) {
+    apiSuspensa = false;
+    apiErrorMsg = "";
+    reqHoje = 0;
+    console.log("✅ Bloqueio de API resetado para novo dia");
+  }
 }
 
 // ─── Endpoints ───────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', api: 'API-Football v3', api_suspensa: apiSuspensa, api_erro: apiErrorMsg || null }));
 
-app.get('/api-status', async (req, res) => {
+app.get("/api-status", async (req, res) => {
+  const ok = await verificarStatusAPI();
+  res.json({
+    ok,
+    suspensa: apiSuspensa,
+    erro: apiErrorMsg || null,
+    requisicoes_hoje: reqHoje,
+    limite_seguro: LIMITE_SEGURO,
+    percentual_uso: ((reqHoje / LIMITE_SEGURO) * 100).toFixed(1) + "%"
+  });
+});
   const ok = await verificarStatusAPI();
   res.json({ ok, suspensa: apiSuspensa, erro: apiErrorMsg || null });
 });
