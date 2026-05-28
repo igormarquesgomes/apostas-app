@@ -435,12 +435,18 @@ async function gerarApostas(data, horaMin, metaJogos) {
     const ligaLower = ligaNome.toLowerCase();
     if (ligaLower.includes('amateur') || ligaLower.includes('reserve') || ligaLower.includes('youth')) continue;
 
-    // Horário Brasília
+    // Horário Brasília (UTC-3)
+    // Jogos entre 00:00-02:59 UTC pertencem ao dia anterior em Brasília
+    // Usamos o timestamp da fixture para calcular horário correto
     const dt = new Date(ts * 1000);
-    const hBR = dt.getUTCHours() - 3;
+    let hBR = dt.getUTCHours() - 3;
     const mBR = dt.getUTCMinutes();
+    // Corrigir horário negativo (jogos após meia-noite UTC = noite em Brasília)
+    if (hBR < 0) hBR += 24;
     const totalMin = hBR * 60 + mBR;
     if (totalMin < minMinutos) continue;
+    // Ignorar jogos madrugada (após 01:00 Brasília = após 04:00 UTC) — são do dia seguinte
+    if (hBR >= 1 && hBR < 10) continue;
 
     const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
     const key = `${timeCasa}-${timeFora}`;
