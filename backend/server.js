@@ -749,6 +749,17 @@ app.get('/calibracao', async (req, res) => {
   res.json({ semestral, mensal, semanal, diario });
 });
 
+// Endpoint para o dashboard buscar apostas + resultados por data
+app.get('/apostas-resultado/:data', async (req, res) => {
+  const data = normalizarData(req.params.data);
+  if (!data) return res.status(400).json({ error: 'Data inválida.' });
+  try {
+    const row = await dbGet(data);
+    if (!row || !row.apostas) return res.json({ data, apostas: null, resultados: null });
+    return res.json({ data, apostas: row.apostas, resultados: row.resultados || null });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 function agendarRotina() {
   const agora = new Date();
   const prox = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()+1, 0, 5, 0));
