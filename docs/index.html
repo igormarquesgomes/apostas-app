@@ -139,6 +139,8 @@
     <div class="nav-links">
       <a class="nav-link active" href="index.html">Apostas</a>
       <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <a class="nav-link" href="relatorios.html">Relatórios</a>
+      <a class="nav-link" href="ligas.html">Ligas &amp; Times</a>
     </div>
     <span class="nav-badge">Estrela Bet</span>
   </nav>
@@ -188,6 +190,23 @@
 <script>
 const BACKEND_URL = window.BACKEND_URL || 'https://apostas-app.onrender.com';
 document.getElementById('backend-url').textContent = BACKEND_URL;
+
+// Limitar calendário: mín = primeira data no banco, máx = amanhã
+async function limitarCalendario() {
+  try {
+    const res = await fetch(BACKEND_URL + '/datas-disponiveis');
+    const json = await res.json();
+    const datas = json.datas || [];
+    const input = document.getElementById('d-input');
+    const h = hoje();
+    const amanha = offsetData(h, 1);
+    if (datas.length > 0) {
+      input.min = datas[0]; // primeira data disponível
+    }
+    input.max = amanha; // máximo = amanhã
+  } catch(e) {}
+}
+limitarCalendario();
 
 function hoje() {
   const d = new Date();
