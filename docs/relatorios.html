@@ -2,130 +2,121 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Relatórios · Análise de Apostas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Relatórios · Estrela Bet</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#080a0f;--s1:#0e1118;--s2:#141720;--s3:#1c2030;--border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--text:#e8eaf2;--text2:#7a7f9a;--text3:#3a3f58;--green:#00e676;--red:#ff1744;--amber:#ffab00;--blue:#448aff;--purple:#e040fb;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--display:'Bebas Neue',sans-serif;}
+:root{--bg:#080a0f;--s1:#0e1118;--s2:#141720;--border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--text:#e8eaf2;--text2:#7a7f9a;--text3:#3a3f58;--green:#00e676;--red:#ff1744;--amber:#ffab00;--purple:#e040fb;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--display:'Bebas Neue',sans-serif;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;}
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
-.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding-bottom:70px;}
+.nav-top{display:flex;align-items:center;justify-content:space-between;padding:0 1rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
 .nav-logo-icon{width:28px;height:28px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;}
 .nav-logo-icon svg{width:13px;height:13px;color:#000;}
 .nav-logo-name{font-size:14px;font-weight:600;color:var(--text);}
 .nav-logo-name span{color:var(--green);}
-.nav-tabs{display:flex;gap:4px;}
-.nav-tab{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:6px 14px;border-radius:6px;border:1px solid transparent;color:var(--text2);cursor:pointer;text-decoration:none;transition:all .15s;}
-.nav-tab:hover{color:var(--text);background:var(--s2);}
-.nav-tab.active{color:var(--green);border-color:rgba(0,230,118,0.2);background:rgba(0,230,118,0.06);}
-.nav-badge{font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:20px;background:rgba(0,230,118,0.08);color:var(--green);border:1px solid rgba(0,230,118,0.2);}
-.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem 4rem;}
-.page-title{font-family:var(--display);font-size:36px;letter-spacing:1px;margin-bottom:4px;}
-.page-sub{font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:2rem;}
+.nav-badge{font-size:10px;font-family:var(--mono);background:rgba(0,230,118,.08);color:var(--green);border:1px solid rgba(0,230,118,.2);padding:4px 10px;border-radius:20px;}
+.nav-bottom{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--s1);border-top:1px solid var(--border);display:flex;}
+.nav-bottom a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;text-decoration:none;color:var(--text3);font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;gap:4px;transition:color .15s;border-top:2px solid transparent;}
+.nav-bottom a svg{width:18px;height:18px;}
+.nav-bottom a.active{color:var(--green);border-top-color:var(--green);}
+.page{padding:1rem;}
+.page-title{font-family:var(--display);font-size:32px;letter-spacing:1px;margin-bottom:2px;}
+.page-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:1.5rem;}
 
-/* Grupos de relatórios */
-.grupo{margin-bottom:2rem;}
-.grupo-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.grupo{margin-bottom:1.5rem;}
+.grupo-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
 .grupo-title::after{content:'';flex:1;height:1px;background:var(--border);}
 
 .rel-item{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;}
-.rel-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;transition:background .12s;}
+.rel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;transition:background .12s;}
 .rel-header:hover{background:var(--s2);}
-.rel-info{display:flex;align-items:center;gap:12px;}
-.rel-icon{font-size:20px;}
+.rel-info{display:flex;align-items:center;gap:10px;}
+.rel-icon{font-size:18px;}
 .rel-title{font-size:13px;font-weight:600;}
-.rel-periodo{font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:2px;}
-.rel-right{display:flex;align-items:center;gap:10px;}
+.rel-periodo{font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:1px;}
 .rel-assert{font-family:var(--display);font-size:22px;}
-.rel-chev{color:var(--text3);font-size:11px;transition:transform .2s;}
+.rel-chev{color:var(--text3);font-size:10px;transition:transform .2s;margin-left:8px;}
 .rel-chev.open{transform:rotate(180deg);}
-.rel-body{display:none;padding:18px;border-top:1px solid var(--border);font-size:13px;color:var(--text2);line-height:1.85;white-space:pre-wrap;background:#0a0c12;}
+.rel-body{display:none;padding:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.8;white-space:pre-wrap;background:#0a0c12;}
 .rel-body.open{display:block;}
 
-.empty{text-align:center;padding:4rem 2rem;color:var(--text3);font-family:var(--mono);font-size:12px;}
-.loading{text-align:center;padding:4rem 2rem;}
-.spin{width:26px;height:26px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px;}
+.empty{text-align:center;padding:3rem;color:var(--text3);font-family:var(--mono);font-size:11px;}
+.loading{text-align:center;padding:3rem;}
+.spin{width:24px;height:24px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
-<nav>
+<div class="nav-top">
   <a class="nav-logo" href="index.html">
     <div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
     <span class="nav-logo-name">Análise de <span>Apostas</span></span>
   </a>
-  <div class="nav-tabs">
-    <a class="nav-tab" href="index.html">Apostas</a>
-    <a class="nav-tab" href="dashboard.html">Dashboard</a>
-    <a class="nav-tab active" href="relatorios.html">Relatórios</a>
-    <a class="nav-tab" href="ligas.html">Ligas & Times</a>
-  </div>
   <span class="nav-badge">Estrela Bet</span>
-</nav>
+</div>
 
 <div class="page">
   <div class="page-title">Relatórios</div>
-  <div class="page-sub">Memória de calibração da IA · Atualiza automaticamente após cada ciclo</div>
+  <div class="page-sub">Memória de calibração da IA · Atualiza após cada ciclo</div>
   <div id="conteudo"><div class="loading"><div class="spin"></div></div></div>
 </div>
 
+<nav class="nav-bottom">
+  <a href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Apostas</a>
+  <a href="dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>Dashboard</a>
+  <a href="relatorios.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Relatórios</a>
+  <a href="ligas.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>Ligas</a>
+</nav>
+
 <script>
 const B='https://apostas-app.onrender.com';
-
 function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
 function fmtD(iso){if(!iso)return '-';const[a,m,d]=iso.split('-');return `${d}/${m}/${a}`;}
 
-async function carregarRelatorios(){
-  try{
-    const r=await fetch(`${B}/calibracao-todos`);
-    return await r.json();
-  }catch(e){return{diarios:[],semanais:[],mensais:[],semestrais:[]};}
+function tog(id){
+  document.getElementById('b'+id).classList.toggle('open');
+  document.getElementById('c'+id).classList.toggle('open');
 }
 
 function renderGrupo(titulo,icone,items,tipo){
-  if(!items||!items.length) return '';
-  return `
-    <div class="grupo">
-      <div class="grupo-title">${icone} ${titulo} (${items.length})</div>
-      ${items.map((r,i)=>{
-        const pct=r.assertividade;
-        const id=`${tipo}-${i}`;
-        return `
-          <div class="rel-item">
-            <div class="rel-header" onclick="tog('${id}')">
-              <div class="rel-info">
-                <span class="rel-icon">${icone}</span>
-                <div>
-                  <div class="rel-title">${titulo} · ${fmtD(r.periodo_inicio)}${r.periodo_fim!==r.periodo_inicio?' → '+fmtD(r.periodo_fim):''}</div>
-                  <div class="rel-periodo">${r.periodo_inicio} ${r.periodo_fim!==r.periodo_inicio?'→ '+r.periodo_fim:''}</div>
-                </div>
-              </div>
-              <div class="rel-right">
-                ${pct!==null?`<span class="rel-assert" style="color:${corP(pct)}">${pct}%</span>`:''}
-                <span class="rel-chev" id="chev-${id}">▾</span>
-              </div>
+  if(!items?.length) return '';
+  return `<div class="grupo">
+    <div class="grupo-title">${icone} ${titulo} <span style="color:var(--text2)">(${items.length})</span></div>
+    ${items.map((r,i)=>{
+      const id=tipo+i, pct=r.assertividade;
+      return `<div class="rel-item">
+        <div class="rel-header" onclick="tog('${id}')">
+          <div class="rel-info">
+            <span class="rel-icon">${icone}</span>
+            <div>
+              <div class="rel-title">${titulo} · ${fmtD(r.periodo_inicio)}${r.periodo_fim!==r.periodo_inicio?' → '+fmtD(r.periodo_fim):''}</div>
+              <div class="rel-periodo">${r.periodo_inicio}${r.periodo_fim!==r.periodo_inicio?' → '+r.periodo_fim:''}</div>
             </div>
-            <div class="rel-body" id="body-${id}">${r.relatorio||'Sem conteúdo.'}</div>
-          </div>`;
-      }).join('')}
-    </div>`;
-}
-
-function tog(id){
-  const b=document.getElementById('body-'+id),c=document.getElementById('chev-'+id);
-  b.classList.toggle('open');c.classList.toggle('open');
+          </div>
+          <div style="display:flex;align-items:center">
+            ${pct!=null?`<span class="rel-assert" style="color:${corP(pct)}">${pct}%</span>`:''}
+            <span class="rel-chev" id="c${id}">▾</span>
+          </div>
+        </div>
+        <div class="rel-body" id="b${id}">${r.relatorio||'Sem conteúdo.'}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 async function init(){
-  const data=await carregarRelatorios();
-  const html=[
-    renderGrupo('Semestral','🗓️',data.semestrais,'sem'),
-    renderGrupo('Mensal','📆',data.mensais,'men'),
-    renderGrupo('Semanal','📅',data.semanais,'sem2'),
-    renderGrupo('Diário','📊',data.diarios,'dia'),
-  ].join('');
-  document.getElementById('conteudo').innerHTML=html||'<div class="empty">Nenhum relatório disponível ainda.<br>A IA aprende após a primeira rotina noturna.</div>';
+  try{
+    const r=await fetch(`${B}/calibracao-todos`);
+    const d=await r.json();
+    const html=[
+      renderGrupo('Semestral','🗓️',d.semestrais,'s'),
+      renderGrupo('Mensal','📆',d.mensais,'m'),
+      renderGrupo('Semanal','📅',d.semanais,'w'),
+      renderGrupo('Diário','📊',d.diarios,'d'),
+    ].join('');
+    document.getElementById('conteudo').innerHTML=html||'<div class="empty">Nenhum relatório disponível ainda.<br>A IA aprende após a primeira rotina noturna.</div>';
+  }catch(e){document.getElementById('conteudo').innerHTML='<div class="empty">Erro ao carregar relatórios.</div>';}
 }
 init();
 </script>
