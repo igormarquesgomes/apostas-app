@@ -48,8 +48,8 @@ let apiSuspensa = false;
 let apiErrorMsg = '';
 let reqHoje = 0;
 let reqDia = '';
-const LIMITE_SEGURO = 200;
-const LIMITE_ALERTA = 150;
+const LIMITE_SEGURO = 1000;
+const LIMITE_ALERTA = 800;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
