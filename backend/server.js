@@ -13,32 +13,35 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 // IDs de liga na API-Football
 const LIGAS_PRIORITY = {
+  // Brasil
   71:  { nome:'Série A',          tipo:'a',    pri:1 },
   72:  { nome:'Série B',          tipo:'b',    pri:2 },
-  73:  { nome:'Série B',          tipo:'b',    pri:2 },
-  75:  { nome:'Série A',          tipo:'a',    pri:1 },
-  76:  { nome:'Série B',          tipo:'b',    pri:2 },
-  135: { nome:'Serie A IT',       tipo:'it',   pri:3 },
-  140: { nome:'La Liga',          tipo:'es',   pri:4 },
+  // Europeias
+  135: { nome:'Serie A 🇮🇹',      tipo:'it',   pri:3 },
+  140: { nome:'La Liga 🇪🇸',       tipo:'es',   pri:4 },
   39:  { nome:'Premier League',   tipo:'eu',   pri:5 },
   78:  { nome:'Bundesliga',       tipo:'eu',   pri:6 },
   61:  { nome:'Ligue 1',          tipo:'eu',   pri:6 },
   94:  { nome:'Liga Portugal',    tipo:'eu',   pri:6 },
+  // Copas internacionais
   13:  { nome:'Libertadores',     tipo:'copa', pri:7 },
   11:  { nome:'Sul-Americana',    tipo:'copa', pri:7 },
   3:   { nome:'Europa League',    tipo:'copa', pri:7 },
   2:   { nome:'Champions League', tipo:'copa', pri:7 },
 };
 
-// Nomes de liga para identificar pelo nome quando o ID falhar
-const NOMES_PRIORITY = [
-  { regex: /série a superbet|serie a.*brazil|brasileir.*série a|brasileir.*serie a/i, nome:'Série A', tipo:'a', pri:1, pais:'Brazil' },
-  { regex: /série b superbet|serie b.*brazil|brasileir.*série b|brasileir.*serie b/i, nome:'Série B', tipo:'b', pri:2, pais:'Brazil' },
-  { regex: /libertadores/i,  nome:'Libertadores',     tipo:'copa', pri:7 },
-  { regex: /sul.americana|sudamericana/i, nome:'Sul-Americana', tipo:'copa', pri:7 },
-  { regex: /champions league/i, nome:'Champions League', tipo:'copa', pri:7 },
-  { regex: /europa league/i,    nome:'Europa League',   tipo:'copa', pri:7 },
-];
+// IDs a ignorar explicitamente (ligas brasileiras que NÃO são prioritárias)
+const LIGAS_IGNORAR = new Set([
+  75, 76,      // Série C e Série D
+  1098,        // Paulista Série B
+  851,         // Carioca A2
+  936, 614, 619, 620, 613, // Estaduais div 2
+  1073, 1076, 1086, 1100, 1107, 1128, 1069, 1071, // Sub-20 e U17
+  1148, 1158, 1096, 1097,  // Copas regionais
+]);
+
+// Sem NOMES_PRIORITY — usamos apenas IDs para máxima precisão
+const NOMES_PRIORITY = [];
 
 // Proteção de cota
 let apiSuspensa = false;
@@ -452,17 +455,17 @@ async function gerarApostas(data, horaMin, metaJogos) {
     const key = `${timeCasa}-${timeFora}`;
     const pais = f.league?.country || '';
 
-    // Identificar liga por ID ou por nome (fallback)
-    let ligaMatch = LIGAS_PRIORITY[ligaId];
-    if (!ligaMatch) {
-      const nomeMatch = NOMES_PRIORITY.find(n => n.regex.test(ligaNome) && (!n.pais || n.pais === pais));
-      if (nomeMatch) ligaMatch = nomeMatch;
-    }
+    // Ignorar ligas explicitamente marcadas
+    if (LIGAS_IGNORAR.has(ligaId)) continue;
+
+    // Identificar liga por ID
+    const ligaMatch = LIGAS_PRIORITY[ligaId];
 
     if (ligaMatch) {
       if (!jogosMap.has(key))
         jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: ligaMatch.pri, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
+      // Complementares — ordenar por região
       const paisLower = pais.toLowerCase();
       let priComp = 20;
       if (["brazil","argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"].includes(paisLower)) priComp = 9;
