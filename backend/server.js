@@ -987,6 +987,32 @@ app.get('/calibracao', async (req, res) => {
   res.json({ semestral, mensal, semanal, diario });
 });
 
+// Endpoint para buscar TODOS os relatórios de calibração (para aba Relatórios)
+app.get('/calibracao-todos', async (req, res) => {
+  try {
+    const [semestrais, mensais, semanais, diarios] = await Promise.all([
+      dbGetCalibracoes('semestral', 10),
+      dbGetCalibracoes('mensal', 12),
+      dbGetCalibracoes('semanal', 8),
+      dbGetCalibracoes('diario', 30)
+    ]);
+    res.json({ semestrais, mensais, semanais, diarios });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Endpoint para buscar datas disponíveis no banco (para limitar calendário)
+app.get('/datas-disponiveis', async (req, res) => {
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data&order=data.asc`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await response.json();
+    const datas = (rows || []).map(r => r.data);
+    res.json({ datas });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 // Endpoint para o dashboard buscar apostas + resultados por data
 app.get('/apostas-resultado/:data', async (req, res) => {
   const data = normalizarData(req.params.data);
