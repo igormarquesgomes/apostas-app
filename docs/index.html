@@ -2,352 +2,342 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Análise de Apostas · Estrela Bet</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Apostas · Estrela Bet</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0d0f12;
-    --surface: #161820;
-    --surface2: #1e2028;
-    --border: rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.13);
-    --text: #e8eaf0;
-    --text2: #8b8fa8;
-    --text3: #454760;
-    --accent: #6ee7b7;
-    --accent2: #34d399;
-    --purple: #a78bfa;
-    --amber: #fbbf24;
-    --red: #f87171;
-    --blue: #60a5fa;
-    --mono: 'DM Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
-  .app { max-width: 1120px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
+:root{
+  --bg:#0d0f12;--s1:#161820;--s2:#1e2028;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8eaf0;--text2:#8b8fa8;--text3:#454760;
+  --green:#6ee7b7;--green2:#34d399;--purple:#a78bfa;
+  --amber:#fbbf24;--red:#f87171;--blue:#60a5fa;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding-bottom:70px;}
 
-  /* ── NAVBAR ── */
-  nav {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 1.5rem; height: 52px;
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 100; margin: 0 -1.5rem 1.5rem;
-  }
-  .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-  .nav-logo-icon { width: 30px; height: 30px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
-  .nav-logo-icon svg { width: 14px; height: 14px; color: #0d0f12; }
-  .nav-logo-name { font-size: 15px; font-weight: 600; color: var(--text); }
-  .nav-logo-name span { color: var(--accent); }
-  .nav-links { display: flex; gap: 4px; }
-  .nav-link { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 6px 14px; border-radius: 6px; border: 1px solid transparent; color: var(--text2); cursor: pointer; text-decoration: none; transition: all .15s; }
-  .nav-link:hover { color: var(--text); background: var(--surface2); }
-  .nav-link.active { color: var(--accent); border-color: rgba(110,231,183,0.2); background: rgba(110,231,183,0.06); }
-  .nav-badge { font-size: 11px; font-family: var(--mono); background: rgba(110,231,183,0.08); color: var(--accent); border: 1px solid rgba(110,231,183,0.18); padding: 5px 12px; border-radius: 20px; }
+/* NAV TOP */
+.nav-top{display:flex;align-items:center;justify-content:space-between;padding:0 1rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-logo-icon{width:28px;height:28px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;}
+.nav-logo-icon svg{width:13px;height:13px;color:#0d0f12;}
+.nav-logo-name{font-size:14px;font-weight:600;color:var(--text);}
+.nav-logo-name span{color:var(--green);}
+.nav-badge{font-size:10px;font-family:var(--mono);background:rgba(110,231,183,0.08);color:var(--green);border:1px solid rgba(110,231,183,0.18);padding:4px 10px;border-radius:20px;}
 
-  /* Navegação de dias */
-  .nav-dias { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
-  .nav-btn { font-family: var(--mono); font-size: 12px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border2); background: var(--surface); color: var(--text2); cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .nav-btn.active { border-color: var(--accent); background: rgba(110,231,183,0.08); color: var(--accent); }
-  .nav-btn .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
-  .nav-btn .nav-date { font-size: 13px; font-weight: 500; color: inherit; }
-  .nav-btn.active .nav-date { color: var(--accent); }
+/* NAV BOTTOM (mobile) */
+.nav-bottom{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--s1);border-top:1px solid var(--border);display:flex;padding:0;safe-area-inset-bottom:env(safe-area-inset-bottom);}
+.nav-bottom a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;text-decoration:none;color:var(--text3);font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;gap:4px;transition:color .15s;border-top:2px solid transparent;}
+.nav-bottom a svg{width:18px;height:18px;}
+.nav-bottom a.active{color:var(--green);border-top-color:var(--green);}
+.nav-bottom a:hover{color:var(--text2);}
 
-  /* Controles */
-  .controls { display: grid; grid-template-columns: 200px 140px 90px 1fr; gap: 12px; align-items: end; margin-bottom: 1.5rem; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .field label { font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
-  input[type="date"], input[type="time"], input[type="number"] { background: var(--surface); border: 1px solid var(--border2); color: var(--text); font-family: var(--mono); font-size: 13px; padding: 10px 12px; border-radius: 8px; width: 100%; outline: none; transition: border-color 0.2s; }
-  input:focus { border-color: var(--accent); }
-  input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
-  .btn { background: var(--accent); color: #0d0f12; font-family: var(--sans); font-size: 14px; font-weight: 600; padding: 11px 22px; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center; }
-  .btn:hover { background: var(--accent2); transform: translateY(-1px); }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+/* PAGE */
+.page{padding:1rem 1rem 1rem;}
 
-  /* Stats */
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
-  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
-  .stat .sl { font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
-  .stat .sv { font-size: 24px; font-weight: 600; }
+/* DIAS */
+.dias{display:flex;gap:6px;margin-bottom:1rem;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;}
+.dias::-webkit-scrollbar{display:none;}
+.dia-btn{flex-shrink:0;font-family:var(--mono);font-size:11px;padding:8px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--s1);color:var(--text2);cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.dia-btn:hover,.dia-btn.active{border-color:var(--green);background:rgba(110,231,183,0.08);color:var(--green);}
+.dia-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;}
+.dia-dt{font-size:12px;font-weight:500;}
 
-  /* Tabela */
-  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-  thead th { padding: 10px 12px; text-align: left; font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; background: var(--surface2); border-bottom: 1px solid var(--border); font-weight: 400; }
-  th:nth-child(1){width:22%} th:nth-child(2){width:10%} th:nth-child(3){width:7%} th:nth-child(4){width:22%} th:nth-child(5){width:12%} th:nth-child(6){width:12%} th:nth-child(7){width:9%} th:nth-child(8){width:6%}
-  tbody tr.dr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
-  tbody tr.dr:hover, tbody tr.dr.open { background: var(--surface2); }
-  td { padding: 10px 12px; vertical-align: middle; }
-  .jn { font-weight: 500; font-size: 13px; }
-  .jh { font-size: 10px; font-family: var(--mono); color: var(--text3); margin-top: 2px; }
-  .pill { font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 20px; display: inline-block; white-space: nowrap; font-weight: 500; }
-  .p-a  { background: rgba(52,211,153,0.12); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.2); }
-  .p-b  { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
-  .p-eu { background: rgba(167,139,250,0.12); color: #a78bfa; border: 1px solid rgba(167,139,250,0.2); }
-  .p-it { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
-  .p-es { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); }
-  .p-copa { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
-  .p-gols { background: rgba(96,165,250,0.12); color: #93c5fd; border: 1px solid rgba(96,165,250,0.2); }
-  .p-esc  { background: rgba(52,211,153,0.12); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.2); }
-  .p-car  { background: rgba(248,113,113,0.12); color: #fca5a5; border: 1px solid rgba(248,113,113,0.2); }
-  .p-res  { background: rgba(251,191,36,0.12); color: #fcd34d; border: 1px solid rgba(251,191,36,0.2); }
-  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
-  .d-a { background: #34d399; } .d-m { background: #fbbf24; } .d-b { background: #f87171; }
-  .c-a { color: #6ee7b7; } .c-m { color: #fbbf24; } .c-b { color: #f87171; }
-  .odd-v { font-family: var(--mono); font-weight: 500; }
-  .chev { color: var(--text3); font-size: 13px; transition: transform 0.2s; display: inline-block; }
-  .chev.open { transform: rotate(180deg); }
-  .sh-row td { padding: 7px 12px; font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); }
-  .er td { padding: 0; }
-  .ei { padding: 16px; border-bottom: 1px solid var(--border); background: #12141a; }
-  .eg { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
-  .ms { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
-  .ml2 { font-size: 9px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
-  .mv2 { font-size: 13px; font-weight: 500; font-family: var(--mono); }
-  .jlabel { font-size: 9px; font-family: var(--mono); color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
-  .jtxt { font-size: 13px; color: var(--text2); line-height: 1.7; padding: 11px 14px; background: var(--surface); border-left: 2px solid var(--accent2); }
-  .empty { text-align: center; padding: 5rem 2rem; color: var(--text3); }
-  .empty svg { width: 40px; height: 40px; margin-bottom: 14px; display: block; margin-left: auto; margin-right: auto; opacity: 0.3; }
-  .loading { text-align: center; padding: 5rem 2rem; color: var(--text2); }
-  .spin { width: 30px; height: 30px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite; margin: 0 auto 12px; }
-  .loading p { font-size: 13px; font-family: var(--mono); color: var(--text3); }
-  .loading .step { font-size: 12px; color: var(--accent); margin-top: 6px; font-family: var(--mono); }
-  .errmsg { text-align: center; padding: 3rem 2rem; color: var(--red); font-family: var(--mono); font-size: 13px; }
-  .aviso-banco { text-align: center; padding: 3rem 2rem; color: var(--amber); font-family: var(--mono); font-size: 13px; }
-  @keyframes sp { to { transform: rotate(360deg); } }
-  @media (max-width: 700px) {
-    .controls { grid-template-columns: 1fr 1fr; }
-    .stats { grid-template-columns: 1fr 1fr; }
-    .eg { grid-template-columns: repeat(3, 1fr); }
-    nav { padding: 0 1rem; }
-  }
+/* CONTROLES */
+.controles{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end;}
+.field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:100px;}
+.field label{font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
+input[type=date],input[type=time],input[type=number]{background:var(--s1);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:13px;padding:9px 10px;border-radius:8px;width:100%;outline:none;-webkit-appearance:none;}
+input:focus{border-color:var(--green);}
+input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{filter:invert(.7);}
+.btn-buscar{background:var(--green);color:#0d0f12;font-family:var(--sans);font-size:14px;font-weight:600;padding:10px 18px;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:background .2s;}
+.btn-buscar:hover{background:var(--green2);}
+.btn-buscar:disabled{opacity:.4;cursor:not-allowed;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem;}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.stat-l{font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+.stat-v{font-size:22px;font-weight:600;}
+
+/* CARDS DE JOGO */
+.jogos-wrap{display:flex;flex-direction:column;gap:8px;}
+.liga-header{font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:6px 4px;margin-top:4px;}
+.jogo-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.jogo-main{padding:12px 14px;cursor:pointer;}
+.jogo-times{font-size:14px;font-weight:600;margin-bottom:6px;}
+.jogo-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pill{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap;}
+.p-a{background:rgba(52,211,153,.12);color:#6ee7b7;border:1px solid rgba(52,211,153,.2);}
+.p-b{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.2);}
+.p-eu{background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.2);}
+.p-it{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.2);}
+.p-es{background:rgba(96,165,250,.12);color:#60a5fa;border:1px solid rgba(96,165,250,.2);}
+.p-copa{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.2);}
+.p-gols{background:rgba(96,165,250,.12);color:#93c5fd;border:1px solid rgba(96,165,250,.2);}
+.p-esc{background:rgba(52,211,153,.12);color:#6ee7b7;border:1px solid rgba(52,211,153,.2);}
+.p-car{background:rgba(248,113,113,.12);color:#fca5a5;border:1px solid rgba(248,113,113,.2);}
+.p-res{background:rgba(251,191,36,.12);color:#fcd34d;border:1px solid rgba(251,191,36,.2);}
+.jogo-hora{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.jogo-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
+.jogo-aposta{font-size:13px;font-weight:500;flex:1;}
+.jogo-odd{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--amber);}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}
+.d-a{background:#34d399;}.d-m{background:#fbbf24;}.d-b{background:#f87171;}
+.c-a{color:#6ee7b7;}.c-m{color:#fbbf24;}.c-b{color:#f87171;}
+.jogo-conf{font-size:11px;font-family:var(--mono);}
+.chev{color:var(--text3);font-size:11px;transition:transform .2s;}
+.chev.open{transform:rotate(180deg);}
+
+/* EXPANDIDO */
+.jogo-expand{display:none;border-top:1px solid var(--border);padding:12px 14px;background:#12141a;}
+.jogo-expand.open{display:block;}
+.stats-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
+.sm{background:var(--s1);border:1px solid var(--border);border-radius:7px;padding:8px 10px;}
+.sm-l{font-size:8px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;margin-bottom:3px;}
+.sm-v{font-size:12px;font-weight:500;font-family:var(--mono);}
+.justif-l{font-size:9px;font-family:var(--mono);color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.justif-t{font-size:12px;color:var(--text2);line-height:1.7;padding:10px 12px;background:var(--s1);border-left:2px solid var(--green2);}
+
+/* ESTADOS */
+.empty-state{text-align:center;padding:4rem 2rem;color:var(--text3);}
+.empty-state svg{width:36px;height:36px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;opacity:.3;}
+.loading-state{text-align:center;padding:4rem 2rem;}
+.spin{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px;}
+.loading-txt{font-size:12px;font-family:var(--mono);color:var(--text3);}
+.loading-step{font-size:11px;color:var(--green);margin-top:6px;font-family:var(--mono);}
+.errmsg{text-align:center;padding:2rem;color:var(--red);font-family:var(--mono);font-size:12px;}
+.aviso{text-align:center;padding:2rem;color:var(--amber);font-family:var(--mono);font-size:12px;}
+
+@keyframes sp{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
-<div class="app">
 
-  <!-- NAVBAR -->
-  <nav>
-    <a class="nav-logo" href="index.html">
-      <div class="nav-logo-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      </div>
-      <span class="nav-logo-name">Análise de <span>Apostas</span></span>
-    </a>
-    <div class="nav-links">
-      <a class="nav-link active" href="index.html">Apostas</a>
-      <a class="nav-link" href="dashboard.html">Dashboard</a>
-      <a class="nav-link" href="relatorios.html">Relatórios</a>
-      <a class="nav-link" href="ligas.html">Ligas &amp; Times</a>
-    </div>
-    <span class="nav-badge">Estrela Bet</span>
-  </nav>
+<div class="nav-top">
+  <a class="nav-logo" href="index.html">
+    <div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    <span class="nav-logo-name">Análise de <span>Apostas</span></span>
+  </a>
+  <span class="nav-badge">Estrela Bet</span>
+</div>
 
-  <!-- Navegação de dias -->
-  <div class="nav-dias" id="nav-dias"></div>
+<div class="page">
 
-  <!-- Controles -->
-  <div class="controls">
+  <div class="dias" id="dias"></div>
+
+  <div class="controles">
     <div class="field">
-      <label>Data dos jogos</label>
+      <label>Data</label>
       <input type="date" id="d-input">
     </div>
-    <div class="field">
-      <label>Horário mínimo</label>
+    <div class="field" style="max-width:100px">
+      <label>Horário mín.</label>
       <input type="time" id="h-min" value="13:00">
     </div>
-    <div class="field">
+    <div class="field" style="max-width:70px">
       <label>Meta</label>
       <input type="number" id="q-jogos" value="15" min="5" max="20">
     </div>
-    <button class="btn" id="btn-b" onclick="buscar()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Buscar e analisar
+    <button class="btn-buscar" id="btn-b" onclick="buscar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Analisar
     </button>
   </div>
 
   <div class="stats" id="sa" style="display:none">
-    <div class="stat"><div class="sl">Jogos</div><div class="sv" style="color:var(--accent)" id="sj">0</div></div>
-    <div class="stat"><div class="sl">Alta confiança</div><div class="sv" style="color:var(--amber)" id="sa2">0</div></div>
-    <div class="stat"><div class="sl">Odd média</div><div class="sv" style="color:var(--blue)" id="so">-</div></div>
-    <div class="stat"><div class="sv" style="color:var(--purple)" id="sm">-</div><div class="sl">Mercados</div></div>
+    <div class="stat"><div class="stat-l">Jogos</div><div class="stat-v" style="color:var(--green)" id="sj">0</div></div>
+    <div class="stat"><div class="stat-l">Alta confiança</div><div class="stat-v" style="color:var(--amber)" id="sa2">0</div></div>
+    <div class="stat"><div class="stat-l">Odd média</div><div class="stat-v" style="color:var(--blue)" id="so">-</div></div>
+    <div class="stat"><div class="stat-l">Mercados</div><div class="stat-v" style="color:var(--purple)" id="sm">-</div></div>
   </div>
 
-  <div class="table-wrap" id="tw">
-    <div class="empty">
+  <div id="tw">
+    <div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       <p>Selecione a data ou use os atalhos acima</p>
     </div>
   </div>
 
-  <p style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:1rem">
-    Backend: <span style="color:var(--accent)" id="backend-url">carregando...</span>
+  <p style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:1.5rem">
+    Backend: <span style="color:var(--green)" id="backend-url"></span>
   </p>
 </div>
 
-<script>
-const BACKEND_URL = window.BACKEND_URL || 'https://apostas-app.onrender.com';
-document.getElementById('backend-url').textContent = BACKEND_URL;
+<!-- NAV BOTTOM -->
+<nav class="nav-bottom">
+  <a href="index.html" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    Apostas
+  </a>
+  <a href="dashboard.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+    Dashboard
+  </a>
+  <a href="relatorios.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Relatórios
+  </a>
+  <a href="ligas.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+    Ligas
+  </a>
+</nav>
 
-// Limitar calendário: mín = primeira data no banco, máx = amanhã
-async function limitarCalendario() {
-  try {
-    const res = await fetch(BACKEND_URL + '/datas-disponiveis');
-    const json = await res.json();
-    const datas = json.datas || [];
-    const input = document.getElementById('d-input');
-    const h = hoje();
-    const amanha = offsetData(h, 1);
-    if (datas.length > 0) {
-      input.min = datas[0]; // primeira data disponível
-    }
-    input.max = amanha; // máximo = amanhã
-  } catch(e) {}
+<script>
+const BACKEND_URL='https://apostas-app.onrender.com';
+document.getElementById('backend-url').textContent=BACKEND_URL;
+
+function hoje(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function offsetData(base,n){const d=new Date(base+'T12:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function fmtD(iso){const[a,m,d]=iso.split('-');return `${d}/${m}`;}
+function fmtDL(iso){const[a,m,d]=iso.split('-');return `${d}/${m}/${a}`;}
+
+const hojeStr=hoje();
+document.getElementById('d-input').value=offsetData(hojeStr,1);
+
+// Limitar calendário
+async function limitarCalendario(){
+  try{
+    const r=await fetch(BACKEND_URL+'/datas-disponiveis');
+    const j=await r.json();
+    const input=document.getElementById('d-input');
+    if(j.datas?.length>0) input.min=j.datas[0];
+    input.max=offsetData(hojeStr,1);
+  }catch(e){}
 }
 limitarCalendario();
 
-function hoje() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function offsetData(base, n) {
-  const d = new Date(base + 'T12:00:00');
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function fmtData(iso) { const [a,m,d] = iso.split('-'); return `${d}/${m}`; }
-function fmtDataLong(iso) { const [a,m,d] = iso.split('-'); return `${d}/${m}/${a}`; }
-
-const hojeStr = hoje();
-document.getElementById('d-input').value = offsetData(hojeStr, 1);
-
-function renderNav() {
-  const nav = document.getElementById('nav-dias');
-  const dias = [{ label:'Ontem', offset:-1 }, { label:'Hoje', offset:0 }, { label:'Amanhã', offset:1 }];
-  nav.innerHTML = dias.map(d => {
-    const data = offsetData(hojeStr, d.offset);
-    return `<button class="nav-btn" data-data="${data}" onclick="carregarDia('${data}', '${d.label}')">
-      <span class="nav-label">${d.label}</span>
-      <span class="nav-date">${fmtData(data)}</span>
+// Navegação de dias
+function renderDias(){
+  const el=document.getElementById('dias');
+  const dias=[{l:'Ontem',o:-1},{l:'Hoje',o:0},{l:'Amanhã',o:1}];
+  el.innerHTML=dias.map(d=>{
+    const dt=offsetData(hojeStr,d.o);
+    return `<button class="dia-btn" data-dt="${dt}" onclick="carregarDia('${dt}','${d.l}')">
+      <span class="dia-lbl">${d.l}</span>
+      <span class="dia-dt">${fmtD(dt)}</span>
     </button>`;
   }).join('');
 }
-renderNav();
+renderDias();
 
-async function carregarDia(data, label) {
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector(`[data-data="${data}"]`)?.classList.add('active');
-  document.getElementById('d-input').value = data;
-  document.getElementById('sa').style.display = 'none';
-  document.getElementById('tw').innerHTML = `<div class="loading"><div class="spin"></div><p>Buscando apostas de ${label} (${fmtDataLong(data)})...</p><div class="step">Verificando banco de dados...</div></div>`;
-  document.getElementById('btn-b').disabled = true;
-  try {
-    const periodo = label === 'Ontem' ? 'ontem' : label === 'Hoje' ? 'hoje' : 'amanha';
-    const res = await fetch(`${BACKEND_URL}/apostas/${periodo}`);
-    const json = await res.json();
-    if (json.jogos && json.jogos.length > 0) render(json.jogos);
-    else if (json.aviso) document.getElementById('tw').innerHTML = `<div class="aviso-banco">⚠ ${json.aviso}<br><br><small>Use "Buscar e analisar" para gerar as apostas deste dia.</small></div>`;
-    else document.getElementById('tw').innerHTML = `<div class="aviso-banco">Nenhuma aposta encontrada para ${fmtDataLong(data)}.</div>`;
-  } catch(err) {
-    document.getElementById('tw').innerHTML = `<div class="errmsg">Erro: ${err.message}</div>`;
-  } finally {
-    document.getElementById('btn-b').disabled = false;
-  }
+async function carregarDia(data,label){
+  document.querySelectorAll('.dia-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`[data-dt="${data}"]`)?.classList.add('active');
+  document.getElementById('d-input').value=data;
+  document.getElementById('sa').style.display='none';
+  document.getElementById('btn-b').disabled=true;
+  document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando apostas de ${label}...</div></div>`;
+  try{
+    const p=label==='Ontem'?'ontem':label==='Hoje'?'hoje':'amanha';
+    const r=await fetch(`${BACKEND_URL}/apostas/${p}`);
+    const j=await r.json();
+    if(j.jogos?.length>0) render(j.jogos);
+    else if(j.aviso) document.getElementById('tw').innerHTML=`<div class="aviso">⚠ ${j.aviso}<br><small>Use "Analisar" para gerar as apostas deste dia.</small></div>`;
+    else document.getElementById('tw').innerHTML=`<div class="aviso">Nenhuma aposta para ${fmtDL(data)}.</div>`;
+  }catch(e){
+    document.getElementById('tw').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
+  }finally{document.getElementById('btn-b').disabled=false;}
 }
 
-const steps = ['Buscando jogos na API Football...','Filtrando por ligas prioritárias...','Coletando estatísticas...','IA analisando com dados reais...','Definindo apostas...','Salvando no banco...'];
+const steps=['Buscando jogos na API...','Filtrando ligas prioritárias...','Coletando estatísticas...','IA analisando jogos...','Definindo apostas...','Salvando no banco...'];
 
-async function buscar() {
-  const dv = document.getElementById('d-input').value;
-  const hora = document.getElementById('h-min').value;
-  const meta = parseInt(document.getElementById('q-jogos').value) || 15;
-  if (!dv) return;
-  document.getElementById('btn-b').disabled = true;
-  document.getElementById('sa').style.display = 'none';
-  let stepIdx = 0;
-  document.getElementById('tw').innerHTML = `<div class="loading"><div class="spin"></div><p>Analisando ${fmtDataLong(dv)}...</p><div class="step" id="step-txt">${steps[0]}</div></div>`;
-  const interval = setInterval(() => { stepIdx=(stepIdx+1)%steps.length; const el=document.getElementById('step-txt'); if(el) el.textContent=steps[stepIdx]; }, 3000);
-  try {
-    const res = await fetch(`${BACKEND_URL}/analisar`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({data:dv,hora,meta}) });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error || `Erro ${res.status}`); }
-    const parsed = await res.json();
-    clearInterval(interval);
-    if (parsed.aviso) document.getElementById('tw').innerHTML = `<div class="aviso-banco">⚠ ${parsed.aviso}</div>`;
-    else render(parsed.jogos || []);
-  } catch(err) {
-    clearInterval(interval);
-    document.getElementById('tw').innerHTML = `<div class="errmsg">❌ ${err.message}</div>`;
-  } finally {
-    document.getElementById('btn-b').disabled = false;
-  }
+async function buscar(){
+  const dv=document.getElementById('d-input').value;
+  const hora=document.getElementById('h-min').value;
+  const meta=parseInt(document.getElementById('q-jogos').value)||15;
+  if(!dv) return;
+  document.getElementById('btn-b').disabled=true;
+  document.getElementById('sa').style.display='none';
+  let si=0;
+  document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Analisando ${fmtDL(dv)}...</div><div class="loading-step" id="step">${steps[0]}</div></div>`;
+  const iv=setInterval(()=>{si=(si+1)%steps.length;const e=document.getElementById('step');if(e)e.textContent=steps[si];},3000);
+  try{
+    const r=await fetch(`${BACKEND_URL}/analisar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:dv,hora,meta})});
+    if(!r.ok){const e=await r.json();throw new Error(e.error||`Erro ${r.status}`);}
+    const p=await r.json();
+    clearInterval(iv);
+    if(p.aviso) document.getElementById('tw').innerHTML=`<div class="aviso">⚠ ${p.aviso}</div>`;
+    else render(p.jogos||[]);
+  }catch(e){
+    clearInterval(iv);
+    document.getElementById('tw').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
+  }finally{document.getElementById('btn-b').disabled=false;}
 }
 
-let exp = new Set();
-const ml = { gols:'Gols', escanteios:'Escanteios', cartoes:'Cartões', resultado:'Resultado' };
-const lc = { a:'p-a', b:'p-b', eu:'p-eu', it:'p-it', es:'p-es', copa:'p-copa' };
-const ln = { a:'Série A', b:'Série B', eu:'Europa', it:'Serie A 🇮🇹', es:'La Liga 🇪🇸', copa:'Copa' };
-const mc = { gols:'p-gols', escanteios:'p-esc', cartoes:'p-car', resultado:'p-res' };
-const gNomes = { a:'🇧🇷 Série A', b:'🇧🇷 Série B', it:'🇮🇹 Serie A Italiana', es:'🇪🇸 La Liga', eu:'🌍 Ligas Europeias', copa:'🏆 Copas' };
+const ml={gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
+const lc={a:'p-a',b:'p-b',eu:'p-eu',it:'p-it',es:'p-es',copa:'p-copa'};
+const ln={a:'Série A',b:'Série B',eu:'Europa',it:'Serie A 🇮🇹',es:'La Liga 🇪🇸',copa:'Copa'};
+const mc={gols:'p-gols',escanteios:'p-esc',cartoes:'p-car',resultado:'p-res'};
+const gN={a:'🇧🇷 Série A',b:'🇧🇷 Série B',it:'🇮🇹 Serie A',es:'🇪🇸 La Liga',eu:'🌍 Europeias',copa:'🏆 Copas'};
 
-function render(jogos) {
-  if (!jogos.length) { document.getElementById('tw').innerHTML='<div class="empty"><p>Nenhum jogo encontrado.</p></div>'; return; }
-  const alta = jogos.filter(j=>j.confianca==='alta').length;
-  const odds = jogos.map(j=>parseFloat(j.odd_sugerida)).filter(Boolean);
-  const om = odds.length?(odds.reduce((a,b)=>a+b,0)/odds.length).toFixed(2):'-';
-  const mercs = new Set(jogos.map(j=>j.mercado)).size;
+let exp=new Set();
+
+function render(jogos){
+  if(!jogos.length){document.getElementById('tw').innerHTML='<div class="empty-state"><p>Nenhum jogo encontrado.</p></div>';return;}
+  const alta=jogos.filter(j=>j.confianca==='alta').length;
+  const odds=jogos.map(j=>parseFloat(j.odd_sugerida)).filter(Boolean);
+  const om=odds.length?(odds.reduce((a,b)=>a+b,0)/odds.length).toFixed(2):'-';
   document.getElementById('sj').textContent=jogos.length;
   document.getElementById('sa2').textContent=alta;
   document.getElementById('so').textContent=om;
-  document.getElementById('sm').textContent=mercs;
+  document.getElementById('sm').textContent=new Set(jogos.map(j=>j.mercado)).size;
   document.getElementById('sa').style.display='grid';
+
   const grupos={};
-  jogos.forEach(j=>{ const g=j.tipo_liga||'eu'; if(!grupos[g]) grupos[g]=[]; grupos[g].push(j); });
+  jogos.forEach(j=>{const g=j.tipo_liga||'eu';if(!grupos[g])grupos[g]=[];grupos[g].push(j);});
   const ordem=['a','b','it','es','eu','copa'];
-  let html='', i=0;
+  let html='',i=0;
   ordem.forEach(g=>{
-    if(!grupos[g]||!grupos[g].length) return;
-    html+=`<tr class="sh-row"><td colspan="8">${gNomes[g]||g}</td></tr>`;
+    if(!grupos[g]?.length) return;
+    html+=`<div class="liga-header">${gN[g]||g}</div>`;
     grupos[g].forEach(j=>{
       const dc=j.confianca==='alta'?'d-a':j.confianca==='media'?'d-m':'d-b';
       const cc=j.confianca==='alta'?'c-a':j.confianca==='media'?'c-m':'c-b';
       const cl=j.confianca?(j.confianca[0].toUpperCase()+j.confianca.slice(1)):'-';
-      html+=`<tr class="dr" id="r${i}" onclick="tog(${i})">
-        <td><div class="jn">${j.time_casa} x ${j.time_fora}</div><div class="jh">${j.horario||''}</div></td>
-        <td><span class="pill ${lc[j.tipo_liga]||'p-eu'}">${ln[j.tipo_liga]||j.liga}</span></td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${j.horario||'-'}</td>
-        <td style="font-weight:500;font-size:13px">${j.aposta}</td>
-        <td><span class="pill ${mc[j.mercado]||'p-gols'}">${ml[j.mercado]||j.mercado}</span></td>
-        <td><span class="dot ${dc}"></span><span class="${cc}" style="font-size:11px;font-family:var(--mono)">${cl}</span></td>
-        <td><span class="odd-v">${j.odd_sugerida||'-'}</span></td>
-        <td><span class="chev" id="cv${i}">▾</span></td>
-      </tr>
-      <tr class="er" id="e${i}" style="display:none"><td colspan="8"><div class="ei">
-        <div class="eg">
-          <div class="ms"><div class="ml2">Gols casa</div><div class="mv2">${j.media_gols_casa||'-'}</div></div>
-          <div class="ms"><div class="ml2">Gols fora</div><div class="mv2">${j.media_gols_fora||'-'}</div></div>
-          <div class="ms"><div class="ml2">Escanteios</div><div class="mv2">${j.media_escanteios||'-'}</div></div>
-          <div class="ms"><div class="ml2">Cartões</div><div class="mv2">${j.media_cartoes||'-'}</div></div>
-          <div class="ms"><div class="ml2">Forma casa</div><div class="mv2" style="font-size:10px">${j.forma_casa||'-'}</div></div>
-          <div class="ms"><div class="ml2">Forma fora</div><div class="mv2" style="font-size:10px">${j.forma_fora||'-'}</div></div>
+      html+=`<div class="jogo-card" id="jc${i}">
+        <div class="jogo-main" onclick="tog(${i})">
+          <div class="jogo-times">${j.time_casa} x ${j.time_fora}</div>
+          <div class="jogo-meta">
+            <span class="pill ${lc[j.tipo_liga]||'p-eu'}">${ln[j.tipo_liga]||j.liga}</span>
+            <span class="pill ${mc[j.mercado]||'p-gols'}">${ml[j.mercado]||j.mercado}</span>
+            <span class="jogo-hora">${j.horario||'-'}</span>
+          </div>
+          <div class="jogo-bottom">
+            <span class="jogo-aposta">${j.aposta}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="jogo-conf ${cc}"><span class="dot ${dc}"></span>${cl}</span>
+              <span class="jogo-odd">${j.odd_sugerida||'-'}</span>
+              <span class="chev" id="cv${i}">▾</span>
+            </div>
+          </div>
         </div>
-        <div class="jlabel">Justificativa</div>
-        <div class="jtxt">${j.justificativa||'-'}</div>
-      </div></td></tr>`;
+        <div class="jogo-expand" id="ex${i}">
+          <div class="stats-mini">
+            <div class="sm"><div class="sm-l">Gols casa</div><div class="sm-v">${j.media_gols_casa||'-'}</div></div>
+            <div class="sm"><div class="sm-l">Gols fora</div><div class="sm-v">${j.media_gols_fora||'-'}</div></div>
+            <div class="sm"><div class="sm-l">Escanteios</div><div class="sm-v">${j.media_escanteios||'-'}</div></div>
+            <div class="sm"><div class="sm-l">Cartões</div><div class="sm-v">${j.media_cartoes||'-'}</div></div>
+            <div class="sm"><div class="sm-l">Forma casa</div><div class="sm-v" style="font-size:10px">${j.forma_casa||'-'}</div></div>
+            <div class="sm"><div class="sm-l">Forma fora</div><div class="sm-v" style="font-size:10px">${j.forma_fora||'-'}</div></div>
+          </div>
+          <div class="justif-l">Justificativa</div>
+          <div class="justif-t">${j.justificativa||'-'}</div>
+        </div>
+      </div>`;
       i++;
     });
   });
-  document.getElementById('tw').innerHTML=`<table><thead><tr>
-    <th>Jogo</th><th>Liga</th><th>Hora</th><th>Aposta</th><th>Mercado</th><th>Confiança</th><th>Odd</th><th></th>
-  </tr></thead><tbody>${html}</tbody></table>`;
-  exp = new Set();
+
+  document.getElementById('tw').innerHTML=`<div class="jogos-wrap">${html}</div>`;
+  exp=new Set();
 }
 
 function tog(i){
-  const er=document.getElementById('e'+i),cv=document.getElementById('cv'+i),rw=document.getElementById('r'+i);
-  if(exp.has(i)){er.style.display='none';cv.classList.remove('open');rw.classList.remove('open');exp.delete(i);}
-  else{er.style.display='table-row';cv.classList.add('open');rw.classList.add('open');exp.add(i);}
+  const ex=document.getElementById('ex'+i),cv=document.getElementById('cv'+i);
+  ex.classList.toggle('open');cv.classList.toggle('open');
 }
 </script>
 </body>
