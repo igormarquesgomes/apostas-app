@@ -2,177 +2,143 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ligas & Times · Análise de Apostas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ligas & Times · Estrela Bet</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#080a0f;--s1:#0e1118;--s2:#141720;--s3:#1c2030;--border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--text:#e8eaf2;--text2:#7a7f9a;--text3:#3a3f58;--green:#00e676;--red:#ff1744;--amber:#ffab00;--blue:#448aff;--purple:#e040fb;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--display:'Bebas Neue',sans-serif;}
+:root{--bg:#080a0f;--s1:#0e1118;--s2:#141720;--s3:#1c2030;--border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--text:#e8eaf2;--text2:#7a7f9a;--text3:#3a3f58;--green:#00e676;--red:#ff1744;--amber:#ffab00;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--display:'Bebas Neue',sans-serif;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;}
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
-.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding-bottom:70px;}
+.nav-top{display:flex;align-items:center;justify-content:space-between;padding:0 1rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
 .nav-logo-icon{width:28px;height:28px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;}
 .nav-logo-icon svg{width:13px;height:13px;color:#000;}
 .nav-logo-name{font-size:14px;font-weight:600;color:var(--text);}
 .nav-logo-name span{color:var(--green);}
-.nav-tabs{display:flex;gap:4px;}
-.nav-tab{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:6px 14px;border-radius:6px;border:1px solid transparent;color:var(--text2);cursor:pointer;text-decoration:none;transition:all .15s;}
-.nav-tab:hover{color:var(--text);background:var(--s2);}
-.nav-tab.active{color:var(--green);border-color:rgba(0,230,118,0.2);background:rgba(0,230,118,0.06);}
-.nav-badge{font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:20px;background:rgba(0,230,118,0.08);color:var(--green);border:1px solid rgba(0,230,118,0.2);}
-.page{max-width:1100px;margin:0 auto;padding:2rem 1.5rem 4rem;}
-.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;}
-.page-title{font-family:var(--display);font-size:36px;letter-spacing:1px;}
-.toggle-wrap{display:flex;gap:4px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;padding:3px;}
-.toggle-btn{font-family:var(--mono);font-size:11px;padding:6px 16px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;}
-.toggle-btn.active{background:rgba(0,230,118,0.1);color:var(--green);}
+.nav-badge{font-size:10px;font-family:var(--mono);background:rgba(0,230,118,.08);color:var(--green);border:1px solid rgba(0,230,118,.2);padding:4px 10px;border-radius:20px;}
+.nav-bottom{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--s1);border-top:1px solid var(--border);display:flex;}
+.nav-bottom a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;text-decoration:none;color:var(--text3);font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;gap:4px;transition:color .15s;border-top:2px solid transparent;}
+.nav-bottom a svg{width:18px;height:18px;}
+.nav-bottom a.active{color:var(--green);border-top-color:var(--green);}
+.page{padding:1rem;}
 
-/* Tabela */
-.table-header{display:grid;gap:12px;padding:8px 18px;margin-bottom:4px;}
-.table-header span{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);}
-.row{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:grid;gap:12px;align-items:center;margin-bottom:8px;transition:border-color .15s;}
-.row:hover{border-color:var(--border2);}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;}
+.page-title{font-family:var(--display);font-size:32px;letter-spacing:1px;}
+.toggle-wrap{display:flex;gap:3px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;padding:3px;}
+.tog-btn{font-family:var(--mono);font-size:10px;padding:6px 14px;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;}
+.tog-btn.active{background:rgba(0,230,118,.1);color:var(--green);}
 
-/* Ligas: rank, nome, total, green, red, %, barra */
-.ligas-cols{grid-template-columns:32px 1fr 80px 70px 70px 80px 160px;}
-/* Times: rank, nome, total, green, red, % */
-.times-cols{grid-template-columns:32px 1fr 80px 70px 70px 80px;}
+.row{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.row-rank{font-family:var(--display);font-size:20px;color:var(--text3);width:26px;flex-shrink:0;}
+.row-info{flex:1;min-width:0;}
+.row-nome{font-size:13px;font-weight:500;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-bottom:4px;}
+.row-bar-fill{height:100%;border-radius:2px;}
+.row-stats{display:flex;gap:10px;}
+.row-stat{font-family:var(--mono);font-size:10px;color:var(--text2);}
+.row-stat strong{font-size:12px;}
+.row-pct{font-family:var(--display);font-size:26px;flex-shrink:0;width:56px;text-align:right;}
 
-.rank{font-family:var(--display);font-size:22px;color:var(--text3);}
-.nome{font-size:13px;font-weight:500;}
-.num{font-family:var(--mono);font-size:13px;text-align:center;}
-.pct{font-family:var(--display);font-size:24px;text-align:right;}
-.barra{height:5px;background:var(--s3);border-radius:3px;overflow:hidden;}
-.barra-fill{height:100%;border-radius:3px;transition:width .8s;}
-
-.empty{text-align:center;padding:4rem 2rem;color:var(--text3);font-family:var(--mono);font-size:12px;}
-.loading{text-align:center;padding:4rem 2rem;}
-.spin{width:26px;height:26px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px;}
+.empty{text-align:center;padding:3rem;color:var(--text3);font-family:var(--mono);font-size:11px;}
+.loading{text-align:center;padding:3rem;}
+.spin{width:24px;height:24px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
-<nav>
+<div class="nav-top">
   <a class="nav-logo" href="index.html">
     <div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
     <span class="nav-logo-name">Análise de <span>Apostas</span></span>
   </a>
-  <div class="nav-tabs">
-    <a class="nav-tab" href="index.html">Apostas</a>
-    <a class="nav-tab" href="dashboard.html">Dashboard</a>
-    <a class="nav-tab" href="relatorios.html">Relatórios</a>
-    <a class="nav-tab active" href="ligas.html">Ligas & Times</a>
-  </div>
   <span class="nav-badge">Estrela Bet</span>
-</nav>
+</div>
 
 <div class="page">
   <div class="page-header">
     <div class="page-title">Ligas & Times</div>
     <div class="toggle-wrap">
-      <button class="toggle-btn active" id="btn-ligas" onclick="mudarVista('ligas')">Ligas</button>
-      <button class="toggle-btn" id="btn-times" onclick="mudarVista('times')">Times</button>
+      <button class="tog-btn active" id="bl" onclick="vista('ligas')">Ligas</button>
+      <button class="tog-btn" id="bt" onclick="vista('times')">Times</button>
     </div>
   </div>
-
-  <div id="vista-ligas"></div>
-  <div id="vista-times" style="display:none"></div>
+  <div id="vl"><div class="loading"><div class="spin"></div></div></div>
+  <div id="vt" style="display:none"></div>
 </div>
+
+<nav class="nav-bottom">
+  <a href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Apostas</a>
+  <a href="dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>Dashboard</a>
+  <a href="relatorios.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Relatórios</a>
+  <a href="ligas.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>Ligas</a>
+</nav>
 
 <script>
 const B='https://apostas-app.onrender.com';
-let dadosLigas=[], dadosTimes=[];
-
+let dL=[],dT=[];
 function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
-function offD(base,n){const d=new Date(base+'T12:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function hoje(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function off(b,n){const d=new Date(b+'T12:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 
-async function carregarDados(){
-  const h=hoje(), promises=[];
-  for(let i=0;i<60;i++) promises.push(fetch(`${B}/apostas-resultado/${offD(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null));
-  const dias=(await Promise.all(promises)).filter(d=>d&&d.apostas);
-
-  const ligasMap={}, timesMap={};
+async function load(){
+  const h=hoje(),ps=[];
+  for(let i=0;i<60;i++) ps.push(fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null));
+  const dias=(await Promise.all(ps)).filter(d=>d&&d.apostas);
+  const lM={},tM={};
   for(const dia of dias){
-    const apostas=dia.apostas?.jogos||[];
-    const resultados=dia.resultados?.apostas||[];
-    for(const a of apostas){
-      const r=resultados.find(x=>x.jogo_id===a.id);
-      const res=r?.resultado_aposta||'pendente';
-      if(res==='pendente') continue;
-
-      const liga=a.liga||'Outras';
-      if(!ligasMap[liga]) ligasMap[liga]={nome:liga,green:0,red:0,total:0};
-      if(res==='green') ligasMap[liga].green++;
-      else ligasMap[liga].red++;
-      ligasMap[liga].total++;
-
-      for(const t of [a.time_casa,a.time_fora]){
-        if(!t) continue;
-        if(!timesMap[t]) timesMap[t]={nome:t,green:0,red:0,total:0};
-        if(res==='green') timesMap[t].green++;
-        else timesMap[t].red++;
-        timesMap[t].total++;
+    const ap=dia.apostas?.jogos||[],res=dia.resultados?.apostas||[];
+    for(const a of ap){
+      const r=res.find(x=>x.jogo_id===a.id);
+      const rv=r?.resultado_aposta||'pendente';
+      if(rv==='pendente') continue;
+      const lg=a.liga||'Outras';
+      if(!lM[lg])lM[lg]={nome:lg,green:0,red:0,total:0};
+      if(rv==='green')lM[lg].green++;else lM[lg].red++;
+      lM[lg].total++;
+      for(const t of[a.time_casa,a.time_fora]){
+        if(!t)continue;
+        if(!tM[t])tM[t]={nome:t,green:0,red:0,total:0};
+        if(rv==='green')tM[t].green++;else tM[t].red++;
+        tM[t].total++;
       }
     }
   }
-
-  dadosLigas=Object.values(ligasMap).map(l=>({...l,pct:Math.round(l.green/l.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
-  dadosTimes=Object.values(timesMap).filter(t=>t.total>=2).map(t=>({...t,pct:Math.round(t.green/t.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
-
-  renderLigas();
-  renderTimes();
+  dL=Object.values(lM).map(l=>({...l,pct:Math.round(l.green/l.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
+  dT=Object.values(tM).filter(t=>t.total>=2).map(t=>({...t,pct:Math.round(t.green/t.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
+  renderL();renderT();
 }
 
-function renderLigas(){
-  const el=document.getElementById('vista-ligas');
-  if(!dadosLigas.length){el.innerHTML='<div class="empty">Nenhuma liga com dados ainda.</div>';return;}
-  el.innerHTML=`
-    <div class="table-header ligas-cols">
-      <span>#</span><span>Liga</span><span style="text-align:center">Total</span>
-      <span style="text-align:center">Green</span><span style="text-align:center">Red</span>
-      <span style="text-align:right">Assert.</span><span>Desempenho</span>
+function rowHtml(item,i){
+  return `<div class="row">
+    <span class="row-rank">${i+1}</span>
+    <div class="row-info">
+      <div class="row-nome">${item.nome}</div>
+      <div class="row-bar"><div class="row-bar-fill" style="width:${item.pct}%;background:${corP(item.pct)}"></div></div>
+      <div class="row-stats">
+        <div class="row-stat"><strong style="color:var(--green)">${item.green}</strong> G</div>
+        <div class="row-stat"><strong style="color:var(--red)">${item.red}</strong> R</div>
+        <div class="row-stat"><strong style="color:var(--text2)">${item.total}</strong> Total</div>
+      </div>
     </div>
-    ${dadosLigas.map((l,i)=>`
-      <div class="row ligas-cols">
-        <span class="rank">${i+1}</span>
-        <span class="nome">${l.nome}</span>
-        <span class="num" style="color:var(--text2)">${l.total}</span>
-        <span class="num" style="color:var(--green)">${l.green}</span>
-        <span class="num" style="color:var(--red)">${l.red}</span>
-        <span class="pct" style="color:${corP(l.pct)}">${l.pct}%</span>
-        <div class="barra"><div class="barra-fill" style="width:${l.pct}%;background:${corP(l.pct)}"></div></div>
-      </div>`).join('')}`;
+    <span class="row-pct" style="color:${corP(item.pct)}">${item.pct}%</span>
+  </div>`;
 }
 
-function renderTimes(){
-  const el=document.getElementById('vista-times');
-  if(!dadosTimes.length){el.innerHTML='<div class="empty">Nenhum time com dados suficientes ainda.<br>Mínimo 2 apostas por time.</div>';return;}
-  el.innerHTML=`
-    <div class="table-header times-cols">
-      <span>#</span><span>Time</span><span style="text-align:center">Total</span>
-      <span style="text-align:center">Green</span><span style="text-align:center">Red</span>
-      <span style="text-align:right">Assert.</span>
-    </div>
-    ${dadosTimes.map((t,i)=>`
-      <div class="row times-cols">
-        <span class="rank">${i+1}</span>
-        <span class="nome">${t.nome}</span>
-        <span class="num" style="color:var(--text2)">${t.total}</span>
-        <span class="num" style="color:var(--green)">${t.green}</span>
-        <span class="num" style="color:var(--red)">${t.red}</span>
-        <span class="pct" style="color:${corP(t.pct)}">${t.pct}%</span>
-      </div>`).join('')}`;
+function renderL(){
+  document.getElementById('vl').innerHTML=dL.length?dL.map(rowHtml).join(''):'<div class="empty">Nenhuma liga com dados ainda.</div>';
+}
+function renderT(){
+  document.getElementById('vt').innerHTML=dT.length?dT.map(rowHtml).join(''):'<div class="empty">Nenhum time com dados suficientes.<br>Mínimo 2 apostas por time.</div>';
 }
 
-function mudarVista(v){
-  document.getElementById('vista-ligas').style.display=v==='ligas'?'block':'none';
-  document.getElementById('vista-times').style.display=v==='times'?'block':'none';
-  document.getElementById('btn-ligas').classList.toggle('active',v==='ligas');
-  document.getElementById('btn-times').classList.toggle('active',v==='times');
+function vista(v){
+  document.getElementById('vl').style.display=v==='ligas'?'block':'none';
+  document.getElementById('vt').style.display=v==='times'?'block':'none';
+  document.getElementById('bl').classList.toggle('active',v==='ligas');
+  document.getElementById('bt').classList.toggle('active',v==='times');
 }
 
-carregarDados();
+load();
 </script>
 </body>
 </html>
