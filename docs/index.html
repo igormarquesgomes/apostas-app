@@ -243,12 +243,22 @@ async function carregarDia(data,label){
   document.getElementById('btn-b').disabled=true;
   document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando apostas de ${label}...</div></div>`;
   try{
-    const p=label==='Ontem'?'ontem':label==='Hoje'?'hoje':'amanha';
-    const r=await fetch(`${BACKEND_URL}/apostas/${p}`);
+    // Buscar apostas + resultados juntos
+    const r=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
     const j=await r.json();
-    if(j.jogos?.length>0) render(j.jogos);
-    else if(j.aviso) document.getElementById('tw').innerHTML=`<div class="aviso">⚠ ${j.aviso}<br><small>Use "Analisar" para gerar as apostas deste dia.</small></div>`;
-    else document.getElementById('tw').innerHTML=`<div class="aviso">Nenhuma aposta para ${fmtDL(data)}.</div>`;
+    if(j.apostas?.jogos?.length>0){
+      // Mesclar resultados nos jogos
+      const resultados=j.resultados?.apostas||[];
+      const jogosComRes=j.apostas.jogos.map(jg=>{
+        const res=resultados.find(x=>x.jogo_id===jg.id);
+        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
+      });
+      render(jogosComRes);
+    } else if(j.apostas===null){
+      document.getElementById('tw').innerHTML=`<div class="aviso">⚠ Apostas de ${fmtDL(data)} ainda não foram geradas.<br><small>Use "Analisar" para gerar.</small></div>`;
+    } else {
+      document.getElementById('tw').innerHTML=`<div class="aviso">Nenhuma aposta para ${fmtDL(data)}.</div>`;
+    }
   }catch(e){
     document.getElementById('tw').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
   }finally{document.getElementById('btn-b').disabled=false;}
@@ -309,13 +319,23 @@ function render(jogos){
       const dc=j.confianca==='alta'?'d-a':j.confianca==='media'?'d-m':'d-b';
       const cc=j.confianca==='alta'?'c-a':j.confianca==='media'?'c-m':'c-b';
       const cl=j.confianca?(j.confianca[0].toUpperCase()+j.confianca.slice(1)):'-';
-      html+=`<div class="jogo-card" id="jc${i}">
+      const resBadge=j.resultado==='green'
+        ?'<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span>'
+        :j.resultado==='red'
+        ?'<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span>'
+        :'';
+      const cardStyle=j.resultado==='green'?'border-color:rgba(0,230,118,.35)':j.resultado==='red'?'border-color:rgba(255,23,68,.35)':'';
+      html+=`<div class="jogo-card" id="jc${i}" style="${cardStyle}">
         <div class="jogo-main" onclick="tog(${i})">
-          <div class="jogo-times">${j.time_casa} x ${j.time_fora}</div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+            <div class="jogo-times">${j.time_casa} x ${j.time_fora}</div>
+            ${resBadge}
+          </div>
           <div class="jogo-meta">
             <span class="pill ${lc[j.tipo_liga]||'p-eu'}">${ln[j.tipo_liga]||j.liga}</span>
             <span class="pill ${mc[j.mercado]||'p-gols'}">${ml[j.mercado]||j.mercado}</span>
             <span class="jogo-hora">${j.horario||'-'}</span>
+            ${j.placar?`<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">${j.placar}</span>`:''}
           </div>
           <div class="jogo-bottom">
             <span class="jogo-aposta">${j.aposta}</span>
