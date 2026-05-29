@@ -153,6 +153,8 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
     <div class="stat"><div class="stat-l">Mercados</div><div class="stat-v" style="color:var(--purple)" id="sm">-</div></div>
   </div>
 
+
+
   <div id="tw">
     <div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -318,7 +320,7 @@ let exp=new Set();
 function render(jogos){
   if(!jogos.length){document.getElementById('tw').innerHTML='<div class="empty-state"><p>Nenhum jogo encontrado.</p></div>';return;}
   const alta=jogos.filter(j=>j.confianca==='alta').length;
-  const odds=jogos.map(j=>parseFloat(j.odd_sugerida)).filter(Boolean);
+  const odds=jogos.map(j=>parseFloat(j.odd_mercado||j.odd_sugerida)).filter(Boolean);
   const om=odds.length?(odds.reduce((a,b)=>a+b,0)/odds.length).toFixed(2):'-';
   document.getElementById('sj').textContent=jogos.length;
   document.getElementById('sa2').textContent=alta;
@@ -359,7 +361,9 @@ function render(jogos){
             <span class="jogo-aposta">${j.aposta}</span>
             <div style="display:flex;align-items:center;gap:8px">
               <span class="jogo-conf ${cc}"><span class="dot ${dc}"></span>${cl}</span>
-              <span class="jogo-odd">${j.odd_sugerida||'-'}</span>
+              <div style="text-align:right">
+                ${j.odd_mercado?`<div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber)">${j.odd_mercado}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3)">mercado</div>`:`<div class="jogo-odd">${j.odd_sugerida||'-'}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3)">estimada</div>`}
+              </div>
               <span class="chev" id="cv${i}">▾</span>
             </div>
           </div>
