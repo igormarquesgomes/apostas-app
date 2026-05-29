@@ -189,6 +189,18 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 const BACKEND_URL='https://apostas-app.onrender.com';
 document.getElementById('backend-url').textContent=BACKEND_URL;
 
+// Limitar calendário: mín = primeira data no banco, máx = amanhã
+async function limitarCalendario(){
+  try{
+    const r=await fetch(BACKEND_URL+'/datas-disponiveis');
+    const j=await r.json();
+    const input=document.getElementById('d-input');
+    if(j.datas?.length>0) input.min=j.datas[0];
+    input.max=offsetData(hojeStr,1);
+  }catch(e){}
+}
+limitarCalendario();
+
 function hoje(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function offsetData(base,n){const d=new Date(base+'T12:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function fmtD(iso){const[a,m,d]=iso.split('-');return `${d}/${m}`;}
