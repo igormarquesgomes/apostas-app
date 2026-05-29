@@ -461,7 +461,7 @@ async function gerarApostas(data, horaMin, metaJogos) {
 
     if (ligaMatch) {
       if (!jogosMap.has(key))
-        jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: ligaMatch.pri, timeCasa, timeFora, horario: hStr });
+        jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: ligaMatch.pri, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
       const paisLower = pais.toLowerCase();
       let priComp = 20;
@@ -470,7 +470,7 @@ async function gerarApostas(data, horaMin, metaJogos) {
       else if (["turkey","netherlands","belgium","scotland","greece","russia","ukraine"].includes(paisLower)) priComp = 11;
       else if (["austria","czech-republic","poland","norway","finland","sweden","denmark"].includes(paisLower)) priComp = 18;
       if (!jogosComp.has(key))
-        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: 'eu', pri: priComp, timeCasa, timeFora, horario: hStr });
+        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: 'eu', pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     }
   }
 
@@ -568,38 +568,273 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 }
 
 // ─── Agentes ─────────────────────────────────────────────────
+// Buscar resultado de fixture pelo ID na API-Football
+async function buscarResultadoFixture(fixtureId) {
+  if (!contarRequisicao()) return null;
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures?id=${fixtureId}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const json = await res.json();
+    const f = json.response?.[0];
+    if (!f) return null;
+    const status = f.fixture?.status?.short;
+    if (!['FT','AET','PEN'].includes(status)) return null; // Jogo não terminou
+    return {
+      placar: `${f.goals?.home}-${f.goals?.away}`,
+      golsCasa: f.goals?.home,
+      golsFora: f.goals?.away,
+      status
+    };
+  } catch(e) { return null; }
+}
+
+// Buscar fixture pelo nome dos times e data (para apostas sem fixtureId)
+async function buscarFixturePorTimes(timeCasa, timeFora, data) {
+  if (!contarRequisicao()) return null;
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures?date=${data}&timezone=America/Sao_Paulo`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const json = await res.json();
+    const fixtures = json.response || [];
+    // Buscar por nome aproximado
+    const normalizar = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nCasa = normalizar(timeCasa), nFora = normalizar(timeFora);
+    return fixtures.find(f => {
+      const hNome = normalizar(f.teams?.home?.name);
+      const aNome = normalizar(f.teams?.away?.name);
+      return (hNome?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hNome?.split(' ')[0])) &&
+             (aNome?.includes(nFora?.split(' ')[0]) || nFora?.includes(aNome?.split(' ')[0]));
+    }) || null;
+  } catch(e) { return null; }
+}
+
+// Buscar estatísticas detalhadas de um fixture (escanteios, cartões)
+async function buscarStatsFixture(fixtureId) {
+  if (!contarRequisicao()) return null;
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/fixtures/statistics?fixture=${fixtureId}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const json = await res.json();
+    const teams = json.response || [];
+    let escanteiosCasa = 0, escanteiosFora = 0;
+    let cartoesCasa = 0, cartoesFora = 0;
+    let ambosM = false;
+
+    for (const team of teams) {
+      const stats = team.statistics || [];
+      const corners = stats.find(s => s.type === 'Corner Kicks')?.value || 0;
+      const yellowCards = stats.find(s => s.type === 'Yellow Cards')?.value || 0;
+      const redCards = stats.find(s => s.type === 'Red Cards')?.value || 0;
+      const goals = stats.find(s => s.type === 'Goals')?.value || 0;
+
+      if (teams.indexOf(team) === 0) {
+        escanteiosCasa = parseInt(corners) || 0;
+        cartoesCasa = (parseInt(yellowCards) || 0) + (parseInt(redCards) || 0);
+        if ((parseInt(goals) || 0) > 0) ambosM = true;
+      } else {
+        escanteiosFora = parseInt(corners) || 0;
+        cartoesFora = (parseInt(yellowCards) || 0) + (parseInt(redCards) || 0);
+        if ((parseInt(goals) || 0) > 0) ambosM = true;
+      }
+    }
+
+    return {
+      escanteiosTotal: escanteiosCasa + escanteiosFora,
+      escanteiosCasa, escanteiosFora,
+      cartoesTotal: cartoesCasa + cartoesFora,
+      cartoesCasa, cartoesFora,
+      ambosMarcaram: teams.length === 2 ? ambosM : null
+    };
+  } catch(e) { return null; }
+}
+
+// Verificar se aposta bateu baseado no resultado e estatísticas
+function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
+  const total = golsCasa + golsFora;
+  const aposta = jogo.aposta?.toLowerCase() || '';
+  const mercado = jogo.mercado?.toLowerCase() || '';
+  const casaVence = golsCasa > golsFora;
+  const foraVence = golsFora > golsCasa;
+  const empate = golsCasa === golsFora;
+
+  // Helper: verificar over/under genérico
+  const checkOverUnder = (valor, linha) => {
+    const n = parseFloat(linha);
+    if (aposta.includes(`over ${linha}`) || aposta.includes(`mais de ${linha}`)) return valor > n ? 'green' : 'red';
+    if (aposta.includes(`under ${linha}`) || aposta.includes(`menos de ${linha}`)) return valor < n ? 'green' : 'red';
+    return null;
+  };
+
+  // ── MERCADO GOLS ──────────────────────────────────────────
+  if (mercado === 'gols') {
+    for (const linha of ['0.5','1.5','2.5','3.5','4.5']) {
+      const r = checkOverUnder(total, linha);
+      if (r) return r;
+    }
+    // Ambos marcam
+    if (aposta.includes('ambos marcam') || aposta.includes('ambas marcam') || aposta.includes('btts')) {
+      const ambos = golsCasa > 0 && golsFora > 0;
+      if (aposta.includes('não') || aposta.includes('nao') || aposta.includes('- não')) return ambos ? 'red' : 'green';
+      return ambos ? 'green' : 'red';
+    }
+    // Time marca primeiro / anytime
+    if (aposta.includes('marca')) {
+      const nomeCasa = jogo.time_casa?.toLowerCase() || '';
+      const nomeFora = jogo.time_fora?.toLowerCase() || '';
+      const palavrasCasa = nomeCasa.split(' ').filter(p => p.length > 3);
+      const palavrasFora = nomeFora.split(' ').filter(p => p.length > 3);
+      if (palavrasCasa.some(p => aposta.includes(p))) return golsCasa > 0 ? 'green' : 'red';
+      if (palavrasFora.some(p => aposta.includes(p))) return golsFora > 0 ? 'green' : 'red';
+    }
+  }
+
+  // ── MERCADO ESCANTEIOS ────────────────────────────────────
+  if (mercado === 'escanteios' && stats) {
+    const esc = stats.escanteiosTotal;
+    for (const linha of ['7.5','8.5','9.5','10.5','11.5','12.5']) {
+      const r = checkOverUnder(esc, linha);
+      if (r) return r;
+    }
+    // Escanteios por time
+    if (aposta.includes('escanteios casa') || aposta.includes('cantos casa')) {
+      for (const linha of ['3.5','4.5','5.5','6.5']) {
+        const r = checkOverUnder(stats.escanteiosCasa, linha);
+        if (r) return r;
+      }
+    }
+  }
+
+  // ── MERCADO CARTÕES ───────────────────────────────────────
+  if (mercado === 'cartoes' && stats) {
+    const cart = stats.cartoesTotal;
+    for (const linha of ['1.5','2.5','3.5','4.5','5.5']) {
+      const r = checkOverUnder(cart, linha);
+      if (r) return r;
+    }
+    // Cartões por time
+    const nomeCasa = jogo.time_casa?.toLowerCase() || '';
+    const nomeFora = jogo.time_fora?.toLowerCase() || '';
+    const palavrasCasa = nomeCasa.split(' ').filter(p => p.length > 3);
+    const palavrasFora = nomeFora.split(' ').filter(p => p.length > 3);
+    if (palavrasCasa.some(p => aposta.includes(p))) {
+      for (const linha of ['0.5','1.5','2.5']) {
+        const r = checkOverUnder(stats.cartoesCasa, linha);
+        if (r) return r;
+      }
+    }
+    if (palavrasFora.some(p => aposta.includes(p))) {
+      for (const linha of ['0.5','1.5','2.5']) {
+        const r = checkOverUnder(stats.cartoesFora, linha);
+        if (r) return r;
+      }
+    }
+  }
+
+  // ── MERCADO RESULTADO ─────────────────────────────────────
+  if (mercado === 'resultado') {
+    const nomeCasa = jogo.time_casa?.toLowerCase() || '';
+    const nomeFora = jogo.time_fora?.toLowerCase() || '';
+    const palavrasCasa = nomeCasa.split(' ').filter(p => p.length > 3);
+    const apostaMencCasa = palavrasCasa.some(p => aposta.includes(p));
+    const apostaMencFora = !apostaMencCasa && nomeFora.split(' ').filter(p => p.length > 3).some(p => aposta.includes(p));
+
+    if (aposta.includes('empate')) return empate ? 'green' : 'red';
+    if (aposta.includes('ou empata') || aposta.includes('vence ou empata') || aposta.includes('dupla chance')) {
+      if (apostaMencCasa) return (casaVence || empate) ? 'green' : 'red';
+      if (apostaMencFora) return (foraVence || empate) ? 'green' : 'red';
+    }
+    if (aposta.includes('vence') || aposta.includes('vitória') || aposta.includes('vitoria')) {
+      if (apostaMencCasa) return casaVence ? 'green' : 'red';
+      if (apostaMencFora) return foraVence ? 'green' : 'red';
+    }
+  }
+
+  return 'pendente';
+}
+
 async function agentValidar(data) {
   console.log(`\n🔍 Validando ${data}`);
   const row = await dbGet(data);
   if (!row?.apostas?.jogos) { console.log('Sem apostas'); return; }
   if (row.resultados) { console.log('Já validado'); return; }
 
+  const jogos = row.apostas.jogos;
   const resultados = [];
-  for (const jogo of row.apostas.jogos) {
-    const prompt = `Busque o resultado do jogo: ${jogo.time_casa} x ${jogo.time_fora} em ${data}.
-Aposta: ${jogo.aposta} (${jogo.mercado})
-Responda SOMENTE JSON: {"encontrado":true,"placar":"2-1","resultado_aposta":"green","motivo":"explicação"}
-Se não encontrar: {"encontrado":false,"placar":null,"resultado_aposta":"pendente","motivo":"não encontrado"}`;
+  let cacheFixtures = null; // Cache das fixtures do dia para evitar múltiplas chamadas
+
+  for (const jogo of jogos) {
+    console.log(`  Verificando: ${jogo.time_casa} x ${jogo.time_fora}`);
+    let placar = null, golsCasa = null, golsFora = null, fixtureIdUsado = jogo.fixtureId || null;
+
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 500, tools: [{ type: 'web_search_20250305', name: 'web_search' }], messages: [{ role: 'user', content: prompt }] })
-      });
-      const json = await res.json();
-      const txt = (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-      const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-      if (s !== -1) resultados.push({ ...JSON.parse(txt.slice(s,e+1)), jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+      // Tentar pelo fixtureId salvo
+      if (jogo.fixtureId) {
+        const res = await buscarResultadoFixture(jogo.fixtureId);
+        if (res) { placar = res.placar; golsCasa = res.golsCasa; golsFora = res.golsFora; }
+        await sleep(300);
+      }
+
+      // Fallback: buscar pelo nome dos times
+      if (golsCasa === null) {
+        if (!cacheFixtures) {
+          // Buscar todos os fixtures do dia de uma vez (1 requisição)
+          if (!contarRequisicao()) { resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: 'limite API', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora }); continue; }
+          const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${data}&timezone=America/Sao_Paulo`, { headers: { 'x-apisports-key': APIFOOTBALL_KEY } });
+          const json = await res.json();
+          cacheFixtures = json.response || [];
+          await sleep(300);
+        }
+
+        const normalizar = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+        const nCasa = normalizar(jogo.time_casa), nFora = normalizar(jogo.time_fora);
+        const fixture = cacheFixtures.find(f => {
+          const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
+          const status = f.fixture?.status?.short;
+          if (!['FT','AET','PEN'].includes(status)) return false;
+          return (hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0])) &&
+                 (aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]));
+        });
+
+        if (fixture) {
+          golsCasa = fixture.goals?.home;
+          golsFora = fixture.goals?.away;
+          placar = `${golsCasa}-${golsFora}`;
+          fixtureIdUsado = fixture.fixture?.id || fixtureIdUsado;
+        }
+      }
+
+      if (golsCasa !== null && golsFora !== null) {
+        // Buscar stats detalhadas se precisar (cartões/escanteios)
+        let stats = null;
+        const mercado = jogo.mercado?.toLowerCase() || '';
+        if (['escanteios','cartoes'].includes(mercado) && fixtureIdUsado) {
+          stats = await buscarStatsFixture(fixtureIdUsado);
+          await sleep(300);
+        }
+        const resultado = verificarAposta(jogo, golsCasa, golsFora, stats);
+        console.log(`    ✅ ${placar} → ${resultado.toUpperCase()}`);
+        resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+      } else {
+        console.log(`    ⏳ Resultado não encontrado`);
+        resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: 'resultado não encontrado na API', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+      }
     } catch(err) {
-      resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: err.message, jogo_id: jogo.id });
+      console.log(`    ❌ Erro: ${err.message}`);
+      resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: err.message, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
     }
-    await sleep(500);
   }
 
   await dbSaveResultados(data, { validado_em: new Date().toISOString(), apostas: resultados });
   const g = resultados.filter(r=>r.resultado_aposta==='green').length;
   const r = resultados.filter(r=>r.resultado_aposta==='red').length;
-  console.log(`✅ ${g} green, ${r} red`);
+  const p = resultados.filter(r=>r.resultado_aposta==='pendente').length;
+  console.log(`✅ Validação: ${g} green, ${r} red, ${p} pendente`);
 }
 
 async function agentDiario(data) {
