@@ -148,13 +148,62 @@ async function dbGetCalibracao(tipo) {
   } catch(e) { return null; }
 }
 
+async function dbGetCalibracaoPorPeriodo(tipo, periodoInicio) {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/calibracao?tipo=eq.${tipo}&periodo_inicio=eq.${periodoInicio}&select=id,relatorio,assertividade`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await res.json();
+    return rows && rows.length > 0 ? rows[0] : null;
+  } catch(e) { return null; }
+}
+
 async function dbSaveCalibracao(tipo, periodoInicio, periodoFim, relatorio, assertividade) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/calibracao`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, periodo_inicio: periodoInicio, periodo_fim: periodoFim, relatorio, assertividade })
-    });
+    // Verificar se já existe relatório para este período
+    const existente = await dbGetCalibracaoPorPeriodo(tipo, periodoInicio);
+
+    if (existente) {
+      // Complementar com IA: mesclar relatório antigo + novo
+      console.log(`🔄 Complementando relatório ${tipo} de ${periodoInicio}...`);
+      const promptComplementar = `Você é um analista de apostas esportivas. Você tem um relatório de calibração existente e um novo relatório com informações adicionais. Sua tarefa é COMPLEMENTAR o relatório existente com as novas informações, gerando um relatório único mais completo e atualizado.
+
+RELATÓRIO EXISTENTE (assertividade: ${existente.assertividade}%):
+${existente.relatorio}
+
+NOVAS INFORMAÇÕES (assertividade atual: ${assertividade}%):
+${relatorio}
+
+Gere um único relatório complementado que:
+1. Mantenha os padrões já identificados no relatório anterior
+2. Adicione os novos padrões e informações encontrados
+3. Atualize a análise com base na assertividade atual (${assertividade}%)
+4. Seja mais completo que ambos os relatórios separados
+5. Mantenha o mesmo estilo técnico e objetivo
+
+Retorne APENAS o texto do relatório complementado, sem títulos extras.`;
+
+      const relatorioComplementado = await chamarIA(promptComplementar, 3000);
+      const relatorioFinal = relatorioComplementado || relatorio;
+      const assertividadeFinal = assertividade; // usar a mais recente
+
+      // Atualizar registro existente
+      await fetch(`${SUPABASE_URL}/rest/v1/calibracao?id=eq.${existente.id}`, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ relatorio: relatorioFinal, assertividade: assertividadeFinal, periodo_fim: periodoFim })
+      });
+      console.log(`✅ Relatório ${tipo} complementado`);
+    } else {
+      // Criar novo relatório
+      await fetch(`${SUPABASE_URL}/rest/v1/calibracao`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, periodo_inicio: periodoInicio, periodo_fim: periodoFim, relatorio, assertividade })
+      });
+      console.log(`✅ Relatório ${tipo} criado`);
+    }
   } catch(e) { console.error('Erro dbSaveCalibracao:', e.message); }
 }
 
