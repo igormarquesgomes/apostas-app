@@ -210,16 +210,31 @@ const hojeStr=hoje();
 document.getElementById('d-input').value=offsetData(hojeStr,1);
 
 // Limitar calendário
+let dataMin=null, dataMax=offsetData(hojeStr,1);
+
 async function limitarCalendario(){
   try{
     const r=await fetch(BACKEND_URL+'/datas-disponiveis');
     const j=await r.json();
     const input=document.getElementById('d-input');
-    if(j.datas?.length>0) input.min=j.datas[0];
-    input.max=offsetData(hojeStr,1);
+    dataMax=offsetData(hojeStr,1);
+    if(j.datas?.length>0){ dataMin=j.datas[0]; input.min=dataMin; }
+    input.max=dataMax;
+    // Validar ao mudar a data no mobile
+    input.addEventListener('change',()=>{
+      const v=input.value;
+      if(dataMin && v < dataMin){ input.value=dataMin; mostrarAviso('Data mínima disponível: '+fmtDL(dataMin)); return; }
+      if(v > dataMax){ input.value=dataMax; mostrarAviso('Máximo: amanhã ('+fmtDL(dataMax)+')'); return; }
+    });
   }catch(e){}
 }
 limitarCalendario();
+
+function mostrarAviso(msg){
+  const tw=document.getElementById('tw');
+  tw.innerHTML=`<div class="aviso">⚠ ${msg}</div>`;
+  setTimeout(()=>{ if(tw.innerHTML.includes(msg)) tw.innerHTML=''; },3000);
+}
 
 // Navegação de dias
 function renderDias(){
@@ -271,6 +286,9 @@ async function buscar(){
   const hora=document.getElementById('h-min').value;
   const meta=parseInt(document.getElementById('q-jogos').value)||15;
   if(!dv) return;
+  // Validar intervalo no mobile
+  if(dataMin && dv < dataMin){ mostrarAviso('Data mínima disponível: '+fmtDL(dataMin)); return; }
+  if(dv > dataMax){ mostrarAviso('Máximo disponível: amanhã ('+fmtDL(dataMax)+')'); return; }
   document.getElementById('btn-b').disabled=true;
   document.getElementById('sa').style.display='none';
   let si=0;
