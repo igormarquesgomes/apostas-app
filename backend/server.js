@@ -11,6 +11,168 @@ const APIFOOTBALL_KEY = process.env.APIFOOTBALL_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
+const ODDS_API_KEY = process.env.ODDS_API_KEY;
+
+// ─── The Odds API ─────────────────────────────────────────────
+// Mapeamento de ligas para a The Odds API
+const ODDS_SPORT_KEYS = {
+  'soccer_brazil_campeonato': 'Série A',
+  'soccer_brazil_serie_b': 'Série B',
+  'soccer_conmebol_copa_libertadores': 'Libertadores',
+  'soccer_conmebol_copa_sudamericana': 'Sul-Americana',
+  'soccer_uefa_champs_league': 'Champions League',
+  'soccer_uefa_europa_league': 'Europa League',
+  'soccer_spain_la_liga': 'La Liga',
+  'soccer_italy_serie_a': 'Serie A IT',
+  'soccer_epl': 'Premier League',
+  'soccer_germany_bundesliga': 'Bundesliga',
+  'soccer_france_ligue_one': 'Ligue 1',
+};
+
+// Cache de odds do dia — busca 1x por dia
+let oddsCacheData = null;
+let oddsCacheDate = '';
+let oddsReqHoje = 0;
+const ODDS_LIMITE = 25; // máx 25 chamadas/mês para ficar bem dentro dos 500
+
+async function buscarOddsDia(data) {
+  // Só busca 1 vez por dia
+  if (oddsCacheDate === data && oddsCacheData) {
+    console.log('✅ Odds cache hit');
+    return oddsCacheData;
+  }
+
+  if (oddsReqHoje >= ODDS_LIMITE) {
+    console.warn(`⚠️ Odds API: limite mensal de segurança atingido (${ODDS_LIMITE} req)`);
+    return null;
+  }
+
+  if (!ODDS_API_KEY) {
+    console.log('ℹ️ ODDS_API_KEY não configurada');
+    return null;
+  }
+
+  try {
+    const todasOdds = {};
+    const sports = Object.keys(ODDS_SPORT_KEYS);
+
+    for (const sport of sports) {
+      const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal&dateFormat=iso`;
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        console.log(`⚠️ Odds API ${sport}: HTTP ${res.status}`);
+        continue;
+      }
+
+      const remaining = res.headers.get('x-requests-remaining');
+      const used = res.headers.get('x-requests-used');
+      console.log(`📊 Odds API: ${used} usados, ${remaining} restantes`);
+
+      if (remaining && parseInt(remaining) < 50) {
+        console.warn(`⚠️ Odds API: apenas ${remaining} créditos restantes!`);
+        oddsReqHoje = ODDS_LIMITE; // bloquear mais chamadas
+        break;
+      }
+
+      const jogos = await res.json();
+      oddsReqHoje++;
+
+      for (const jogo of jogos) {
+        // Filtrar por data aproximada
+        const jogoData = jogo.commence_time?.substring(0, 10);
+        if (jogoData !== data) continue;
+
+        const key = `${jogo.home_team}|${jogo.away_team}`;
+        todasOdds[key] = jogo.bookmakers || [];
+      }
+
+      await sleep(200);
+    }
+
+    oddsCacheData = todasOdds;
+    oddsCacheDate = data;
+    console.log(`✅ Odds carregadas para ${data}: ${Object.keys(todasOdds).length} jogos`);
+    return todasOdds;
+  } catch(e) {
+    console.error('Erro buscarOdds:', e.message);
+    return null;
+  }
+}
+
+// Encontrar odds de um jogo específico
+function extrairOdds(todasOdds, timeCasa, timeFora, mercado) {
+  if (!todasOdds) return null;
+
+  const normalizar = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+  const nCasa = normalizar(timeCasa), nFora = normalizar(timeFora);
+
+  // Encontrar jogo por nome aproximado
+  let jogoOdds = null;
+  for (const [key, bookmakers] of Object.entries(todasOdds)) {
+    const [hNome, aNome] = key.split('|').map(normalizar);
+    const palavraCasa = nCasa?.split(' ')[0], palavraFora = nFora?.split(' ')[0];
+    if ((hNome?.includes(palavraCasa) || palavraCasa?.includes(hNome?.split(' ')[0])) &&
+        (aNome?.includes(palavraFora) || palavraFora?.includes(aNome?.split(' ')[0]))) {
+      jogoOdds = bookmakers;
+      break;
+    }
+  }
+
+  if (!jogoOdds || !jogoOdds.length) return null;
+
+  // Calcular odd média do mercado solicitado
+  let oddCasa = [], oddEmpate = [], oddFora = [], oddOver = [], oddUnder = [];
+
+  for (const bm of jogoOdds) {
+    for (const market of bm.markets || []) {
+      if (market.key === 'h2h') {
+        for (const outcome of market.outcomes || []) {
+          const n = normalizar(outcome.name);
+          if (n === nCasa || n?.includes(palavraCasa)) oddCasa.push(outcome.price);
+          else if (n === 'draw') oddEmpate.push(outcome.price);
+          else oddFora.push(outcome.price);
+        }
+      }
+      if (market.key === 'totals') {
+        for (const outcome of market.outcomes || []) {
+          if (outcome.name === 'Over') oddOver.push(outcome.price);
+          if (outcome.name === 'Under') oddUnder.push(outcome.price);
+        }
+      }
+    }
+  }
+
+  const media = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : null;
+
+  return {
+    casa: media(oddCasa),
+    empate: media(oddEmpate),
+    fora: media(oddFora),
+    over: media(oddOver),
+    under: media(oddUnder),
+    bookmakers: jogoOdds.length
+  };
+}
+
+// Selecionar a odd correta baseado na aposta definida
+function selecionarOdd(oddsJogo, aposta, timeCasa, timeFora) {
+  if (!oddsJogo) return null;
+  const a = aposta?.toLowerCase() || '';
+  const nCasa = timeCasa?.toLowerCase() || '';
+  const nFora = timeFora?.toLowerCase() || '';
+  const palavrasCasa = nCasa.split(' ').filter(p=>p.length>3);
+  const mencCasa = palavrasCasa.some(p=>a.includes(p));
+  const mencFora = !mencCasa && nFora.split(' ').filter(p=>p.length>3).some(p=>a.includes(p));
+
+  if (a.includes('over')) return oddsJogo.over;
+  if (a.includes('under') || a.includes('menos de')) return oddsJogo.under;
+  if (a.includes('empate')) return oddsJogo.empate;
+  if (mencCasa && (a.includes('vence') || a.includes('vitória'))) return oddsJogo.casa;
+  if (mencFora && (a.includes('vence') || a.includes('vitória'))) return oddsJogo.fora;
+  return null;
+}
+
 // IDs de liga na API-Football
 const LIGAS_PRIORITY = {
   // Brasil
@@ -616,7 +778,31 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   if (!txt) return null;
   const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
   if (s === -1 || e === -1) return null;
-  return JSON.parse(txt.slice(s, e+1));
+  const resultado = JSON.parse(txt.slice(s, e+1));
+
+  // Buscar odds reais da The Odds API (1 chamada/dia, cached)
+  console.log('\n💰 Buscando odds reais...');
+  const todasOdds = await buscarOddsDia(data);
+
+  // Enriquecer cada aposta com a odd real do mercado
+  if (resultado.jogos && todasOdds) {
+    for (const jogo of resultado.jogos) {
+      const oddsJogo = extrairOdds(todasOdds, jogo.time_casa, jogo.time_fora, jogo.mercado);
+      const oddReal = selecionarOdd(oddsJogo, jogo.aposta, jogo.time_casa, jogo.time_fora);
+
+      if (oddReal) {
+        jogo.odd_mercado = parseFloat(oddReal); // odd real do mercado
+        // Se odd do mercado for muito baixa (< 1.20), alertar
+        if (parseFloat(oddReal) < 1.20) {
+          jogo.alerta_odd = true;
+          jogo.confianca = 'baixa';
+        }
+      }
+    }
+    console.log(`✅ Odds reais aplicadas`);
+  }
+
+  return resultado;
 }
 
 // ─── Agentes ─────────────────────────────────────────────────
