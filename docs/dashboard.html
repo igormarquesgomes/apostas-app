@@ -17,9 +17,7 @@
   --text2: #7a7f9a;
   --text3: #3a3f58;
   --green: #00e676;
-  --green2: #00c853;
   --red: #ff1744;
-  --red2: #d50000;
   --amber: #ffab00;
   --blue: #448aff;
   --purple: #e040fb;
@@ -30,429 +28,368 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
 
-/* ── NAV ── */
-nav {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 2rem; height: 56px;
-  background: var(--s1); border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 100;
-}
-.nav-logo { display: flex; align-items: center; gap: 10px; }
-.nav-logo-icon { width: 30px; height: 30px; background: var(--green); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
-.nav-logo-icon svg { width: 14px; height: 14px; color: #000; }
-.nav-logo-name { font-size: 14px; font-weight: 600; }
-.nav-logo-name span { color: var(--green); }
-.nav-tabs { display: flex; gap: 4px; }
-.nav-tab { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 6px 14px; border-radius: 6px; border: 1px solid transparent; color: var(--text2); cursor: pointer; text-decoration: none; transition: all .15s; }
-.nav-tab:hover { color: var(--text); background: var(--s2); }
-.nav-tab.active { color: var(--green); border-color: rgba(0,230,118,0.2); background: rgba(0,230,118,0.06); }
-.nav-badge { font-family: var(--mono); font-size: 10px; padding: 4px 10px; border-radius: 20px; background: rgba(0,230,118,0.08); color: var(--green); border: 1px solid rgba(0,230,118,0.2); }
+/* NAV */
+nav { display:flex; align-items:center; justify-content:space-between; padding:0 2rem; height:52px; background:var(--s1); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+.nav-logo { display:flex; align-items:center; gap:10px; text-decoration:none; }
+.nav-logo-icon { width:28px; height:28px; background:var(--green); border-radius:6px; display:flex; align-items:center; justify-content:center; }
+.nav-logo-icon svg { width:13px; height:13px; color:#000; }
+.nav-logo-name { font-size:14px; font-weight:600; color:var(--text); }
+.nav-logo-name span { color:var(--green); }
+.nav-tabs { display:flex; gap:4px; }
+.nav-tab { font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; padding:6px 14px; border-radius:6px; border:1px solid transparent; color:var(--text2); cursor:pointer; text-decoration:none; transition:all .15s; }
+.nav-tab:hover { color:var(--text); background:var(--s2); }
+.nav-tab.active { color:var(--green); border-color:rgba(0,230,118,0.2); background:rgba(0,230,118,0.06); }
+.nav-badge { font-family:var(--mono); font-size:10px; padding:4px 10px; border-radius:20px; background:rgba(0,230,118,0.08); color:var(--green); border:1px solid rgba(0,230,118,0.2); }
 
-/* ── LAYOUT ── */
-.page { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+/* PAGE */
+.page { max-width:1200px; margin:0 auto; padding:2rem 1.5rem 4rem; }
 
-/* ── SAÚDE GERAL ── */
-.health-banner {
-  position: relative; overflow: hidden;
-  background: var(--s1); border: 1px solid var(--border2);
-  border-radius: 16px; padding: 2rem 2.5rem;
-  margin-bottom: 1.5rem;
-  display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center;
-}
-.health-banner::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--green), transparent);
-}
-.health-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--text3); margin-bottom: 8px; }
-.health-pct { font-family: var(--display); font-size: 72px; line-height: 1; letter-spacing: 2px; }
-.health-pct.good { color: var(--green); }
-.health-pct.ok { color: var(--amber); }
-.health-pct.bad { color: var(--red); }
-.health-sub { font-size: 13px; color: var(--text2); margin-top: 6px; font-family: var(--mono); }
-.health-top3 { display: flex; flex-direction: column; gap: 10px; min-width: 280px; }
-.health-top3-title { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--text3); margin-bottom: 4px; }
-.top3-item { display: flex; align-items: center; gap: 10px; }
-.top3-rank { font-family: var(--display); font-size: 18px; color: var(--text3); width: 20px; }
-.top3-bar-wrap { flex: 1; }
-.top3-liga { font-size: 12px; font-weight: 500; margin-bottom: 4px; display: flex; justify-content: space-between; }
-.top3-bar { height: 4px; background: var(--s3); border-radius: 2px; overflow: hidden; }
-.top3-bar-fill { height: 100%; border-radius: 2px; transition: width .8s ease; }
-.top3-pct { font-family: var(--mono); font-size: 11px; }
+/* TABS */
+.tabs { display:flex; gap:6px; margin-bottom:2rem; border-bottom:1px solid var(--border); padding-bottom:0; }
+.tab { font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; padding:10px 18px; border-radius:8px 8px 0 0; border:1px solid transparent; border-bottom:none; color:var(--text2); cursor:pointer; transition:all .15s; position:relative; bottom:-1px; }
+.tab:hover { color:var(--text); background:var(--s2); }
+.tab.active { color:var(--green); border-color:var(--border2); border-bottom-color:var(--bg); background:var(--bg); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
 
-/* ── STATS GRID ── */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
-.stat-card { background: var(--s1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
-.stat-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--text3); margin-bottom: 8px; }
-.stat-value { font-family: var(--display); font-size: 36px; letter-spacing: 1px; line-height: 1; }
-.stat-sub { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-top: 4px; }
+/* SAÚDE CARDS */
+.saude-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:1.5rem; }
+.saude-card { background:var(--s1); border:1px solid var(--border2); border-radius:14px; padding:20px 24px; position:relative; overflow:hidden; }
+.saude-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.saude-card.ontem::before { background:linear-gradient(90deg,var(--blue),transparent); }
+.saude-card.semana::before { background:linear-gradient(90deg,var(--green),transparent); }
+.saude-card.mes::before { background:linear-gradient(90deg,var(--purple),transparent); }
+.saude-label { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--text3); margin-bottom:8px; }
+.saude-pct { font-family:var(--display); font-size:52px; letter-spacing:1px; line-height:1; margin-bottom:6px; }
+.saude-pct.good { color:var(--green); }
+.saude-pct.ok { color:var(--amber); }
+.saude-pct.bad { color:var(--red); }
+.saude-pct.empty { color:var(--text3); }
+.saude-detail { display:flex; gap:14px; }
+.saude-d { font-family:var(--mono); font-size:12px; }
+.saude-d span { font-size:16px; font-weight:600; display:block; }
 
-/* ── FILTRO DATA ── */
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-.section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text2); }
-.date-filter { display: flex; gap: 6px; align-items: center; }
-.date-btn { font-family: var(--mono); font-size: 11px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border2); background: var(--s1); color: var(--text2); cursor: pointer; transition: all .15s; }
-.date-btn:hover, .date-btn.active { border-color: var(--green); color: var(--green); background: rgba(0,230,118,0.06); }
-.date-input { background: var(--s1); border: 1px solid var(--border2); color: var(--text); font-family: var(--mono); font-size: 11px; padding: 6px 10px; border-radius: 6px; outline: none; }
-.date-input:focus { border-color: var(--green); }
+/* HEALTH BANNER */
+.health-banner { background:var(--s1); border:1px solid var(--border2); border-radius:14px; padding:20px 24px; margin-bottom:1.5rem; display:grid; grid-template-columns:1fr auto; gap:2rem; align-items:center; position:relative; overflow:hidden; }
+.health-banner::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--green),transparent); }
+.health-pct { font-family:var(--display); font-size:64px; letter-spacing:2px; line-height:1; }
+.health-sub { font-size:12px; color:var(--text2); font-family:var(--mono); margin-top:4px; }
+.health-label { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--text3); margin-bottom:6px; }
+.top3 { min-width:260px; }
+.top3-title { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--text3); margin-bottom:10px; }
+.top3-item { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.top3-rank { font-family:var(--display); font-size:16px; color:var(--text3); width:18px; }
+.top3-info { flex:1; }
+.top3-name { font-size:12px; font-weight:500; display:flex; justify-content:space-between; margin-bottom:4px; }
+.top3-bar { height:3px; background:var(--s3); border-radius:2px; overflow:hidden; }
+.top3-fill { height:100%; border-radius:2px; }
 
-/* ── HISTÓRICO DIÁRIO ── */
-.daily-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 2rem; }
-.daily-item { background: var(--s1); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.daily-header { display: grid; grid-template-columns: 120px 1fr repeat(4, 80px) 30px; align-items: center; padding: 12px 16px; cursor: pointer; transition: background .12s; gap: 8px; }
-.daily-header:hover { background: var(--s2); }
-.daily-date { font-family: var(--mono); font-size: 12px; color: var(--text2); }
-.daily-assertividade { font-family: var(--display); font-size: 22px; letter-spacing: 1px; }
-.daily-bar { height: 3px; background: var(--s3); border-radius: 2px; overflow: hidden; flex: 1; }
-.daily-bar-fill { height: 100%; border-radius: 2px; }
-.daily-stat { text-align: center; }
-.daily-stat-v { font-family: var(--mono); font-size: 13px; font-weight: 500; }
-.daily-stat-l { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
-.daily-chev { color: var(--text3); font-size: 12px; transition: transform .2s; justify-self: center; }
-.daily-chev.open { transform: rotate(180deg); }
+/* STATS GRID */
+.stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.5rem; }
+.stat-card { background:var(--s1); border:1px solid var(--border); border-radius:10px; padding:14px 18px; }
+.stat-label { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--text3); margin-bottom:6px; }
+.stat-value { font-family:var(--display); font-size:34px; letter-spacing:1px; line-height:1; }
 
-/* ── APOSTAS DO DIA ── */
-.daily-apostas { display: none; border-top: 1px solid var(--border); }
-.daily-apostas.open { display: block; }
-.aposta-row { display: grid; grid-template-columns: 1fr 100px 120px 80px 60px 80px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); gap: 8px; font-size: 12px; }
-.aposta-row:last-child { border-bottom: none; }
-.aposta-jogo { font-weight: 500; }
-.aposta-hora { font-family: var(--mono); font-size: 11px; color: var(--text2); }
-.aposta-tipo { font-size: 11px; color: var(--text2); }
-.aposta-odd { font-family: var(--mono); font-size: 12px; font-weight: 500; }
-.aposta-placar { font-family: var(--mono); font-size: 11px; color: var(--text2); }
-.result-badge { font-family: var(--mono); font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 20px; text-align: center; }
-.result-green { background: rgba(0,230,118,0.12); color: var(--green); border: 1px solid rgba(0,230,118,0.25); }
-.result-red { background: rgba(255,23,68,0.12); color: var(--red); border: 1px solid rgba(255,23,68,0.25); }
-.result-pendente { background: rgba(255,171,0,0.1); color: var(--amber); border: 1px solid rgba(255,171,0,0.2); }
+/* SECTION */
+.section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+.section-title { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text2); }
 
-/* ── RANKING LIGAS ── */
-.ligas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 2rem; }
-.liga-card { background: var(--s1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
-.liga-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.liga-nome { font-size: 13px; font-weight: 600; }
-.liga-pct { font-family: var(--display); font-size: 28px; letter-spacing: 1px; }
-.liga-stats { display: flex; gap: 16px; margin-bottom: 10px; }
-.liga-stat { font-family: var(--mono); font-size: 11px; }
-.liga-stat span { font-size: 14px; font-weight: 600; display: block; }
-.liga-bar { height: 4px; background: var(--s3); border-radius: 2px; overflow: hidden; }
-.liga-bar-fill { height: 100%; border-radius: 2px; transition: width .8s ease; }
+/* DAILY LIST */
+.daily-list { display:flex; flex-direction:column; gap:8px; }
+.daily-item { background:var(--s1); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.daily-header { display:grid; grid-template-columns:110px 1fr 80px 70px 70px 70px 28px; align-items:center; padding:12px 16px; cursor:pointer; gap:8px; transition:background .12s; }
+.daily-header:hover { background:var(--s2); }
+.daily-date { font-family:var(--mono); font-size:12px; color:var(--text2); }
+.daily-bar { height:3px; background:var(--s3); border-radius:2px; overflow:hidden; }
+.daily-bar-fill { height:100%; border-radius:2px; }
+.daily-pct { font-family:var(--display); font-size:20px; }
+.daily-stat { text-align:center; }
+.daily-stat-v { font-family:var(--mono); font-size:13px; font-weight:500; }
+.daily-stat-l { font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; margin-top:1px; }
+.daily-chev { color:var(--text3); font-size:11px; transition:transform .2s; }
+.daily-chev.open { transform:rotate(180deg); }
+.daily-apostas { display:none; border-top:1px solid var(--border); }
+.daily-apostas.open { display:block; }
+.aposta-row { display:grid; grid-template-columns:1fr 90px 110px 70px 60px 80px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--border); gap:8px; font-size:12px; }
+.aposta-row:last-child { border-bottom:none; }
+.aposta-jogo { font-weight:500; }
+.aposta-sub { font-size:10px; color:var(--text2); margin-top:1px; }
+.rbadge { font-family:var(--mono); font-size:10px; padding:3px 8px; border-radius:20px; text-align:center; }
+.r-green { background:rgba(0,230,118,.1); color:var(--green); border:1px solid rgba(0,230,118,.2); }
+.r-red { background:rgba(255,23,68,.1); color:var(--red); border:1px solid rgba(255,23,68,.2); }
+.r-pend { background:rgba(255,171,0,.08); color:var(--amber); border:1px solid rgba(255,171,0,.18); }
 
-/* ── RELATÓRIO IA ── */
-.relatorio-card { background: var(--s1); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 2rem; }
-.relatorio-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.relatorio-icon { width: 28px; height: 28px; background: rgba(224,64,251,0.12); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-.relatorio-title { font-size: 13px; font-weight: 600; }
-.relatorio-tipo { font-family: var(--mono); font-size: 10px; color: var(--purple); text-transform: uppercase; letter-spacing: .1em; }
-.relatorio-texto { font-size: 13px; color: var(--text2); line-height: 1.8; white-space: pre-wrap; }
+/* LIGAS */
+.toggle-btns { display:flex; gap:4px; }
+.toggle-btn { font-family:var(--mono); font-size:11px; padding:6px 14px; border-radius:6px; border:1px solid var(--border2); background:var(--s1); color:var(--text2); cursor:pointer; transition:all .15s; }
+.toggle-btn.active { color:var(--green); border-color:rgba(0,230,118,.25); background:rgba(0,230,118,.06); }
+.ligas-list { display:flex; flex-direction:column; gap:8px; }
+.liga-row { background:var(--s1); border:1px solid var(--border); border-radius:10px; padding:14px 18px; display:grid; grid-template-columns:28px 1fr 80px 70px 70px 80px 120px; align-items:center; gap:12px; }
+.liga-rank { font-family:var(--display); font-size:20px; color:var(--text3); }
+.liga-nome { font-size:13px; font-weight:500; }
+.liga-total { font-family:var(--mono); font-size:12px; color:var(--text2); text-align:center; }
+.liga-green { font-family:var(--mono); font-size:13px; font-weight:600; color:var(--green); text-align:center; }
+.liga-red { font-family:var(--mono); font-size:13px; font-weight:600; color:var(--red); text-align:center; }
+.liga-pct { font-family:var(--display); font-size:22px; text-align:right; }
+.liga-bar-wrap { }
+.liga-bar { height:4px; background:var(--s3); border-radius:2px; overflow:hidden; }
+.liga-bar-fill { height:100%; border-radius:2px; transition:width .8s; }
 
-/* ── BOTÃO MANUAL ── */
-.btn-manual { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(255,171,0,0.3); background: rgba(255,171,0,0.06); color: var(--amber); cursor: pointer; transition: all .15s; }
-.btn-manual:hover { background: rgba(255,171,0,0.12); border-color: var(--amber); }
-.btn-manual:disabled { opacity: 0.4; cursor: not-allowed; }
+/* RELATÓRIOS */
+.relatorios-list { display:flex; flex-direction:column; gap:10px; }
+.rel-item { background:var(--s1); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.rel-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; cursor:pointer; transition:background .12s; }
+.rel-header:hover { background:var(--s2); }
+.rel-info { display:flex; align-items:center; gap:12px; }
+.rel-icon { font-size:18px; }
+.rel-title { font-size:13px; font-weight:600; }
+.rel-sub { font-family:var(--mono); font-size:10px; color:var(--text2); margin-top:2px; }
+.rel-badge { font-family:var(--mono); font-size:11px; padding:3px 10px; border-radius:20px; }
+.rel-body { display:none; padding:16px 18px; border-top:1px solid var(--border); font-size:13px; color:var(--text2); line-height:1.8; white-space:pre-wrap; }
+.rel-body.open { display:block; }
 
-/* ── LOADING / EMPTY ── */
-.loading { text-align: center; padding: 4rem 2rem; }
-.spin { width: 28px; height: 28px; border: 2px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: sp .8s linear infinite; margin: 0 auto 12px; }
-@keyframes sp { to { transform: rotate(360deg); } }
-.empty { text-align: center; padding: 3rem 2rem; color: var(--text3); font-family: var(--mono); font-size: 13px; }
+/* BTN */
+.btn-manual { display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; padding:7px 14px; border-radius:7px; border:1px solid rgba(255,171,0,.3); background:rgba(255,171,0,.06); color:var(--amber); cursor:pointer; transition:all .15s; }
+.btn-manual:hover { background:rgba(255,171,0,.12); }
+.btn-manual:disabled { opacity:.4; cursor:not-allowed; }
 
-@media (max-width: 768px) {
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .ligas-grid { grid-template-columns: 1fr; }
-  .health-banner { grid-template-columns: 1fr; }
-  .health-top3 { min-width: unset; }
-  .daily-header { grid-template-columns: 90px 1fr repeat(3, 60px) 30px; }
-  .aposta-row { grid-template-columns: 1fr 80px 80px; }
+/* MISC */
+.loading { text-align:center; padding:4rem 2rem; }
+.spin { width:26px; height:26px; border:2px solid var(--border2); border-top-color:var(--green); border-radius:50%; animation:sp .8s linear infinite; margin:0 auto 10px; }
+.empty { text-align:center; padding:3rem 2rem; color:var(--text3); font-family:var(--mono); font-size:12px; }
+@keyframes sp { to { transform:rotate(360deg); } }
+
+@media(max-width:768px) {
+  .saude-grid { grid-template-columns:1fr; }
+  .stats-grid { grid-template-columns:1fr 1fr; }
+  .liga-row { grid-template-columns:24px 1fr 60px 60px 60px; }
+  .liga-pct { display:none; }
+  .liga-bar-wrap { display:none; }
 }
 </style>
 </head>
 <body>
-
 <nav>
-  <div class="nav-logo">
-    <div class="nav-logo-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    </div>
+  <a class="nav-logo" href="index.html">
+    <div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
     <span class="nav-logo-name">Análise de <span>Apostas</span></span>
-  </div>
+  </a>
   <div class="nav-tabs">
     <a class="nav-tab" href="index.html">Apostas</a>
     <a class="nav-tab active" href="dashboard.html">Dashboard</a>
+    <a class="nav-tab" href="relatorios.html">Relatórios</a>
+    <a class="nav-tab" href="ligas.html">Ligas & Times</a>
   </div>
   <span class="nav-badge">Estrela Bet</span>
 </nav>
 
 <div class="page">
 
+  <!-- SAÚDE POR PERÍODO -->
+  <div class="saude-grid" id="saude-grid">
+    <div class="saude-card ontem"><div class="saude-label">Ontem</div><div class="saude-pct empty">--</div></div>
+    <div class="saude-card semana"><div class="saude-label">Esta semana</div><div class="saude-pct empty">--</div></div>
+    <div class="saude-card mes"><div class="saude-label">Este mês</div><div class="saude-pct empty">--</div></div>
+  </div>
+
   <!-- SAÚDE GERAL -->
   <div class="health-banner" id="health-banner">
     <div class="loading"><div class="spin"></div></div>
   </div>
 
-  <!-- STATS GRID -->
+  <!-- STATS -->
   <div class="stats-grid" id="stats-grid">
-    <div class="stat-card"><div class="stat-label">Carregando...</div></div>
+    <div class="stat-card"><div class="stat-label">Carregando</div></div>
   </div>
 
-  <!-- RANKING LIGAS -->
+  <!-- HISTÓRICO -->
   <div class="section-header">
-    <span class="section-title">Assertividade por Liga</span>
-  </div>
-  <div class="ligas-grid" id="ligas-grid">
-    <div class="empty">Carregando ligas...</div>
-  </div>
-
-  <!-- HISTÓRICO DIÁRIO -->
-  <div class="section-header">
-    <span class="section-title">Histórico Diário</span>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn-manual" id="btn-rotina" onclick="dispararRotina()">
-        ⚡ Disparar rotina manualmente
-      </button>
-      <input type="date" class="date-input" id="filtro-data" onchange="filtrarData(this.value)">
-    </div>
+    <span class="section-title">Histórico diário</span>
+    <button class="btn-manual" id="btn-rotina" onclick="dispararRotina()">⚡ Disparar rotina</button>
   </div>
   <div class="daily-list" id="daily-list">
-    <div class="loading"><div class="spin"></div><p style="color:var(--text3);font-family:var(--mono);font-size:12px">Carregando histórico...</p></div>
+    <div class="loading"><div class="spin"></div></div>
   </div>
-
-  <!-- RELATÓRIO IA -->
-  <div class="section-header" style="margin-top:1rem">
-    <span class="section-title">Memória da IA</span>
-  </div>
-  <div id="relatorios-ia"></div>
 
 </div>
 
 <script>
-const BACKEND = 'https://apostas-app.onrender.com';
+const B = 'https://apostas-app.onrender.com';
 
-// ─── Helpers ───────────────────────────────────────────────
-function corPct(p) {
-  if (p >= 80) return 'var(--green)';
-  if (p >= 60) return 'var(--amber)';
-  return 'var(--red)';
-}
-function classePct(p) {
-  if (p >= 80) return 'good';
-  if (p >= 60) return 'ok';
-  return 'bad';
-}
-function fmtData(iso) {
-  if (!iso) return '-';
-  const [a,m,d] = iso.split('-');
-  return `${d}/${m}/${a}`;
-}
-function hoje() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function diaOffset(base, n) {
-  const d = new Date(base + 'T12:00:00');
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-// ─── Carregar dados ─────────────────────────────────────────
-async function carregarDados() {
-  // Buscar apostas dos últimos 30 dias do Supabase via backend
-  const promises = [];
-  const hojeStr = hoje();
-  for (let i = 0; i < 30; i++) {
-    promises.push(buscarDia(diaOffset(hojeStr, -i)));
-  }
-  const dias = (await Promise.all(promises)).filter(d => d && d.apostas);
-  return dias;
-}
+function corP(p) { return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)'; }
+function classeP(p) { return p>=80?'good':p>=60?'ok':'bad'; }
+function fmtD(iso) { if(!iso) return '-'; const[a,m,d]=iso.split('-'); return `${d}/${m}`; }
+function fmtDL(iso) { if(!iso) return '-'; const[a,m,d]=iso.split('-'); return `${d}/${m}/${a}`; }
+function hoje() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function offD(base,n) { const d=new Date(base+'T12:00:00'); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 async function buscarDia(data) {
   try {
-    const res = await fetch(`${BACKEND}/apostas-resultado/${data}`);
-    if (!res.ok) return null;
-    return await res.json();
+    const r = await fetch(`${B}/apostas-resultado/${data}`);
+    if(!r.ok) return null;
+    return await r.json();
   } catch(e) { return null; }
 }
 
-async function carregarCalibracao() {
-  try {
-    const res = await fetch(`${BACKEND}/calibracao`);
-    return await res.json();
-  } catch(e) { return {}; }
+async function carregarTodos() {
+  const h = hoje();
+  const promises = [];
+  for(let i=0;i<30;i++) promises.push(buscarDia(offD(h,-i)));
+  const dias = (await Promise.all(promises)).filter(d=>d&&d.apostas);
+  return dias;
 }
 
-// ─── Processar dados ────────────────────────────────────────
-function processarDados(dias) {
-  let totalApostas = 0, totalGreen = 0, totalRed = 0;
-  const ligasMap = {};
-  const diasProcessados = [];
+function processar(dias) {
+  let tG=0,tR=0,tT=0;
+  const ligasMap={}, timesMap={};
+  const diasP=[];
 
-  for (const dia of dias) {
-    const apostas = dia.apostas?.jogos || [];
-    const resultados = dia.resultados?.apostas || [];
-    let dGreen = 0, dRed = 0, dPendente = 0;
+  // Períodos
+  const h=hoje(), ontem=offD(h,-1);
+  const inicioSemana=offD(h,-6), inicioMes=h.substring(0,8)+'01';
 
-    const apostasComRes = apostas.map(a => {
-      const r = resultados.find(x => x.jogo_id === a.id);
-      if (r?.resultado_aposta === 'green') { dGreen++; totalGreen++; }
-      else if (r?.resultado_aposta === 'red') { dRed++; totalRed++; }
-      else dPendente++;
+  let oG=0,oR=0, sG=0,sR=0, mG=0,mR=0;
 
-      // Acumular por liga
-      const liga = a.liga || 'Outras';
-      if (!ligasMap[liga]) ligasMap[liga] = { green: 0, red: 0, total: 0 };
-      if (r?.resultado_aposta === 'green') ligasMap[liga].green++;
-      else if (r?.resultado_aposta === 'red') ligasMap[liga].red++;
-      if (r?.resultado_aposta === 'green' || r?.resultado_aposta === 'red') ligasMap[liga].total++;
+  for(const dia of dias) {
+    const apostas=dia.apostas?.jogos||[];
+    const resultados=dia.resultados?.apostas||[];
+    let dG=0,dR=0,dP=0;
 
-      return {
-        ...a,
-        resultado: r?.resultado_aposta || 'pendente',
-        placar: r?.placar || null,
-        motivo: r?.motivo || null
-      };
+    const apostasR=apostas.map(a=>{
+      const r=resultados.find(x=>x.jogo_id===a.id);
+      const res=r?.resultado_aposta||'pendente';
+      if(res==='green'){dG++;tG++;}
+      else if(res==='red'){dR++;tR++;}
+      else dP++;
+
+      // Ligas
+      const liga=a.liga||'Outras';
+      if(!ligasMap[liga]) ligasMap[liga]={green:0,red:0,total:0};
+      if(res==='green') ligasMap[liga].green++;
+      else if(res==='red') ligasMap[liga].red++;
+      if(res!=='pendente') ligasMap[liga].total++;
+
+      // Times
+      [a.time_casa,a.time_fora].forEach(t=>{
+        if(!t) return;
+        if(!timesMap[t]) timesMap[t]={green:0,red:0,total:0};
+        if(res==='green') timesMap[t].green++;
+        else if(res==='red') timesMap[t].red++;
+        if(res!=='pendente') timesMap[t].total++;
+      });
+
+      return {...a,resultado:res,placar:r?.placar||null};
     });
 
-    totalApostas += apostas.length;
-    const dTotal = dGreen + dRed;
-    const dAssert = dTotal > 0 ? Math.round(dGreen / dTotal * 100) : null;
+    tT+=apostas.length;
+    const dTot=dG+dR;
+    const dAssert=dTot>0?Math.round(dG/dTot*100):null;
 
-    diasProcessados.push({
-      data: dia.data,
-      apostas: apostasComRes,
-      green: dGreen, red: dRed, pendente: dPendente,
-      total: apostas.length,
-      assertividade: dAssert
-    });
+    // Acumular períodos
+    if(dia.data===ontem){oG+=dG;oR+=dR;}
+    if(dia.data>=inicioSemana){sG+=dG;sR+=dR;}
+    if(dia.data>=inicioMes){mG+=dG;mR+=dR;}
+
+    diasP.push({data:dia.data,apostas:apostasR,green:dG,red:dR,pendente:dP,total:apostas.length,assertividade:dAssert});
   }
 
-  const totalValidado = totalGreen + totalRed;
-  const assertividadeGeral = totalValidado > 0 ? Math.round(totalGreen / totalValidado * 100) : null;
+  const tVal=tG+tR;
+  const assertG=tVal>0?Math.round(tG/tVal*100):null;
 
-  // Top 3 ligas
-  const ligasOrdenadas = Object.entries(ligasMap)
-    .filter(([,v]) => v.total >= 2)
-    .map(([nome, v]) => ({ nome, ...v, pct: Math.round(v.green / v.total * 100) }))
-    .sort((a, b) => b.pct - a.pct);
+  const ligas=Object.entries(ligasMap).filter(([,v])=>v.total>=1)
+    .map(([nome,v])=>({nome,...v,pct:v.total>0?Math.round(v.green/v.total*100):0}))
+    .sort((a,b)=>b.pct-a.pct);
 
-  return { diasProcessados, assertividadeGeral, totalApostas, totalGreen, totalRed, ligasOrdenadas };
+  const times=Object.entries(timesMap).filter(([,v])=>v.total>=1)
+    .map(([nome,v])=>({nome,...v,pct:v.total>0?Math.round(v.green/v.total*100):0}))
+    .sort((a,b)=>b.pct-a.pct);
+
+  const saude={
+    ontem:{g:oG,r:oR,pct:oG+oR>0?Math.round(oG/(oG+oR)*100):null},
+    semana:{g:sG,r:sR,pct:sG+sR>0?Math.round(sG/(sG+sR)*100):null},
+    mes:{g:mG,r:mR,pct:mG+mR>0?Math.round(mG/(mG+mR)*100):null}
+  };
+
+  return {diasP,assertG,tT,tG,tR,ligas,times,saude};
 }
 
-// ─── Renderizar ─────────────────────────────────────────────
-function renderHealth(assert, top3, totalGreen, totalRed) {
-  const pct = assert ?? 0;
-  const total = totalGreen + totalRed;
-  document.getElementById('health-banner').innerHTML = `
-    <div>
-      <div class="health-label">Saúde geral do app</div>
-      <div class="health-pct ${classePct(pct)}">${assert !== null ? pct + '%' : '--'}</div>
-      <div class="health-sub">${total} apostas validadas · ${totalGreen} green · ${totalRed} red</div>
-    </div>
-    <div>
-      <div class="health-top3-title">Top 3 ligas</div>
-      <div class="health-top3">
-        ${top3.slice(0,3).map((l,i) => `
-          <div class="top3-item">
-            <span class="top3-rank">${i+1}</span>
-            <div class="top3-bar-wrap">
-              <div class="top3-liga">
-                <span>${l.nome}</span>
-                <span class="top3-pct" style="color:${corPct(l.pct)}">${l.pct}%</span>
-              </div>
-              <div class="top3-bar">
-                <div class="top3-bar-fill" style="width:${l.pct}%;background:${corPct(l.pct)}"></div>
-              </div>
-            </div>
-          </div>`).join('') || '<div style="color:var(--text3);font-size:12px;font-family:var(--mono)">Aguardando dados...</div>'}
+function renderSaude(s) {
+  const periodos=[
+    {key:'ontem',label:'Ontem',cls:'ontem'},
+    {key:'semana',label:'Esta semana',cls:'semana'},
+    {key:'mes',label:'Este mês',cls:'mes'}
+  ];
+  document.getElementById('saude-grid').innerHTML=periodos.map(p=>{
+    const d=s[p.key];
+    const pct=d.pct;
+    return `<div class="saude-card ${p.cls}">
+      <div class="saude-label">${p.label}</div>
+      <div class="saude-pct ${pct!==null?classeP(pct):'empty'}">${pct!==null?pct+'%':'--'}</div>
+      <div class="saude-detail">
+        <div class="saude-d"><span style="color:var(--green)">${d.g}</span>Green</div>
+        <div class="saude-d"><span style="color:var(--red)">${d.r}</span>Red</div>
+        <div class="saude-d"><span style="color:var(--text2)">${d.g+d.r}</span>Total</div>
       </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHealth(assert,top3,tG,tR) {
+  const pct=assert??0;
+  document.getElementById('health-banner').innerHTML=`
+    <div>
+      <div class="health-label">Saúde geral · últimos 30 dias</div>
+      <div class="health-pct ${assert!==null?classeP(pct):'empty'}">${assert!==null?pct+'%':'--'}</div>
+      <div class="health-sub">${tG+tR} apostas validadas · ${tG} green · ${tR} red</div>
+    </div>
+    <div class="top3">
+      <div class="top3-title">Top 3 ligas</div>
+      ${top3.slice(0,3).map((l,i)=>`
+        <div class="top3-item">
+          <span class="top3-rank">${i+1}</span>
+          <div class="top3-info">
+            <div class="top3-name"><span>${l.nome}</span><span style="color:${corP(l.pct)}">${l.pct}%</span></div>
+            <div class="top3-bar"><div class="top3-fill" style="width:${l.pct}%;background:${corP(l.pct)}"></div></div>
+          </div>
+        </div>`).join('')||'<div class="empty" style="padding:1rem 0">Aguardando dados...</div>'}
     </div>`;
 }
 
-function renderStats(assert, total, green, red, dias) {
-  document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card">
-      <div class="stat-label">Assertividade</div>
-      <div class="stat-value" style="color:${corPct(assert??0)}">${assert !== null ? assert+'%' : '--'}</div>
-      <div class="stat-sub">geral validado</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Total apostas</div>
-      <div class="stat-value" style="color:var(--blue)">${total}</div>
-      <div class="stat-sub">últimos 30 dias</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Green</div>
-      <div class="stat-value" style="color:var(--green)">${green}</div>
-      <div class="stat-sub">apostas certas</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Red</div>
-      <div class="stat-value" style="color:var(--red)">${red}</div>
-      <div class="stat-sub">apostas erradas</div>
-    </div>`;
+function renderStats(assert,total,g,r) {
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Assertividade geral</div><div class="stat-value" style="color:${corP(assert??0)}">${assert!==null?assert+'%':'--'}</div></div>
+    <div class="stat-card"><div class="stat-label">Total apostas</div><div class="stat-value" style="color:var(--blue)">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Green</div><div class="stat-value" style="color:var(--green)">${g}</div></div>
+    <div class="stat-card"><div class="stat-label">Red</div><div class="stat-value" style="color:var(--red)">${r}</div></div>`;
 }
 
-function renderLigas(ligas) {
-  if (!ligas.length) {
-    document.getElementById('ligas-grid').innerHTML = '<div class="empty">Sem dados suficientes ainda.<br>Aguardando validações.</div>';
-    return;
-  }
-  document.getElementById('ligas-grid').innerHTML = ligas.map(l => `
-    <div class="liga-card">
-      <div class="liga-card-header">
-        <span class="liga-nome">${l.nome}</span>
-        <span class="liga-pct" style="color:${corPct(l.pct)}">${l.pct}%</span>
-      </div>
-      <div class="liga-stats">
-        <div class="liga-stat"><span style="color:var(--green)">${l.green}</span>Green</div>
-        <div class="liga-stat"><span style="color:var(--red)">${l.red}</span>Red</div>
-        <div class="liga-stat"><span style="color:var(--blue)">${l.total}</span>Total</div>
-      </div>
-      <div class="liga-bar">
-        <div class="liga-bar-fill" style="width:${l.pct}%;background:${corPct(l.pct)}"></div>
-      </div>
-    </div>`).join('');
-}
-
-function renderDiario(dias, filtro) {
-  const diasFiltrados = filtro ? dias.filter(d => d.data === filtro) : dias;
-  if (!diasFiltrados.length) {
-    document.getElementById('daily-list').innerHTML = '<div class="empty">Nenhum dado encontrado.</div>';
-    return;
-  }
-  document.getElementById('daily-list').innerHTML = diasFiltrados.map((d, idx) => {
-    const pct = d.assertividade;
-    const apostasHtml = d.apostas.map(a => `
+function renderDiario(dias) {
+  if(!dias.length){document.getElementById('daily-list').innerHTML='<div class="empty">Nenhum dado encontrado.</div>';return;}
+  document.getElementById('daily-list').innerHTML=dias.map((d,idx)=>{
+    const pct=d.assertividade;
+    const apostasHtml=d.apostas.map(a=>`
       <div class="aposta-row">
-        <div>
-          <div class="aposta-jogo">${a.time_casa} x ${a.time_fora}</div>
-          <div class="aposta-tipo">${a.aposta}</div>
-        </div>
-        <div class="aposta-hora">${a.horario||'-'}</div>
-        <div style="font-size:11px;color:var(--text2)">${a.liga||'-'}</div>
-        <div class="aposta-odd">${a.odd_sugerida||'-'}</div>
-        <div class="aposta-placar">${a.placar||'-'}</div>
-        <div><span class="result-badge ${a.resultado==='green'?'result-green':a.resultado==='red'?'result-red':'result-pendente'}">${a.resultado==='green'?'GREEN':a.resultado==='red'?'RED':'PEND.'}</span></div>
+        <div><div class="aposta-jogo">${a.time_casa} x ${a.time_fora}</div><div class="aposta-sub">${a.liga||''}</div></div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text2)">${a.horario||'-'}</div>
+        <div style="font-size:12px">${a.aposta}</div>
+        <div style="font-family:var(--mono);font-size:12px">${a.odd_sugerida||'-'}</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text2)">${a.placar||'-'}</div>
+        <div><span class="rbadge ${a.resultado==='green'?'r-green':a.resultado==='red'?'r-red':'r-pend'}">${a.resultado==='green'?'GREEN':a.resultado==='red'?'RED':'PEND.'}</span></div>
       </div>`).join('');
-
     return `
       <div class="daily-item">
-        <div class="daily-header" onclick="toggleDia(${idx})">
-          <span class="daily-date">${fmtData(d.data)}</span>
-          <div class="daily-bar"><div class="daily-bar-fill" style="width:${pct||0}%;background:${corPct(pct||0)}"></div></div>
-          <div class="daily-assertividade" style="color:${corPct(pct||0)}">${pct !== null ? pct+'%' : '--'}</div>
+        <div class="daily-header" onclick="togD(${idx})">
+          <span class="daily-date">${fmtDL(d.data)}</span>
+          <div class="daily-bar"><div class="daily-bar-fill" style="width:${pct||0}%;background:${corP(pct||0)}"></div></div>
+          <div class="daily-pct" style="color:${corP(pct||0)}">${pct!==null?pct+'%':'--'}</div>
           <div class="daily-stat"><div class="daily-stat-v" style="color:var(--green)">${d.green}</div><div class="daily-stat-l">Green</div></div>
           <div class="daily-stat"><div class="daily-stat-v" style="color:var(--red)">${d.red}</div><div class="daily-stat-l">Red</div></div>
           <div class="daily-stat"><div class="daily-stat-v" style="color:var(--text2)">${d.total}</div><div class="daily-stat-l">Total</div></div>
           <span class="daily-chev" id="chev-${idx}">▾</span>
         </div>
-        <div class="daily-apostas" id="apostas-${idx}">
-          <div style="display:grid;grid-template-columns:1fr 100px 120px 80px 60px 80px;padding:8px 16px;border-bottom:1px solid var(--border);gap:8px">
-            <span style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Jogo</span>
-            <span style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase">Hora</span>
-            <span style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase">Liga</span>
-            <span style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase">Odd</span>
-            <span style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase">Placar</span>
-            <span style="font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase">Res.</span>
+        <div class="daily-apostas" id="ap-${idx}">
+          <div style="display:grid;grid-template-columns:1fr 90px 110px 70px 60px 80px;padding:7px 16px;border-bottom:1px solid var(--border);gap:8px">
+            ${['Jogo','Hora','Aposta','Odd','Placar','Res.'].map(h=>`<span style="font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em">${h}</span>`).join('')}
           </div>
           ${apostasHtml}
         </div>
@@ -460,71 +397,29 @@ function renderDiario(dias, filtro) {
   }).join('');
 }
 
-function renderRelatorios(cal) {
-  const tipos = [
-    { key: 'diario', label: 'Diário', icon: '📊' },
-    { key: 'semanal', label: 'Semanal', icon: '📅' },
-    { key: 'mensal', label: 'Mensal', icon: '📆' },
-    { key: 'semestral', label: 'Semestral', icon: '🗓️' }
-  ];
-  const html = tipos.filter(t => cal[t.key]).map(t => {
-    const r = cal[t.key];
-    return `
-      <div class="relatorio-card">
-        <div class="relatorio-header">
-          <div class="relatorio-icon">${t.icon}</div>
-          <div>
-            <div class="relatorio-title">Relatório ${t.label}</div>
-            <div class="relatorio-tipo">${r.periodo_inicio} → ${r.periodo_fim} · ${r.assertividade}% assertividade</div>
-          </div>
-        </div>
-        <div class="relatorio-texto">${r.relatorio}</div>
-      </div>`;
-  }).join('');
-  document.getElementById('relatorios-ia').innerHTML = html || '<div class="empty">Nenhum relatório de calibração ainda.<br>A IA aprende após a primeira rotina noturna.</div>';
+function togD(i){
+  const el=document.getElementById('ap-'+i),cv=document.getElementById('chev-'+i);
+  el.classList.toggle('open');cv.classList.toggle('open');
 }
 
-// ─── Interações ─────────────────────────────────────────────
-let dadosGlobais = [];
-
-function toggleDia(idx) {
-  const el = document.getElementById(`apostas-${idx}`);
-  const chev = document.getElementById(`chev-${idx}`);
-  el.classList.toggle('open');
-  chev.classList.toggle('open');
+async function dispararRotina(){
+  const btn=document.getElementById('btn-rotina');
+  btn.disabled=true;btn.textContent='⏳ Disparando...';
+  try{
+    await fetch(`${B}/rotina-noturna`,{method:'POST'});
+    btn.textContent='✅ Disparado!';
+  }catch(e){btn.textContent='❌ Erro';}
+  setTimeout(()=>{btn.disabled=false;btn.textContent='⚡ Disparar rotina';},3000);
 }
 
-function filtrarData(val) {
-  renderDiario(dadosGlobais, val || null);
+async function init(){
+  const dias=await carregarTodos();
+  const {diasP,assertG,tT,tG,tR,ligas,times,saude}=processar(dias);
+  renderSaude(saude);
+  renderHealth(assertG,ligas,tG,tR);
+  renderStats(assertG,tT,tG,tR);
+  renderDiario(diasP);
 }
-
-async function dispararRotina() {
-  const btn = document.getElementById('btn-rotina');
-  btn.disabled = true;
-  btn.textContent = '⏳ Disparando...';
-  try {
-    const res = await fetch(`${BACKEND}/rotina-noturna`, { method: 'POST' });
-    const json = await res.json();
-    btn.textContent = '✅ Disparado!';
-    setTimeout(() => { btn.disabled = false; btn.textContent = '⚡ Disparar rotina manualmente'; }, 3000);
-  } catch(e) {
-    btn.textContent = '❌ Erro';
-    setTimeout(() => { btn.disabled = false; btn.textContent = '⚡ Disparar rotina manualmente'; }, 3000);
-  }
-}
-
-// ─── Init ────────────────────────────────────────────────────
-async function init() {
-  const [dias, cal] = await Promise.all([carregarDados(), carregarCalibracao()]);
-  const { diasProcessados, assertividadeGeral, totalApostas, totalGreen, totalRed, ligasOrdenadas } = processarDados(dias);
-  dadosGlobais = diasProcessados;
-  renderHealth(assertividadeGeral, ligasOrdenadas, totalGreen, totalRed);
-  renderStats(assertividadeGeral, totalApostas, totalGreen, totalRed, diasProcessados.length);
-  renderLigas(ligasOrdenadas);
-  renderDiario(diasProcessados, null);
-  renderRelatorios(cal);
-}
-
 init();
 </script>
 </body>
