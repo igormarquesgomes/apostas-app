@@ -121,6 +121,53 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
     <div class="stat-card"><div class="stat-lbl">Carregando</div></div>
   </div>
 
+  <!-- GESTÃO DE BANCA -->
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:1rem;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--amber),transparent)"></div>
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:12px">💰 Gestão de banca</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:120px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Valor por aposta (R$)</div>
+        <input type="number" id="banca-valor" value="50" min="1" step="10"
+          style="background:var(--s2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:14px;padding:8px 10px;border-radius:7px;width:100%;outline:none;"
+          oninput="calcularBanca()">
+      </div>
+      <button onclick="calcularBanca()" style="background:rgba(255,171,0,.1);border:1px solid rgba(255,171,0,.3);color:var(--amber);font-family:var(--mono);font-size:11px;padding:9px 16px;border-radius:7px;cursor:pointer;white-space:nowrap;">
+        Calcular
+      </button>
+    </div>
+    <div id="banca-resultado" style="display:none;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+        <div style="background:var(--s2);border-radius:8px;padding:10px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Investido</div>
+          <div style="font-family:var(--mono);font-size:15px;font-weight:600;" id="b-investido">-</div>
+        </div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Retorno</div>
+          <div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--green)" id="b-retorno">-</div>
+        </div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Resultado</div>
+          <div style="font-family:var(--mono);font-size:15px;font-weight:600;" id="b-resultado">-</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <div style="background:var(--s2);border-radius:8px;padding:10px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Ontem</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:600;" id="b-ontem">-</div>
+        </div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Semana</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:600;" id="b-semana">-</div>
+        </div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Mês</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:600;" id="b-mes">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="sec-header">
     <span class="sec-title">Histórico diário</span>
     <button class="btn-manual" id="btn-r" onclick="rotina()">⚡ Rotina manual</button>
@@ -137,6 +184,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 
 <script>
 const B='https://apostas-app.onrender.com';
+let dadosGlobais=[];
+
 function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
 function cP(p){return p>=80?'good':p>=60?'ok':'bad';}
 function hoje(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -182,6 +231,7 @@ function processar(dias,h){
   const ligas=Object.entries(ligasMap).filter(([,v])=>v.total>=1).map(([n,v])=>({nome:n,...v,pct:Math.round(v.green/v.total*100)})).sort((a,b)=>b.pct-a.pct);
   const saude={ontem:{g:oG,r:oR,pct:oG+oR>0?Math.round(oG/(oG+oR)*100):null},semana:{g:sG,r:sR,pct:sG+sR>0?Math.round(sG/(sG+sR)*100):null},mes:{g:mG,r:mR,pct:mG+mR>0?Math.round(mG/(mG+mR)*100):null}};
 
+  dadosGlobais=diasP;
   renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR);renderDiario(diasP);
 }
 
@@ -258,6 +308,43 @@ function renderDiario(dias){
 function togD(i){
   document.getElementById('da'+i).classList.toggle('open');
   document.getElementById('dc'+i).classList.toggle('open');
+}
+
+function calcularBanca(){
+  const banca=parseFloat(document.getElementById('banca-valor').value)||50;
+  if(!dadosGlobais.length) return;
+
+  const h=hoje(),ontem=off(h,-1),sw=off(h,-6),sm=h.substring(0,8)+'01';
+  let tInv=0,tRet=0,oInv=0,oRet=0,sInv=0,sRet=0,mInv=0,mRet=0;
+
+  for(const dia of dadosGlobais){
+    const ap=dia.apostas||[];
+    for(const a of ap){
+      const odd=parseFloat(a.odd_mercado||a.odd_sugerida)||0;
+      if(!odd) continue;
+      tInv+=banca;
+      if(a.resultado==='green') tRet+=banca*odd;
+      // Por período
+      if(dia.data===ontem){oInv+=banca;if(a.resultado==='green')oRet+=banca*odd;}
+      if(dia.data>=sw){sInv+=banca;if(a.resultado==='green')sRet+=banca*odd;}
+      if(dia.data>=sm){mInv+=banca;if(a.resultado==='green')mRet+=banca*odd;}
+    }
+  }
+
+  const fmt=(inv,ret)=>{
+    const r=ret-inv;
+    const cor=r>=0?'var(--green)':'var(--red)';
+    return `<span style="color:${cor}">${r>=0?'+':''}R$ ${r.toFixed(2)}</span>`;
+  };
+
+  document.getElementById('b-investido').textContent='R$ '+tInv.toFixed(2);
+  document.getElementById('b-retorno').textContent='R$ '+tRet.toFixed(2);
+  document.getElementById('b-resultado').innerHTML=fmt(tInv,tRet);
+  document.getElementById('b-resultado').style.color='';
+  document.getElementById('b-ontem').innerHTML=oInv>0?fmt(oInv,oRet):'<span style="color:var(--text3)">sem dados</span>';
+  document.getElementById('b-semana').innerHTML=sInv>0?fmt(sInv,sRet):'<span style="color:var(--text3)">sem dados</span>';
+  document.getElementById('b-mes').innerHTML=mInv>0?fmt(mInv,mRet):'<span style="color:var(--text3)">sem dados</span>';
+  document.getElementById('banca-resultado').style.display='block';
 }
 
 async function rotina(){
