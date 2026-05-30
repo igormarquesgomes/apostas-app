@@ -929,17 +929,28 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   console.log(`✅ Total apostas geradas: ${jogosResultado.length}`);
   const resultado = { jogos: jogosResultado };
 
-  // Garantir tipo_liga correto em todos os jogos antes de salvar
+  // Corrigir tipo_liga e liga usando dados originais dos jogos selecionados
   if (resultado.jogos) {
-    resultado.jogos = resultado.jogos.map((j, idx) => {
-      // Recuperar tipo do jogosMap original se IA não preencheu
-      const jogoOriginal = jogos[idx];
+    resultado.jogos = resultado.jogos.map((j) => {
+      // Encontrar jogo original pelo time casa/fora
+      const jogoOriginal = jogos.find(jg =>
+        jg.timeCasa === j.time_casa && jg.timeFora === j.time_fora
+      ) || jogos[j.id - 1];
+
+      // Sempre usar tipo e liga do original — nunca confiar na IA para isso
+      const tipoCorreto = jogoOriginal?.tipo || j.tipo_liga || 'eu';
+      const ligaCorreta = jogoOriginal?.liga || j.liga || 'Internacional';
+
       return {
         ...j,
-        tipo_liga: j.tipo_liga || jogoOriginal?.tipo || 'eu',
-        liga: j.liga || jogoOriginal?.liga || 'Internacional',
+        tipo_liga: tipoCorreto,
+        liga: ligaCorreta,
+        pri: jogoOriginal?.pri || 20, // guardar prioridade para ordenar no frontend
       };
     });
+
+    // Ordenar por prioridade original
+    resultado.jogos.sort((a, b) => (a.pri || 20) - (b.pri || 20));
   }
 
   // Buscar odds reais da The Odds API (1 chamada/dia, cached)
