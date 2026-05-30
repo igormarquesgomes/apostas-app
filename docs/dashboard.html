@@ -168,6 +168,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
     </div>
   </div>
 
+  <!-- ACOMPANHAMENTO DO DIA -->
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:1rem;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);">📡 Hoje em tempo real</div>
+      <button id="btn-hoje" onclick="validarHoje()" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(68,138,255,.3);background:rgba(68,138,255,.08);color:var(--blue);cursor:pointer;">
+        🔄 Atualizar resultados
+      </button>
+    </div>
+    <div id="hoje-conteudo">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:center;padding:1rem;">
+        Clique em "Atualizar resultados" para ver os jogos de hoje
+      </div>
+    </div>
+  </div>
+
   <div class="sec-header">
     <span class="sec-title">Histórico diário</span>
     <button class="btn-manual" id="btn-r" onclick="rotina()">⚡ Rotina manual</button>
@@ -308,6 +324,83 @@ function renderDiario(dias){
 function togD(i){
   document.getElementById('da'+i).classList.toggle('open');
   document.getElementById('dc'+i).classList.toggle('open');
+}
+
+async function validarHoje(){
+  const btn=document.getElementById('btn-hoje');
+  btn.disabled=true;btn.textContent='⏳ Validando...';
+
+  try{
+    // Disparar validação
+    await fetch(`${B}/validar-agora`,{method:'POST'});
+
+    // Aguardar 8 segundos e buscar resultado atualizado
+    await new Promise(r=>setTimeout(r,8000));
+
+    const r=await fetch(`${B}/apostas-resultado/${hoje()}`);
+    const d=await r.json();
+
+    if(!d.apostas?.jogos?.length){
+      document.getElementById('hoje-conteudo').innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:center;padding:1rem;">Sem apostas geradas para hoje ainda.</div>';
+      return;
+    }
+
+    const ap=d.apostas.jogos, res=d.resultados?.apostas||[];
+    const jogosComRes=ap.map(a=>{
+      const rv=res.find(x=>x.jogo_id===a.id);
+      return{...a,resultado:rv?.resultado_aposta||'pendente',placar:rv?.placar||null};
+    });
+
+    const g=jogosComRes.filter(j=>j.resultado==='green').length;
+    const r2=jogosComRes.filter(j=>j.resultado==='red').length;
+    const p=jogosComRes.filter(j=>j.resultado==='pendente').length;
+    const tot=g+r2;
+    const pct=tot>0?Math.round(g/tot*100):null;
+
+    const resumo=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Total</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:600;">${ap.length}</div>
+        </div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Green</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)">${g}</div>
+        </div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Red</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--red)">${r2}</div>
+        </div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Pendente</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--amber)">${p}</div>
+        </div>
+      </div>
+      ${pct!==null?`<div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px;">Assertividade até agora: <strong style="color:${corP(pct)}">${pct}%</strong></div>`:''}
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${jogosComRes.map(j=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border-radius:8px;gap:8px;${j.resultado==='green'?'border-left:2px solid var(--green)':j.resultado==='red'?'border-left:2px solid var(--red)':'border-left:2px solid var(--s3)'}">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.time_casa} x ${j.time_fora}</div>
+              <div style="font-size:10px;color:var(--text2);font-family:var(--mono);">${j.aposta} · ${j.horario||''}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              ${j.placar?`<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">${j.placar}</span>`:''}
+              <span style="font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:20px;${j.resultado==='green'?'background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25)':j.resultado==='red'?'background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.25)':'background:rgba(255,171,0,.08);color:var(--amber);border:1px solid rgba(255,171,0,.2)'}">
+                ${j.resultado==='green'?'✓ GREEN':j.resultado==='red'?'✗ RED':'⏳ Aguardando'}
+              </span>
+            </div>
+          </div>`).join('')}
+      </div>`;
+
+    document.getElementById('hoje-conteudo').innerHTML=resumo;
+    btn.textContent='🔄 Atualizar resultados';
+
+  }catch(e){
+    document.getElementById('hoje-conteudo').innerHTML=`<div style="font-family:var(--mono);font-size:11px;color:var(--red);text-align:center;padding:1rem;">Erro: ${e.message}</div>`;
+  }finally{
+    btn.disabled=false;
+  }
 }
 
 function calcularBanca(){
