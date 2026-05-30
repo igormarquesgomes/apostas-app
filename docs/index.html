@@ -464,7 +464,10 @@ function renderDiasMult() {
   }).join('');
 }
 
+let dataMultAtual = null;
+
 async function carregarMultiplas(data, label) {
+  dataMultAtual = data;
   document.querySelectorAll('[data-dtm]').forEach(b=>b.classList.remove('active'));
   document.querySelector(`[data-dtm="${data}"]`)?.classList.add('active');
   document.getElementById('tw-mult').innerHTML = `<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando múltiplas de ${label}...</div></div>`;
@@ -472,10 +475,32 @@ async function carregarMultiplas(data, label) {
     const r = await fetch(`${BACKEND_URL}/multiplas/${data}`);
     const j = await r.json();
     if (!j.multiplas) {
-      document.getElementById('tw-mult').innerHTML = `<div class="aviso">⚠ Múltiplas de ${fmtDL(data)} ainda não foram geradas.<br><small>Gere as apostas do dia primeiro.</small></div>`;
+      document.getElementById('tw-mult').innerHTML = `
+        <div class="aviso" style="text-align:center;padding:2rem">
+          ⚠ Múltiplas de ${fmtDL(data)} ainda não foram geradas.
+          <br><br>
+          <button onclick="gerarMultiplas('${data}')" style="background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.3);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 20px;border-radius:8px;cursor:pointer;">
+            🎯 Gerar múltiplas agora
+          </button>
+        </div>`;
       return;
     }
     renderMultiplas(j.multiplas, j.resultados_multiplas);
+  } catch(e) {
+    document.getElementById('tw-mult').innerHTML = `<div class="aviso">Sem múltiplas para este dia.</div>`;
+  }
+}
+
+async function gerarMultiplas(data) {
+  document.getElementById('tw-mult').innerHTML = `<div class="loading-state"><div class="spin"></div><div class="loading-txt">Gerando múltiplas... pode levar ~1 min</div></div>`;
+  try {
+    await fetch(`${BACKEND_URL}/gerar-multiplas/${data}`, { method: 'POST' });
+    // Aguardar processamento
+    await new Promise(r => setTimeout(r, 70000));
+    const r = await fetch(`${BACKEND_URL}/multiplas/${data}`);
+    const j = await r.json();
+    if (j.multiplas) renderMultiplas(j.multiplas, j.resultados_multiplas);
+    else document.getElementById('tw-mult').innerHTML = `<div class="aviso">Tente novamente em alguns instantes.</div>`;
   } catch(e) {
     document.getElementById('tw-mult').innerHTML = `<div class="errmsg">❌ ${e.message}</div>`;
   }
