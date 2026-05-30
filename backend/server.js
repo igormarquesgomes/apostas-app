@@ -771,19 +771,28 @@ async function gerarApostas(data, horaMin, metaJogos) {
       if (!jogosMap.has(key))
         jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
-      // Complementares — ordenar por região e times conhecidos
+      // Complementares — definir tipo CORRETO e prioridade pelo país
       const paisLower = pais.toLowerCase();
       let priComp = 20;
+      let tipoComp = 'other';
 
-      // Times Europa B
-      if (isTimesEuropaB(timeCasa, timeFora)) priComp = 5;
-      else if (["brazil","argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"].includes(paisLower)) priComp = 7;
-      else if (["egypt","morocco","algeria","saudi-arabia","uae","qatar","kuwait"].includes(paisLower)) priComp = 8;
-      else if (["turkey","netherlands","belgium","scotland","greece","russia","ukraine","austria","switzerland","denmark","norway","croatia","serbia"].includes(paisLower)) priComp = 9;
-      else if (["czech-republic","poland","finland","sweden"].includes(paisLower)) priComp = 14;
+      const EUROPEUS = ["england","scotland","spain","italy","france","germany","portugal","netherlands","belgium","turkey","austria","switzerland","denmark","norway","croatia","serbia","ukraine","greece","russia","poland","czech-republic","finland","sweden","hungary","romania","slovakia","bulgaria","georgia","albania","armenia","estonia","latvia","lithuania","luxembourg","malta","wales","ireland","iceland","cyprus","north macedonia","montenegro","kosovo","andorra","faroe islands","gibraltar","bosnia"];
+      const SUL_AMERICANOS = ["argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"];
+      const AFRICA_ORIENTE = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
+
+      if (EUROPEUS.includes(paisLower)) {
+        tipoComp = 'eu';
+        priComp = isTimesEuropaB(timeCasa, timeFora) ? 5 : 9;
+      } else if (SUL_AMERICANOS.includes(paisLower)) {
+        tipoComp = 'sul';
+        priComp = 7;
+      } else if (AFRICA_ORIENTE.includes(paisLower)) {
+        tipoComp = 'af';
+        priComp = 8;
+      }
 
       if (!jogosComp.has(key))
-        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: 'eu', pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     }
   }
 
