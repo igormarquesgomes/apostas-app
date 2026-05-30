@@ -288,11 +288,29 @@ async function buscar(){
   const hora=document.getElementById('h-min').value;
   const meta=parseInt(document.getElementById('q-jogos').value)||15;
   if(!dv) return;
-  // Validar intervalo no mobile
   if(dataMin && dv < dataMin){ mostrarAviso('Data mínima disponível: '+fmtDL(dataMin)); return; }
   if(dv > dataMax){ mostrarAviso('Máximo disponível: amanhã ('+fmtDL(dataMax)+')'); return; }
   document.getElementById('btn-b').disabled=true;
   document.getElementById('sa').style.display='none';
+  document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando apostas de ${fmtDL(dv)}...</div></div>`;
+
+  // Sempre tentar buscar do banco com resultados primeiro
+  try{
+    const r=await fetch(`${BACKEND_URL}/apostas-resultado/${dv}`);
+    const j=await r.json();
+    if(j.apostas?.jogos?.length>0){
+      const resultados=j.resultados?.apostas||[];
+      const jogosComRes=j.apostas.jogos.map(jg=>{
+        const res=resultados.find(x=>x.jogo_id===jg.id);
+        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
+      });
+      render(jogosComRes);
+      document.getElementById('btn-b').disabled=false;
+      return;
+    }
+  }catch(e){}
+
+  // Se não tem no banco, gerar novas apostas
   let si=0;
   document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Analisando ${fmtDL(dv)}...</div><div class="loading-step" id="step">${steps[0]}</div></div>`;
   const iv=setInterval(()=>{si=(si+1)%steps.length;const e=document.getElementById('step');if(e)e.textContent=steps[si];},3000);
