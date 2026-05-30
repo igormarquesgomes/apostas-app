@@ -106,12 +106,13 @@ function extrairOdds(todasOdds, timeCasa, timeFora, mercado) {
 
   const normalizar = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
   const nCasa = normalizar(timeCasa), nFora = normalizar(timeFora);
+  const palavraCasa = nCasa?.split(' ')[0] || '';
+  const palavraFora = nFora?.split(' ')[0] || '';
 
   // Encontrar jogo por nome aproximado
   let jogoOdds = null;
   for (const [key, bookmakers] of Object.entries(todasOdds)) {
     const [hNome, aNome] = key.split('|').map(normalizar);
-    const palavraCasa = nCasa?.split(' ')[0], palavraFora = nFora?.split(' ')[0];
     if ((hNome?.includes(palavraCasa) || palavraCasa?.includes(hNome?.split(' ')[0])) &&
         (aNome?.includes(palavraFora) || palavraFora?.includes(aNome?.split(' ')[0]))) {
       jogoOdds = bookmakers;
