@@ -1506,9 +1506,9 @@ app.post('/validar-parcial', async (req, res) => {
       return;
     }
     console.log(`🔄 Rotina parcial ${data}: ${pendentes.length} pendentes para validar`);
-    await dbSaveResultados(data, null);
   }
 
+  // agentValidar já mantém confirmados e revalida apenas pendentes
   agentValidar(data).catch(console.error);
 });
 
@@ -1525,7 +1525,6 @@ app.post('/validar-pendentes', async (req, res) => {
     const semResultado = !rowOntem.resultados;
     if (semResultado || pendentesOntem.length > 0) {
       console.log(`🔄 Pendentes ontem (${ontem}): ${semResultado ? 'sem validação' : pendentesOntem.length + ' pendentes'}`);
-      if (semResultado) await dbSaveResultados(ontem, null);
       await agentValidar(ontem);
       await agentDiario(ontem);
     } else {
@@ -1540,7 +1539,6 @@ app.post('/validar-pendentes', async (req, res) => {
     const semResultado = !rowHoje.resultados;
     if (semResultado || pendentesHoje.length > 0) {
       console.log(`🔄 Pendentes hoje (${hoje}): ${semResultado ? 'sem validação' : pendentesHoje.length + ' pendentes'}`);
-      if (semResultado) await dbSaveResultados(hoje, null);
       await agentValidar(hoje);
     } else {
       console.log(`✅ Hoje (${hoje}): todos validados`);
