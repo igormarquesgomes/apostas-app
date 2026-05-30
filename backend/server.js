@@ -774,15 +774,29 @@ async function chamarIAComBusca(prompt, maxTokens = 8000) {
 
 // ─── Memória de calibração ────────────────────────────────────
 async function buscarMemoria() {
-  const [semestral, mensal, semanal, diario] = await Promise.all([
-    dbGetCalibracao('semestral'), dbGetCalibracao('mensal'),
-    dbGetCalibracao('semanal'), dbGetCalibracao('diario')
+  // Buscar todos os tipos de relatório + últimos 7 diários
+  const [semestral, mensal, semanal, diarios] = await Promise.all([
+    dbGetCalibracao('semestral'),
+    dbGetCalibracao('mensal'),
+    dbGetCalibracao('semanal'),
+    dbGetCalibracoes('diario', 7)
   ]);
+
   let mem = '';
-  if (semestral) mem += `\n[SEMESTRAL ${semestral.periodo_inicio}→${semestral.periodo_fim} | ${semestral.assertividade}%]\n${semestral.relatorio}\n`;
-  if (mensal)    mem += `\n[MENSAL ${mensal.periodo_inicio}→${mensal.periodo_fim} | ${mensal.assertividade}%]\n${mensal.relatorio}\n`;
-  if (semanal)   mem += `\n[SEMANAL ${semanal.periodo_inicio}→${semanal.periodo_fim} | ${semanal.assertividade}%]\n${semanal.relatorio}\n`;
-  if (diario)    mem += `\n[DIÁRIO ${diario.periodo_inicio} | ${diario.assertividade}%]\n${diario.relatorio}\n`;
+
+  // Semestral e mensal — contexto macro
+  if (semestral) mem += `[SEMESTRAL ${semestral.periodo_inicio}→${semestral.periodo_fim} | ${semestral.assertividade}%]\n${semestral.relatorio.substring(0,500)}\n\n`;
+  if (mensal)    mem += `[MENSAL ${mensal.periodo_inicio}→${mensal.periodo_fim} | ${mensal.assertividade}%]\n${mensal.relatorio.substring(0,500)}\n\n`;
+  if (semanal)   mem += `[SEMANAL ${semanal.periodo_inicio}→${semanal.periodo_fim} | ${semanal.assertividade}%]\n${semanal.relatorio.substring(0,600)}\n\n`;
+
+  // Todos os diários disponíveis — do mais antigo para o mais recente
+  if (diarios?.length) {
+    const diariosList = [...diarios].reverse(); // mais antigo primeiro
+    diariosList.forEach(d => {
+      mem += `[DIÁRIO ${d.periodo_inicio} | ${d.assertividade}%]\n${d.relatorio.substring(0,400)}\n\n`;
+    });
+  }
+
   return mem;
 }
 
@@ -928,7 +942,7 @@ async function gerarApostas(data, horaMin, metaJogos) {
 
   // Montar lista de jogos com estatísticas para o prompt
   const memoria = await buscarMemoria();
-  const blocoMem = memoria ? `\nHISTÓRICO:\n${memoria.substring(0,2000)}\n` : '';
+  const blocoMem = memoria ? `\nHISTÓRICO DE CALIBRAÇÃO (use para melhorar as apostas):\n${memoria.substring(0,3000)}\n` : '';
 
   function montarListaJogos(lista, offsetId = 0) {
     return lista.map((j, i) => {
@@ -1829,6 +1843,33 @@ app.get('/datas-disponiveis', async (req, res) => {
     const datas = (rows || []).map(r => r.data);
     res.json({ datas });
   } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Gerar múltiplas para data que já tem apostas salvas
+app.post('/gerar-multiplas/:data', async (req, res) => {
+  const data = normalizarData(req.params.data);
+  if (!data) return res.status(400).json({ error: 'Data inválida.' });
+
+  const row = await dbGet(data);
+  if (!row?.apostas?.jogos) return res.status(404).json({ error: 'Sem apostas para esta data.' });
+
+  res.json({ mensagem: `Gerando múltiplas para ${data}...` });
+
+  try {
+    // Reconstruir lista de jogos com prioridade a partir das apostas salvas
+    const jogosComPri = row.apostas.jogos.map(j => ({
+      ...j,
+      timeCasa: j.time_casa,
+      timeFora: j.time_fora,
+      pri: j.tipo_liga === 'a' ? 1 : j.tipo_liga === 'b' ? 2 : j.tipo_liga === 'copa' ? 3 : j.tipo_liga === 'it' ? 4 : j.tipo_liga === 'es' ? 4 : j.tipo_liga === 'eu' ? 5 : 6
+    }));
+
+    const multiplas = await gerarMultiplas(data, jogosComPri);
+    if (multiplas) {
+      await dbSaveMultiplas(data, multiplas);
+      console.log(`✅ Múltiplas geradas para ${data} — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
+    }
+  } catch(e) { console.error('Erro gerar-multiplas:', e.message); }
 });
 
 // Endpoint para buscar múltiplas do dia
