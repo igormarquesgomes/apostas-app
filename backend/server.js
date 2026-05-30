@@ -815,6 +815,19 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   if (s === -1 || e === -1) return null;
   const resultado = JSON.parse(txt.slice(s, e+1));
 
+  // Garantir tipo_liga correto em todos os jogos antes de salvar
+  if (resultado.jogos) {
+    resultado.jogos = resultado.jogos.map((j, idx) => {
+      // Recuperar tipo do jogosMap original se IA não preencheu
+      const jogoOriginal = jogos[idx];
+      return {
+        ...j,
+        tipo_liga: j.tipo_liga || jogoOriginal?.tipo || 'eu',
+        liga: j.liga || jogoOriginal?.liga || 'Internacional',
+      };
+    });
+  }
+
   // Buscar odds reais da The Odds API (1 chamada/dia, cached)
   console.log('\n💰 Buscando odds reais...');
   const todasOdds = await buscarOddsDia(data);
