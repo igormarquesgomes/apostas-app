@@ -883,30 +883,45 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   const lote2 = jogos.slice(LOTE);
 
   const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
+  console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
   const txt1 = await chamarIAComBusca(prompt1);
-  await sleep(3000); // Aguardar 3s entre chamadas para respeitar rate limit
-
+  
   let jogosResultado = [];
   if (txt1) {
-    const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
-    if (s1 !== -1) {
-      const r1 = JSON.parse(txt1.slice(s1, e1+1));
-      jogosResultado = [...(r1.jogos || [])];
-    }
+    try {
+      const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
+      if (s1 !== -1) {
+        const r1 = JSON.parse(txt1.slice(s1, e1+1));
+        jogosResultado = [...(r1.jogos || [])];
+        console.log(`✅ Lote 1: ${jogosResultado.length} apostas geradas`);
+      }
+    } catch(e) { console.error('❌ Erro parse lote 1:', e.message); }
+  } else {
+    console.error('❌ Lote 1: sem resposta da IA');
   }
 
   if (lote2.length > 0) {
+    console.log(`\n⏳ Aguardando 15s antes do lote 2...`);
+    await sleep(15000); // 15s para garantir reset do rate limit
+    console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
     const txt2 = await chamarIAComBusca(prompt2);
     if (txt2) {
-      const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
-      if (s2 !== -1) {
-        const r2 = JSON.parse(txt2.slice(s2, e2+1));
-        jogosResultado = [...jogosResultado, ...(r2.jogos || [])];
-      }
+      try {
+        const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
+        if (s2 !== -1) {
+          const r2 = JSON.parse(txt2.slice(s2, e2+1));
+          const jogos2 = r2.jogos || [];
+          jogosResultado = [...jogosResultado, ...jogos2];
+          console.log(`✅ Lote 2: ${jogos2.length} apostas geradas`);
+        }
+      } catch(e) { console.error('❌ Erro parse lote 2:', e.message); }
+    } else {
+      console.error('❌ Lote 2: sem resposta da IA');
     }
   }
 
+  console.log(`✅ Total apostas geradas: ${jogosResultado.length}`);
   const resultado = { jogos: jogosResultado };
 
   // Garantir tipo_liga correto em todos os jogos antes de salvar
