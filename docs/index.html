@@ -329,8 +329,14 @@ function render(jogos){
   document.getElementById('sa').style.display='grid';
 
   const grupos={};
-  jogos.forEach(j=>{const g=j.tipo_liga||'eu';if(!grupos[g])grupos[g]=[];grupos[g].push(j);});
-  const ordem=['a','b','it','es','eu','copa'];
+  jogos.forEach(j=>{
+    const g=j.tipo_liga||'eu';
+    // Normalizar: qualquer tipo desconhecido vira 'eu' ou 'copa'
+    const gNorm = ['a','b','it','es','eu','copa'].includes(g) ? g : 'eu';
+    if(!grupos[gNorm])grupos[gNorm]=[];
+    grupos[gNorm].push(j);
+  });
+  const ordem=['a','b','copa','it','es','eu'];
   let html='',i=0;
   ordem.forEach(g=>{
     if(!grupos[g]?.length) return;
