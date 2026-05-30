@@ -402,6 +402,38 @@ async function dbGet(data) {
   } catch(e) { return null; }
 }
 
+// ─── Múltiplas ───────────────────────────────────────────────
+async function dbSaveMultiplas(data, multiplas) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ multiplas })
+    });
+  } catch(e) { console.error('Erro dbSaveMultiplas:', e.message); }
+}
+
+async function dbSaveResultadosMultiplas(data, resultados_multiplas) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resultados_multiplas })
+    });
+  } catch(e) { console.error('Erro dbSaveResultadosMultiplas:', e.message); }
+}
+
+async function dbGetComMultiplas(data) {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas,resultados,multiplas,resultados_multiplas`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await res.json();
+    return rows && rows.length > 0 ? rows[0] : null;
+  } catch(e) { return null; }
+}
+
 async function dbSave(data, apostas) {
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
@@ -1034,6 +1066,100 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   return resultado;
 }
 
+// ─── Geração de Múltiplas ────────────────────────────────────
+const PRIORIDADES_MULTIPLA = new Set([1,2,3,4,5,6]); // Só até pri 6
+
+async function gerarMultiplas(data, jogosDodia) {
+  // Filtrar apenas jogos de prioridade 1-6
+  const jogosElegiveis = jogosDodia.filter(j => PRIORIDADES_MULTIPLA.has(j.pri || 99));
+  if (jogosElegiveis.length < 2) {
+    console.log('Poucos jogos elegíveis para múltiplas');
+    return null;
+  }
+
+  const lista = jogosElegiveis.map((j,i) =>
+    `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario} | pri:${j.pri}`
+  ).join('
+');
+
+  const prompt = `Você é especialista em apostas múltiplas. Analise os jogos elegíveis abaixo e monte 2 sugestões de múltiplas para a Estrela Bet.
+
+JOGOS ELEGÍVEIS (prioridade 1-6):
+${lista}
+
+REGRAS:
+- Múltipla A: odd total entre 3.50 e 4.50 (mais jogos)
+- Múltipla B: odd total entre 2.50 e 3.49 (menos jogos, mais seguro)
+- Use APENAS jogos da lista acima
+- A aposta de cada jogo PODE ser diferente da aposta simples do dia
+- Escolha o mercado com MAIOR probabilidade de acerto para cada jogo
+- Não repita necessariamente os mesmos jogos nas duas múltiplas
+- Prefira alta confiança em todos os jogos da múltipla
+- Use web_search para verificar lesões/escalações dos jogos selecionados
+
+Retorne SOMENTE JSON:
+{
+  "multipla_a": {
+    "odd_total": 4.10,
+    "jogos": [
+      {"liga":"Série A","time_casa":"Flamengo","time_fora":"Vasco","horario":"16:00","aposta":"Flamengo marca","mercado":"gols","odd":1.60,"justificativa":"Flamengo marcou em 8 dos últimos 10 jogos em casa."}
+    ]
+  },
+  "multipla_b": {
+    "odd_total": 3.10,
+    "jogos": [
+      {"liga":"Série A","time_casa":"Flamengo","time_fora":"Vasco","horario":"16:00","aposta":"Over 1.5 gols","mercado":"gols","odd":1.35,"justificativa":"Últimos 10 jogos tiveram mais de 1.5 gols em 9 deles."}
+    ]
+  }
+}`;
+
+  const txt = await chamarIAComBusca(prompt, 4000);
+  if (!txt) return null;
+  try {
+    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+    if (s === -1) return null;
+    return JSON.parse(txt.slice(s, e+1));
+  } catch(err) {
+    console.error('Erro parse múltiplas:', err.message);
+    return null;
+  }
+}
+
+// Validar resultado de uma múltipla
+async function validarMultipla(multipla, resultadosApostas) {
+  if (!multipla?.jogos?.length) return null;
+
+  const resultadosJogos = multipla.jogos.map(j => {
+    // Buscar resultado do jogo nos resultados do dia
+    const res = resultadosApostas.find(r =>
+      r.time_casa === j.time_casa && r.time_fora === j.time_fora
+    );
+    if (!res || res.resultado_aposta === 'pendente') return 'pendente';
+
+    // Verificar se a aposta específica da múltipla bateu
+    if (!res.placar) return 'pendente';
+    const partes = res.placar.split('-');
+    const golsCasa = parseInt(partes[0]) || 0;
+    const golsFora = parseInt(partes[1]) || 0;
+
+    const jogoFake = { ...j, time_casa: j.time_casa, time_fora: j.time_fora };
+    const resultado = verificarAposta(jogoFake, golsCasa, golsFora, null);
+    return resultado;
+  });
+
+  const todosGreen = resultadosJogos.every(r => r === 'green');
+  const algumRed = resultadosJogos.some(r => r === 'red');
+  const temPendente = resultadosJogos.some(r => r === 'pendente');
+
+  return {
+    resultado: algumRed ? 'red' : todosGreen ? 'green' : 'pendente',
+    jogos_resultado: multipla.jogos.map((j, i) => ({
+      ...j,
+      resultado: resultadosJogos[i]
+    }))
+  };
+}
+
 // ─── Agentes ─────────────────────────────────────────────────
 // Buscar resultado de fixture pelo ID na API-Football
 async function buscarResultadoFixture(fixtureId) {
@@ -1321,6 +1447,22 @@ async function agentValidar(data) {
   const r = resultados.filter(r=>r.resultado_aposta==='red').length;
   const p = resultados.filter(r=>r.resultado_aposta==='pendente').length;
   console.log(`✅ Validação: ${g} green, ${r} red, ${p} pendente`);
+
+  // Validar múltiplas automaticamente
+  const rowMultiplas = await dbGetComMultiplas(data);
+  if (rowMultiplas?.multiplas) {
+    console.log('🎯 Validando múltiplas...');
+    const resA = await validarMultipla(rowMultiplas.multiplas.multipla_a, resultados);
+    const resB = await validarMultipla(rowMultiplas.multiplas.multipla_b, resultados);
+    if (resA || resB) {
+      await dbSaveResultadosMultiplas(data, {
+        validado_em: new Date().toISOString(),
+        multipla_a: resA,
+        multipla_b: resB
+      });
+      console.log(`✅ Múltiplas: A=${resA?.resultado||'?'} B=${resB?.resultado||'?'}`);
+    }
+  }
 }
 
 // Calcular quais mercados alternativos teriam dado green num jogo red
@@ -1413,7 +1555,21 @@ INSTRUÇÕES:
 4. Registre padrões de "red flag" — situações em que é melhor ir para mercados alternativos
 Máx 400 palavras.`;
 
-  const relatorio = await chamarIA(promptDiario, 3000);
+  // Incluir resultado das múltiplas no relatório
+  const rowM = await dbGetComMultiplas(data);
+  let blocoMultiplas = '';
+  if (rowM?.resultados_multiplas) {
+    const rm = rowM.resultados_multiplas;
+    const rA = rm.multipla_a;
+    const rB = rm.multipla_b;
+    blocoMultiplas = `\nMÚLTIPLAS DO DIA:
+- Múltipla A (odd ~${rowM.multiplas?.multipla_a?.odd_total||'?'}): ${rA?.resultado?.toUpperCase()||'PENDENTE'}
+  Jogos: ${rA?.jogos_resultado?.map(j=>`${j.time_casa} x ${j.time_fora} (${j.aposta}) → ${j.resultado?.toUpperCase()||'?'}`).join(', ')||'-'}
+- Múltipla B (odd ~${rowM.multiplas?.multipla_b?.odd_total||'?'}): ${rB?.resultado?.toUpperCase()||'PENDENTE'}
+  Jogos: ${rB?.jogos_resultado?.map(j=>`${j.time_casa} x ${j.time_fora} (${j.aposta}) → ${j.resultado?.toUpperCase()||'?'}`).join(', ')||'-'}`;
+  }
+
+  const relatorio = await chamarIA(promptDiario + blocoMultiplas + '\n\nSe as múltiplas deram RED, identifique qual jogo quebrou e sugira alternativa de mercado para próximas múltiplas.', 3000);
   if (!relatorio) return;
   await dbSaveCalibracao('diario', data, data, relatorio, parseFloat(assert));
   console.log(`✅ Relatório diário — ${assert}%`);
@@ -1509,8 +1665,20 @@ app.post('/analisar', async (req, res) => {
     }
     const resultado = await gerarApostas(data, horaMin, metaJogos);
     if (!resultado) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
-    if (SUPABASE_URL && SUPABASE_KEY) { await dbSave(data, resultado); console.log('✅ Salvo no banco'); }
-    res.json(resultado);
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      await dbSave(data, resultado);
+      console.log('✅ Salvo no banco');
+
+      // Gerar múltiplas com os jogos do dia
+      console.log('\n🎯 Gerando múltiplas...');
+      await sleep(60000); // Aguardar rate limit
+      const multiplas = await gerarMultiplas(data, jogos);
+      if (multiplas) {
+        await dbSaveMultiplas(data, multiplas);
+        console.log(`✅ Múltiplas salvas — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
+      }
+    }
+    res.json({ ...resultado, multiplas: resultado.multiplas });
   } catch (err) {
     console.error('Erro:', err.message);
     res.status(500).json({ error: err.message });
@@ -1660,6 +1828,21 @@ app.get('/datas-disponiveis', async (req, res) => {
     const rows = await response.json();
     const datas = (rows || []).map(r => r.data);
     res.json({ datas });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Endpoint para buscar múltiplas do dia
+app.get('/multiplas/:data', async (req, res) => {
+  const data = normalizarData(req.params.data);
+  if (!data) return res.status(400).json({ error: 'Data inválida.' });
+  try {
+    const row = await dbGetComMultiplas(data);
+    if (!row) return res.json({ data, multiplas: null, resultados_multiplas: null });
+    return res.json({
+      data,
+      multiplas: row.multiplas || null,
+      resultados_multiplas: row.resultados_multiplas || null
+    });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
