@@ -304,6 +304,40 @@ const LIMITE_ALERTA = 800;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ─── Monitor de custos Anthropic ─────────────────────────────
+// Preços aproximados por 1M tokens (mai/2026)
+const CUSTO_SONNET_INPUT  = 3.00;  // USD por 1M tokens input
+const CUSTO_SONNET_OUTPUT = 15.00; // USD por 1M tokens output
+const CUSTO_HAIKU_INPUT   = 0.80;  // USD por 1M tokens input
+const CUSTO_HAIKU_OUTPUT  = 4.00;  // USD por 1M tokens output
+const ALERTA_CUSTO_DIA    = 0.50;  // USD — alertar se passar disso no dia
+
+let custoHoje = 0;
+let custoDia = '';
+let chamadas = { sonnet: 0, haiku: 0, webSearch: 0 };
+
+function registrarCusto(modelo, inputTokens, outputTokens) {
+  const hoje = hojeStr();
+  if (custoDia !== hoje) { custoDia = hoje; custoHoje = 0; chamadas = { sonnet: 0, haiku: 0, webSearch: 0 }; }
+
+  let custo = 0;
+  if (modelo.includes('sonnet')) {
+    custo = (inputTokens / 1e6) * CUSTO_SONNET_INPUT + (outputTokens / 1e6) * CUSTO_SONNET_OUTPUT;
+    chamadas.sonnet++;
+  } else {
+    custo = (inputTokens / 1e6) * CUSTO_HAIKU_INPUT + (outputTokens / 1e6) * CUSTO_HAIKU_OUTPUT;
+    chamadas.haiku++;
+  }
+  custoHoje += custo;
+
+  const custoFmt = custoHoje.toFixed(4);
+  console.log(`💸 Custo estimado hoje: $${custoFmt} (Sonnet: ${chamadas.sonnet}x, Haiku: ${chamadas.haiku}x)`);
+
+  if (custoHoje > ALERTA_CUSTO_DIA) {
+    console.warn(`🚨 ALERTA: Custo diário alto! $${custoFmt} — dia atípico detectado!`);
+  }
+}
+
 // ─── Utilitários de data ─────────────────────────────────────
 function hojeStr() {
   const d = new Date();
@@ -661,7 +695,13 @@ async function chamarIA(prompt, maxTokens = 8000) {
         body: JSON.stringify({ model: modelo, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
       });
       const json = await res.json();
-      if (!json.error) { console.log(`✅ Modelo: ${modelo}`); return (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(''); }
+      if (!json.error) {
+        console.log(`✅ Modelo: ${modelo}`);
+        // Registrar custo
+        const usage = json.usage || {};
+        registrarCusto(modelo, usage.input_tokens || 2000, usage.output_tokens || 500);
+        return (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+      }
       console.log(`❌ ${modelo}: ${json.error.message}`);
     } catch(e) { console.log(`❌ ${modelo}: ${e.message}`); }
   }
@@ -669,7 +709,7 @@ async function chamarIA(prompt, maxTokens = 8000) {
 }
 
 // ─── IA com busca web (para estatísticas reais) ─────────────
-async function chamarIAComBusca(prompt, maxTokens = 16000) {
+async function chamarIAComBusca(prompt, maxTokens = 8000) {
   const modelos = ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-3-5-sonnet-20241022'];
   for (const modelo of modelos) {
     try {
@@ -686,6 +726,10 @@ async function chamarIAComBusca(prompt, maxTokens = 16000) {
       const json = await res.json();
       if (!json.error) {
         console.log(`✅ Modelo com busca: ${modelo}`);
+        // Registrar custo
+        const usage = json.usage || {};
+        registrarCusto(modelo, usage.input_tokens || 3000, usage.output_tokens || 800);
+        chamadas.webSearch++;
         const txt = (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
         return txt;
       }
@@ -1355,7 +1399,10 @@ async function rotinaNoturna() {
 app.get('/health', (req, res) => res.json({
   status: 'ok', api: 'API-Football v3',
   api_suspensa: apiSuspensa, api_erro: apiErrorMsg || null,
-  req_hoje: reqHoje, limite: LIMITE_SEGURO
+  req_hoje: reqHoje, limite: LIMITE_SEGURO,
+  custo_hoje_usd: parseFloat(custoHoje.toFixed(4)),
+  chamadas_ia: chamadas,
+  alerta_custo: custoHoje > ALERTA_CUSTO_DIA
 }));
 
 app.get('/api-status', async (req, res) => {
@@ -1437,6 +1484,68 @@ app.post('/validar-agora', async (req, res) => {
   }
 
   agentValidar(data).catch(console.error);
+});
+
+// ─── Rotinas automáticas de validação ────────────────────────
+
+// Rotina das 15h e 18h — valida jogos do dia que já terminaram
+app.post('/validar-parcial', async (req, res) => {
+  const data = hojeStr();
+  const row = await dbGet(data);
+  if (!row?.apostas?.jogos) {
+    return res.json({ mensagem: 'Sem apostas para hoje.', data });
+  }
+
+  res.json({ mensagem: `Validação parcial de ${data} iniciada...`, data });
+
+  // Sempre revalida — mantém confirmados e atualiza pendentes
+  if (row.resultados) {
+    const pendentes = row.resultados.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
+    if (pendentes.length === 0) {
+      console.log(`✅ Rotina parcial ${data}: todos já validados`);
+      return;
+    }
+    console.log(`🔄 Rotina parcial ${data}: ${pendentes.length} pendentes para validar`);
+    await dbSaveResultados(data, null);
+  }
+
+  agentValidar(data).catch(console.error);
+});
+
+// Rotina das 3h — verifica ontem e hoje por pendentes
+app.post('/validar-pendentes', async (req, res) => {
+  const hoje = hojeStr();
+  const ontem = diaOffset(hoje, -1);
+  res.json({ mensagem: 'Verificação de pendentes iniciada', hoje, ontem });
+
+  // Verificar ontem
+  const rowOntem = await dbGet(ontem);
+  if (rowOntem?.apostas?.jogos) {
+    const pendentesOntem = rowOntem.resultados?.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
+    const semResultado = !rowOntem.resultados;
+    if (semResultado || pendentesOntem.length > 0) {
+      console.log(`🔄 Pendentes ontem (${ontem}): ${semResultado ? 'sem validação' : pendentesOntem.length + ' pendentes'}`);
+      if (semResultado) await dbSaveResultados(ontem, null);
+      await agentValidar(ontem);
+      await agentDiario(ontem);
+    } else {
+      console.log(`✅ Ontem (${ontem}): todos validados`);
+    }
+  }
+
+  // Verificar hoje
+  const rowHoje = await dbGet(hoje);
+  if (rowHoje?.apostas?.jogos) {
+    const pendentesHoje = rowHoje.resultados?.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
+    const semResultado = !rowHoje.resultados;
+    if (semResultado || pendentesHoje.length > 0) {
+      console.log(`🔄 Pendentes hoje (${hoje}): ${semResultado ? 'sem validação' : pendentesHoje.length + ' pendentes'}`);
+      if (semResultado) await dbSaveResultados(hoje, null);
+      await agentValidar(hoje);
+    } else {
+      console.log(`✅ Hoje (${hoje}): todos validados`);
+    }
+  }
 });
 
 app.get('/calibracao', async (req, res) => {
