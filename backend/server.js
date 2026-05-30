@@ -842,42 +842,72 @@ async function gerarApostas(data, horaMin, metaJogos) {
   const df = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano}`;
 
   // Montar lista de jogos com estatísticas para o prompt
-  const listaJogos = jogos.map((j, i) => {
-    const s = j._stats;
-    const sc = s?.statsCasa, sf = s?.statsFora;
-    return `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}
+  const memoria = await buscarMemoria();
+  const blocoMem = memoria ? `\nHISTÓRICO:\n${memoria.substring(0,2000)}\n` : '';
+
+  function montarListaJogos(lista, offsetId = 0) {
+    return lista.map((j, i) => {
+      const s = j._stats;
+      const sc = s?.statsCasa, sf = s?.statsFora;
+      return `${offsetId+i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}
    Casa: forma=${sc?.forma||'?'} gols/jogo=${sc?.mediaGols||'?'} esc=${sc?.mediaEscanteios||'?'} cart=${sc?.mediaCartoes||'?'}
    Fora: forma=${sf?.forma||'?'} gols/jogo=${sf?.mediaGols||'?'} esc=${sf?.mediaEscanteios||'?'} cart=${sf?.mediaCartoes||'?'}
    H2H: ${sc?.h2hTexto||'sem dados'}`;
-  }).join('\n');
+    }).join('\n');
+  }
 
-  const memoria = await buscarMemoria();
-  const blocoMem = memoria ? `\nHISTÓRICO:\n${memoria}\n` : '';
-
-  const prompt = `Você é um analista de apostas esportivas especializado. Analise os jogos abaixo com as estatísticas reais já coletadas da API-Football e gere 1 aposta por jogo para a Estrela Bet.
+  function montarPrompt(listaJogos, blocoMem, df) {
+    return `Você é um analista de apostas esportivas especializado. Analise os jogos abaixo com as estatísticas reais já coletadas da API-Football e gere 1 aposta por jogo para a Estrela Bet.
 
 DATA: ${df}
 ${blocoMem}
-JOGOS COM ESTATÍSTICAS REAIS (últimos 5 jogos de cada time):
+JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
 ${listaJogos}
 
 INSTRUÇÕES:
 - Série A e Série B têm análise OBRIGATÓRIA
 - Use os dados fornecidos (forma, gols/jogo, escanteios, cartões, H2H) para fundamentar cada aposta
-- Pode usar web_search para confirmar ou complementar informações específicas (lesões, escalações, clima)
-- Use o histórico de calibração para evitar padrões que historicamente erram
+- Pode usar web_search para confirmar ou complementar (lesões, escalações)
+- Use o histórico de calibração para evitar padrões que erram
 - Preencha TODOS os campos com valores numéricos reais — nunca use "-"
 
 Retorne SOMENTE JSON válido:
-{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"Casa marca 1.8 gols/jogo, fora sofre 1.2. H2H último ano: 3 jogos com Over 2.5. Forma recente favorece ataque."}]}
+{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"Casa marca 1.8 gols/jogo, fora sofre 1.2. H2H último ano: 3 jogos com Over 2.5."}]}
 
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
+  }
 
-  const txt = await chamarIAComBusca(prompt);
-  if (!txt) return null;
-  const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-  if (s === -1 || e === -1) return null;
-  const resultado = JSON.parse(txt.slice(s, e+1));
+  // Dividir em 2 lotes para não ultrapassar rate limit de tokens
+  const LOTE = 8;
+  const lote1 = jogos.slice(0, LOTE);
+  const lote2 = jogos.slice(LOTE);
+
+  const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
+  const txt1 = await chamarIAComBusca(prompt1);
+  await sleep(3000); // Aguardar 3s entre chamadas para respeitar rate limit
+
+  let jogosResultado = [];
+  if (txt1) {
+    const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
+    if (s1 !== -1) {
+      const r1 = JSON.parse(txt1.slice(s1, e1+1));
+      jogosResultado = [...(r1.jogos || [])];
+    }
+  }
+
+  if (lote2.length > 0) {
+    const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
+    const txt2 = await chamarIAComBusca(prompt2);
+    if (txt2) {
+      const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
+      if (s2 !== -1) {
+        const r2 = JSON.parse(txt2.slice(s2, e2+1));
+        jogosResultado = [...jogosResultado, ...(r2.jogos || [])];
+      }
+    }
+  }
+
+  const resultado = { jogos: jogosResultado };
 
   // Garantir tipo_liga correto em todos os jogos antes de salvar
   if (resultado.jogos) {
