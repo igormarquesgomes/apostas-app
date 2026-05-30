@@ -923,6 +923,9 @@ INSTRUÇÕES:
 - Pode usar web_search para confirmar ou complementar (lesões, escalações)
 - Use o histórico de calibração para evitar padrões que erram
 - Preencha TODOS os campos com valores numéricos reais — nunca use "-"
+- IMPORTANTE: Se não encontrar aposta segura (alta confiança) em resultado ou gols, verifique escanteios e cartões antes de forçar uma aposta ruim
+- Quando o histórico indicar "red flag" em um tipo de jogo, prefira mercados alternativos (escanteios/cartões)
+- Confiança BAIXA só quando realmente não há opção segura
 
 Retorne SOMENTE JSON válido:
 {"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"Casa marca 1.8 gols/jogo, fora sofre 1.2. H2H último ano: 3 jogos com Over 2.5."}]}
@@ -1320,6 +1323,51 @@ async function agentValidar(data) {
   console.log(`✅ Validação: ${g} green, ${r} red, ${p} pendente`);
 }
 
+// Calcular quais mercados alternativos teriam dado green num jogo red
+function calcularAlternativas(jogo, placar, stats) {
+  if (!placar) return [];
+  const partes = placar.split('-');
+  if (partes.length !== 2) return [];
+  const golsCasa = parseInt(partes[0]) || 0;
+  const golsFora = parseInt(partes[1]) || 0;
+  const totalGols = golsCasa + golsFora;
+  const alternativas = [];
+
+  // Só calcula para jogos RED
+  const jGols = { ...jogo, mercado: 'gols' };
+  const jRes  = { ...jogo, mercado: 'resultado' };
+  const jEsc  = { ...jogo, mercado: 'escanteios' };
+  const jCart = { ...jogo, mercado: 'cartoes' };
+
+  // Mercado gols — verificar Over/Under
+  if (totalGols > 2.5) alternativas.push(`Over 2.5 gols (${totalGols} gols no jogo)`);
+  if (totalGols < 2.5) alternativas.push(`Under 2.5 gols (${totalGols} gols no jogo)`);
+  if (totalGols > 1.5) alternativas.push(`Over 1.5 gols`);
+  if (golsCasa > 0 && golsFora > 0) alternativas.push('Ambos marcam - Sim');
+  if (golsCasa === 0 || golsFora === 0) alternativas.push('Ambos marcam - Não');
+
+  // Mercado resultado
+  if (golsCasa > golsFora) alternativas.push(`${jogo.time_casa} vence (${placar})`);
+  if (golsFora > golsCasa) alternativas.push(`${jogo.time_fora} vence (${placar})`);
+  if (golsCasa === golsFora) alternativas.push(`Empate (${placar})`);
+
+  // Mercado escanteios (se tiver stats)
+  if (stats?.escanteiosTotal) {
+    const esc = stats.escanteiosTotal;
+    if (esc > 9.5) alternativas.push(`Over 9.5 escanteios (${esc} no jogo)`);
+    if (esc < 9.5) alternativas.push(`Under 9.5 escanteios (${esc} no jogo)`);
+  }
+
+  // Mercado cartões (se tiver stats)
+  if (stats?.cartoesTotal) {
+    const cart = stats.cartoesTotal;
+    if (cart > 3.5) alternativas.push(`Over 3.5 cartões (${cart} no jogo)`);
+    if (cart < 3.5) alternativas.push(`Under 3.5 cartões (${cart} no jogo)`);
+  }
+
+  return alternativas;
+}
+
 async function agentDiario(data) {
   const row = await dbGet(data);
   if (!row?.resultados) return;
@@ -1329,8 +1377,43 @@ async function agentDiario(data) {
   const r = resultados.filter(r=>r.resultado_aposta==='red').length;
   const total = g + r;
   const assert = total > 0 ? ((g/total)*100).toFixed(2) : 0;
-  const detalhes = resultados.map(r => { const a = apostas.find(x=>x.id===r.jogo_id); return `- ${r.time_casa} x ${r.time_fora}: ${a?.aposta||r.aposta} → ${r.resultado_aposta?.toUpperCase()} (${r.placar||'-'}) | ${r.motivo}`; }).join('\n');
-  const relatorio = await chamarIA(`Analise apostas do dia ${data}. Assertividade: ${assert}% (${g} green, ${r} red).\n${detalhes}\nIdentifique padrões de erro. Máx 300 palavras.`, 2000);
+
+  // Montar detalhes com alternativas para jogos RED
+  const detalhes = resultados.map(r => {
+    const a = apostas.find(x=>x.id===r.jogo_id);
+    let linha = `- ${r.time_casa} x ${r.time_fora}: ${a?.aposta||r.aposta} → ${r.resultado_aposta?.toUpperCase()} (${r.placar||'-'}) | ${r.motivo}`;
+
+    // Para jogos RED, calcular mercados alternativos que teriam dado green
+    if (r.resultado_aposta === 'red' && r.placar) {
+      const alts = calcularAlternativas(a || r, r.placar, null);
+      // Remover a aposta que já foi feita das alternativas
+      const apostaFeita = (a?.aposta || r.aposta || '').toLowerCase();
+      const altsFiltradas = alts.filter(alt => !apostaFeita.includes(alt.split(' ')[0].toLowerCase()));
+      if (altsFiltradas.length > 0) {
+        linha += `\n  💡 Alternativas que dariam GREEN: ${altsFiltradas.slice(0,3).join(' | ')}`;
+      }
+    }
+    return linha;
+  }).join('\n');
+
+  // Identificar jogos com confiança baixa (potenciais red flags)
+  const baixaConfianca = apostas.filter(a => a.confianca === 'baixa').map(a => `${a.time_casa} x ${a.time_fora}`);
+
+  const promptDiario = `Analise as apostas do dia ${data}. Assertividade: ${assert}% (${g} green, ${r} red).
+
+RESULTADOS:
+${detalhes}
+
+${baixaConfianca.length > 0 ? `JOGOS COM BAIXA CONFIANÇA (red flags): ${baixaConfianca.join(', ')}` : ''}
+
+INSTRUÇÕES:
+1. Identifique padrões de erro nos jogos RED
+2. Para os jogos RED que tiveram alternativas disponíveis, analise quais mercados (escanteios, cartões, resultado) seriam mais seguros
+3. Sugira: em jogos com dificuldade de aposta segura, quais mercados têm mais histórico de acerto?
+4. Registre padrões de "red flag" — situações em que é melhor ir para mercados alternativos
+Máx 400 palavras.`;
+
+  const relatorio = await chamarIA(promptDiario, 3000);
   if (!relatorio) return;
   await dbSaveCalibracao('diario', data, data, relatorio, parseFloat(assert));
   console.log(`✅ Relatório diário — ${assert}%`);
