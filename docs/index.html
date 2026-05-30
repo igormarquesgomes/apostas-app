@@ -6,18 +6,9 @@
 <title>Apostas · Estrela Bet</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#0d0f12;--s1:#161820;--s2:#1e2028;
-  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
-  --text:#e8eaf0;--text2:#8b8fa8;--text3:#454760;
-  --green:#6ee7b7;--green2:#34d399;--purple:#a78bfa;
-  --amber:#fbbf24;--red:#f87171;--blue:#60a5fa;
-  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
-}
+:root{--bg:#0d0f12;--s1:#161820;--s2:#1e2028;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e8eaf0;--text2:#8b8fa8;--text3:#454760;--green:#6ee7b7;--green2:#34d399;--purple:#a78bfa;--amber:#fbbf24;--red:#f87171;--blue:#60a5fa;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding-bottom:70px;}
-
-/* NAV TOP */
 .nav-top{display:flex;align-items:center;justify-content:space-between;padding:0 1rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
 .nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
 .nav-logo-icon{width:28px;height:28px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;}
@@ -25,26 +16,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 .nav-logo-name{font-size:14px;font-weight:600;color:var(--text);}
 .nav-logo-name span{color:var(--green);}
 .nav-badge{font-size:10px;font-family:var(--mono);background:rgba(110,231,183,0.08);color:var(--green);border:1px solid rgba(110,231,183,0.18);padding:4px 10px;border-radius:20px;}
-
-/* NAV BOTTOM (mobile) */
-.nav-bottom{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--s1);border-top:1px solid var(--border);display:flex;padding:0;safe-area-inset-bottom:env(safe-area-inset-bottom);}
+.nav-bottom{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--s1);border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);}
 .nav-bottom a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;text-decoration:none;color:var(--text3);font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;gap:4px;transition:color .15s;border-top:2px solid transparent;}
 .nav-bottom a svg{width:18px;height:18px;}
 .nav-bottom a.active{color:var(--green);border-top-color:var(--green);}
-.nav-bottom a:hover{color:var(--text2);}
-
-/* PAGE */
-.page{padding:1rem 1rem 1rem;}
-
-/* DIAS */
+.page{padding:1rem;}
+.subtabs{display:flex;gap:4px;margin-bottom:1rem;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:4px;}
+.subtab{flex:1;font-family:var(--mono);font-size:11px;padding:8px;border-radius:7px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;}
+.subtab.active{background:rgba(110,231,183,0.1);color:var(--green);}
 .dias{display:flex;gap:6px;margin-bottom:1rem;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;}
 .dias::-webkit-scrollbar{display:none;}
 .dia-btn{flex-shrink:0;font-family:var(--mono);font-size:11px;padding:8px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--s1);color:var(--text2);cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px;}
 .dia-btn:hover,.dia-btn.active{border-color:var(--green);background:rgba(110,231,183,0.08);color:var(--green);}
 .dia-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;}
 .dia-dt{font-size:12px;font-weight:500;}
-
-/* CONTROLES */
 .controles{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end;}
 .field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:100px;}
 .field label{font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
@@ -54,14 +39,10 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .btn-buscar{background:var(--green);color:#0d0f12;font-family:var(--sans);font-size:14px;font-weight:600;padding:10px 18px;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:background .2s;}
 .btn-buscar:hover{background:var(--green2);}
 .btn-buscar:disabled{opacity:.4;cursor:not-allowed;}
-
-/* STATS */
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem;}
 .stat{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
 .stat-l{font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
 .stat-v{font-size:22px;font-weight:600;}
-
-/* CARDS DE JOGO */
 .jogos-wrap{display:flex;flex-direction:column;gap:8px;}
 .liga-header{font-size:10px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:6px 4px;margin-top:4px;}
 .jogo-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
@@ -89,8 +70,6 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .jogo-conf{font-size:11px;font-family:var(--mono);}
 .chev{color:var(--text3);font-size:11px;transition:transform .2s;}
 .chev.open{transform:rotate(180deg);}
-
-/* EXPANDIDO */
 .jogo-expand{display:none;border-top:1px solid var(--border);padding:12px 14px;background:#12141a;}
 .jogo-expand.open{display:block;}
 .stats-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
@@ -99,8 +78,6 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .sm-v{font-size:12px;font-weight:500;font-family:var(--mono);}
 .justif-l{font-size:9px;font-family:var(--mono);color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
 .justif-t{font-size:12px;color:var(--text2);line-height:1.7;padding:10px 12px;background:var(--s1);border-left:2px solid var(--green2);}
-
-/* ESTADOS */
 .empty-state{text-align:center;padding:4rem 2rem;color:var(--text3);}
 .empty-state svg{width:36px;height:36px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;opacity:.3;}
 .loading-state{text-align:center;padding:4rem 2rem;}
@@ -109,7 +86,6 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .loading-step{font-size:11px;color:var(--green);margin-top:6px;font-family:var(--mono);}
 .errmsg{text-align:center;padding:2rem;color:var(--red);font-family:var(--mono);font-size:12px;}
 .aviso{text-align:center;padding:2rem;color:var(--amber);font-family:var(--mono);font-size:12px;}
-
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
 </head>
@@ -117,7 +93,64 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 
 <div class="nav-top">
   <a class="nav-logo" href="index.html">
-    <div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><p style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:1.5rem">© Análise de Apostas · Estrela Bet</p>
+    <div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    <span class="nav-logo-name">Análise de <span>Apostas</span></span>
+  </a>
+  <span class="nav-badge">Estrela Bet</span>
+</div>
+
+<div class="page">
+
+  <!-- Subabas -->
+  <div class="subtabs">
+    <button class="subtab active" id="tab-apostas" onclick="mudarTab('apostas')">📋 Apostas do dia</button>
+    <button class="subtab" id="tab-multiplas" onclick="mudarTab('multiplas')">🎯 Múltiplas do dia</button>
+  </div>
+
+  <!-- APOSTAS -->
+  <div id="conteudo-apostas">
+    <div class="dias" id="dias"></div>
+    <div class="controles">
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="d-input">
+      </div>
+      <div class="field" style="max-width:100px">
+        <label>Horário mín.</label>
+        <input type="time" id="h-min" value="13:00">
+      </div>
+      <div class="field" style="max-width:70px">
+        <label>Meta</label>
+        <input type="number" id="q-jogos" value="15" min="5" max="20">
+      </div>
+      <button class="btn-buscar" id="btn-b" onclick="buscar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Analisar
+      </button>
+    </div>
+    <div class="stats" id="sa" style="display:none">
+      <div class="stat"><div class="stat-l">Jogos</div><div class="stat-v" style="color:var(--green)" id="sj">0</div></div>
+      <div class="stat"><div class="stat-l">Alta confiança</div><div class="stat-v" style="color:var(--amber)" id="sa2">0</div></div>
+      <div class="stat"><div class="stat-l">Odd média</div><div class="stat-v" style="color:var(--blue)" id="so">-</div></div>
+      <div class="stat"><div class="stat-l">Mercados</div><div class="stat-v" style="color:var(--purple)" id="sm">-</div></div>
+    </div>
+    <div id="tw">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <p>Selecione a data ou use os atalhos acima</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MÚLTIPLAS -->
+  <div id="conteudo-multiplas" style="display:none">
+    <div class="dias" id="dias-mult"></div>
+    <div id="tw-mult">
+      <div class="empty-state"><p>Selecione a data para ver as múltiplas do dia</p></div>
+    </div>
+  </div>
+
+  <p style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:1.5rem">© Análise de Apostas · Estrela Bet</p>
 </div>
 
 <!-- NAV BOTTOM -->
@@ -131,7 +164,7 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
     Dashboard
   </a>
   <a href="relatorios.html">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
     Relatórios
   </a>
   <a href="ligas.html">
@@ -143,19 +176,6 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 <script>
 const BACKEND_URL='https://apostas-app.onrender.com';
 
-
-// Limitar calendário: mín = primeira data no banco, máx = amanhã
-async function limitarCalendario(){
-  try{
-    const r=await fetch(BACKEND_URL+'/datas-disponiveis');
-    const j=await r.json();
-    const input=document.getElementById('d-input');
-    if(j.datas?.length>0) input.min=j.datas[0];
-    input.max=offsetData(hojeStr,1);
-  }catch(e){}
-}
-limitarCalendario();
-
 function hoje(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function offsetData(base,n){const d=new Date(base+'T12:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function fmtD(iso){const[a,m,d]=iso.split('-');return `${d}/${m}`;}
@@ -164,7 +184,6 @@ function fmtDL(iso){const[a,m,d]=iso.split('-');return `${d}/${m}/${a}`;}
 const hojeStr=hoje();
 document.getElementById('d-input').value=offsetData(hojeStr,1);
 
-// Limitar calendário
 let dataMin=null, dataMax=offsetData(hojeStr,1);
 
 async function limitarCalendario(){
@@ -173,13 +192,12 @@ async function limitarCalendario(){
     const j=await r.json();
     const input=document.getElementById('d-input');
     dataMax=offsetData(hojeStr,1);
-    if(j.datas?.length>0){ dataMin=j.datas[0]; input.min=dataMin; }
+    if(j.datas?.length>0){dataMin=j.datas[0];input.min=dataMin;}
     input.max=dataMax;
-    // Validar ao mudar a data no mobile
     input.addEventListener('change',()=>{
       const v=input.value;
-      if(dataMin && v < dataMin){ input.value=dataMin; mostrarAviso('Data mínima disponível: '+fmtDL(dataMin)); return; }
-      if(v > dataMax){ input.value=dataMax; mostrarAviso('Máximo: amanhã ('+fmtDL(dataMax)+')'); return; }
+      if(dataMin&&v<dataMin){input.value=dataMin;mostrarAviso('Data mínima: '+fmtDL(dataMin));return;}
+      if(v>dataMax){input.value=dataMax;mostrarAviso('Máximo: amanhã ('+fmtDL(dataMax)+')');return;}
     });
   }catch(e){}
 }
@@ -188,49 +206,54 @@ limitarCalendario();
 function mostrarAviso(msg){
   const tw=document.getElementById('tw');
   tw.innerHTML=`<div class="aviso">⚠ ${msg}</div>`;
-  setTimeout(()=>{ if(tw.innerHTML.includes(msg)) tw.innerHTML=''; },3000);
+  setTimeout(()=>{if(tw.innerHTML.includes(msg))tw.innerHTML='';},3000);
 }
 
-// Navegação de dias
+// ─── Subabas ─────────────────────────────────────────────────
+function mudarTab(tab){
+  const isA=tab==='apostas';
+  document.getElementById('conteudo-apostas').style.display=isA?'block':'none';
+  document.getElementById('conteudo-multiplas').style.display=isA?'none':'block';
+  document.getElementById('tab-apostas').classList.toggle('active',isA);
+  document.getElementById('tab-multiplas').classList.toggle('active',!isA);
+  if(!isA) renderDiasMult();
+}
+
+// ─── Navegação de dias ────────────────────────────────────────
 function renderDias(){
   const el=document.getElementById('dias');
   const dias=[{l:'Ontem',o:-1},{l:'Hoje',o:0},{l:'Amanhã',o:1}];
   el.innerHTML=dias.map(d=>{
     const dt=offsetData(hojeStr,d.o);
     return `<button class="dia-btn" data-dt="${dt}" onclick="carregarDia('${dt}','${d.l}')">
-      <span class="dia-lbl">${d.l}</span>
-      <span class="dia-dt">${fmtD(dt)}</span>
+      <span class="dia-lbl">${d.l}</span><span class="dia-dt">${fmtD(dt)}</span>
     </button>`;
   }).join('');
 }
 renderDias();
 
 async function carregarDia(data,label){
-  document.querySelectorAll('.dia-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('[data-dt]').forEach(b=>b.classList.remove('active'));
   document.querySelector(`[data-dt="${data}"]`)?.classList.add('active');
   document.getElementById('d-input').value=data;
   document.getElementById('sa').style.display='none';
   document.getElementById('btn-b').disabled=true;
   document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando apostas de ${label}...</div></div>`;
   try{
-    // Buscar apostas + resultados juntos
     const r=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
     const j=await r.json();
     if(j.apostas?.jogos?.length>0){
-      // Mesclar resultados nos jogos
       const resultados=j.resultados?.apostas||[];
       const jogosComRes=j.apostas.jogos.map(jg=>{
         const res=resultados.find(x=>x.jogo_id===jg.id);
         return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
       });
       render(jogosComRes);
-    } else if(j.apostas===null){
-      document.getElementById('tw').innerHTML=`<div class="aviso">⚠ Apostas de ${fmtDL(data)} ainda não foram geradas.<br><small>Use "Analisar" para gerar.</small></div>`;
-    } else {
-      document.getElementById('tw').innerHTML=`<div class="aviso">Nenhuma aposta para ${fmtDL(data)}.</div>`;
+    }else{
+      document.getElementById('tw').innerHTML=`<div class="aviso">⚠ Sem apostas para ${fmtDL(data)}.<br><small>Use "Analisar" para gerar.</small></div>`;
     }
   }catch(e){
-    document.getElementById('tw').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
+    document.getElementById('tw').innerHTML=`<div class="errmsg">Erro ao carregar.</div>`;
   }finally{document.getElementById('btn-b').disabled=false;}
 }
 
@@ -241,13 +264,11 @@ async function buscar(){
   const hora=document.getElementById('h-min').value;
   const meta=parseInt(document.getElementById('q-jogos').value)||15;
   if(!dv) return;
-  if(dataMin && dv < dataMin){ mostrarAviso('Data mínima disponível: '+fmtDL(dataMin)); return; }
-  if(dv > dataMax){ mostrarAviso('Máximo disponível: amanhã ('+fmtDL(dataMax)+')'); return; }
+  if(dataMin&&dv<dataMin){mostrarAviso('Data mínima: '+fmtDL(dataMin));return;}
+  if(dv>dataMax){mostrarAviso('Máximo: amanhã ('+fmtDL(dataMax)+')');return;}
   document.getElementById('btn-b').disabled=true;
   document.getElementById('sa').style.display='none';
   document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando apostas de ${fmtDL(dv)}...</div></div>`;
-
-  // Sempre tentar buscar do banco com resultados primeiro
   try{
     const r=await fetch(`${BACKEND_URL}/apostas-resultado/${dv}`);
     const j=await r.json();
@@ -262,8 +283,6 @@ async function buscar(){
       return;
     }
   }catch(e){}
-
-  // Se não tem no banco, gerar novas apostas
   let si=0;
   document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Analisando ${fmtDL(dv)}...</div><div class="loading-step" id="step">${steps[0]}</div></div>`;
   const iv=setInterval(()=>{si=(si+1)%steps.length;const e=document.getElementById('step');if(e)e.textContent=steps[si];},3000);
@@ -280,14 +299,82 @@ async function buscar(){
   }finally{document.getElementById('btn-b').disabled=false;}
 }
 
-const ml={gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
+// ─── Múltiplas ────────────────────────────────────────────────
+function renderDiasMult(){
+  const nav=document.getElementById('dias-mult');
+  if(nav.children.length>0) return;
+  const dias=[{l:'Ontem',o:-1},{l:'Hoje',o:0},{l:'Amanhã',o:1}];
+  nav.innerHTML=dias.map(d=>{
+    const dt=offsetData(hojeStr,d.o);
+    return `<button class="dia-btn" data-dtm="${dt}" onclick="carregarMultiplas('${dt}','${d.l}')">
+      <span class="dia-lbl">${d.l}</span><span class="dia-dt">${fmtD(dt)}</span>
+    </button>`;
+  }).join('');
+}
+
+async function carregarMultiplas(data,label){
+  document.querySelectorAll('[data-dtm]').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`[data-dtm="${data}"]`)?.classList.add('active');
+  document.getElementById('tw-mult').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando múltiplas de ${label}...</div></div>`;
+  try{
+    const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
+    const j=await r.json();
+    if(!j.multiplas){
+      document.getElementById('tw-mult').innerHTML=`<div class="aviso">Sem múltiplas para este dia.</div>`;
+      return;
+    }
+    renderMultiplas(j.multiplas,j.resultados_multiplas);
+  }catch(e){
+    document.getElementById('tw-mult').innerHTML=`<div class="aviso">Sem múltiplas para este dia.</div>`;
+  }
+}
+
+function renderMultiplas(multiplas,resultados){
+  const rA=resultados?.multipla_a, rB=resultados?.multipla_b;
+  const renderJogo=(jogo,resJogos)=>{
+    const rj=resJogos?.find(r=>r.time_casa===jogo.time_casa&&r.time_fora===jogo.time_fora);
+    const res=rj?.resultado||null;
+    const badge=res==='green'?'<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px">✓</span>':res==='red'?'<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px">✗</span>':'';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);gap:8px">
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:500">${jogo.time_casa} x ${jogo.time_fora}</div>
+        <div style="font-size:10px;color:var(--text2);font-family:var(--mono)">${jogo.liga||''} · ${jogo.horario||''} · ${jogo.aposta}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber)">${jogo.odd}</span>
+        ${badge}
+      </div>
+    </div>`;
+  };
+  const renderCard=(mult,res,label,cor)=>{
+    if(!mult) return '';
+    const resultado=res?.resultado;
+    const borda=resultado==='green'?'border-color:rgba(0,230,118,.35)':resultado==='red'?'border-color:rgba(255,23,68,.35)':'';
+    const badge=resultado==='green'?'<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px;font-weight:600">✓ GREEN</span>':resultado==='red'?'<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px;font-weight:600">✗ RED</span>':'<span style="background:rgba(255,171,0,.08);color:var(--amber);border:1px solid rgba(255,171,0,.2);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px">⏳</span>';
+    return `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:12px;${borda}">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:4px">${label}</div>
+          <div style="font-size:32px;font-weight:700;color:${cor};line-height:1">@${mult.odd_total}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">${mult.jogos?.length||0} jogos</div>
+        </div>
+        ${badge}
+      </div>
+      ${(mult.jogos||[]).map(j=>renderJogo(j,res?.jogos_resultado)).join('')}
+    </div>`;
+  };
+  document.getElementById('tw-mult').innerHTML=`
+    ${renderCard(multiplas.multipla_a,rA,'Múltipla A — Maior odd','var(--red)')}
+    ${renderCard(multiplas.multipla_b,rB,'Múltipla B — Mais segura','var(--amber)')}`;
+}
+
+// ─── Render apostas ───────────────────────────────────────────
 const lc={a:'p-a',b:'p-b',eu:'p-eu',it:'p-it',es:'p-es',copa:'p-copa',sul:'p-copa',af:'p-eu',other:'p-eu'};
 const ln={a:'Série A',b:'Série B',eu:'Europeia',it:'Serie A 🇮🇹',es:'La Liga 🇪🇸',copa:'Copa',sul:'Sul-Americana',af:'África/Oriente',other:'Internacional'};
 const mc={gols:'p-gols',escanteios:'p-esc',cartoes:'p-car',resultado:'p-res'};
 const gN={a:'🇧🇷 Série A',b:'🇧🇷 Série B',copa:'🏆 Copas',it:'🇮🇹 Serie A Italiana',es:'🇪🇸 La Liga',eu:'🌍 Europeias',sul:'🌎 Sul-Americanas',af:'🌍 África & Oriente Médio',other:'🌐 Outras'};
 
 let exp=new Set();
-
 function render(jogos){
   if(!jogos.length){document.getElementById('tw').innerHTML='<div class="empty-state"><p>Nenhum jogo encontrado.</p></div>';return;}
   const alta=jogos.filter(j=>j.confianca==='alta').length;
@@ -298,14 +385,10 @@ function render(jogos){
   document.getElementById('so').textContent=om;
   document.getElementById('sm').textContent=new Set(jogos.map(j=>j.mercado)).size;
   document.getElementById('sa').style.display='grid';
-
   const grupos={};
   jogos.forEach(j=>{
-    const g=j.tipo_liga||'eu';
-    // Normalizar: qualquer tipo desconhecido vira 'eu' ou 'copa'
-    const gNorm = ['a','b','it','es','eu','copa'].includes(g) ? g : 'eu';
-    if(!grupos[gNorm])grupos[gNorm]=[];
-    grupos[gNorm].push(j);
+    const g=['a','b','copa','it','es','eu','sul','af','other'].includes(j.tipo_liga)?j.tipo_liga:'eu';
+    if(!grupos[g])grupos[g]=[];grupos[g].push(j);
   });
   const ordem=['a','b','copa','it','es','eu','sul','af','other'];
   let html='',i=0;
@@ -316,11 +399,7 @@ function render(jogos){
       const dc=j.confianca==='alta'?'d-a':j.confianca==='media'?'d-m':'d-b';
       const cc=j.confianca==='alta'?'c-a':j.confianca==='media'?'c-m':'c-b';
       const cl=j.confianca?(j.confianca[0].toUpperCase()+j.confianca.slice(1)):'-';
-      const resBadge=j.resultado==='green'
-        ?'<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span>'
-        :j.resultado==='red'
-        ?'<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span>'
-        :'';
+      const resBadge=j.resultado==='green'?'<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span>':j.resultado==='red'?'<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span>':'';
       const cardStyle=j.resultado==='green'?'border-color:rgba(0,230,118,.35)':j.resultado==='red'?'border-color:rgba(255,23,68,.35)':'';
       html+=`<div class="jogo-card" id="jc${i}" style="${cardStyle}">
         <div class="jogo-main" onclick="tog(${i})">
@@ -330,7 +409,7 @@ function render(jogos){
           </div>
           <div class="jogo-meta">
             <span class="pill ${lc[j.tipo_liga]||'p-eu'}">${ln[j.tipo_liga]||j.liga}</span>
-            <span class="pill ${mc[j.mercado]||'p-gols'}">${ml[j.mercado]||j.mercado}</span>
+            <span class="pill ${mc[j.mercado]||'p-gols'}">${{gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'}[j.mercado]||j.mercado}</span>
             <span class="jogo-hora">${j.horario||'-'}</span>
             ${j.placar?`<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">${j.placar}</span>`:''}
           </div>
@@ -339,7 +418,7 @@ function render(jogos){
             <div style="display:flex;align-items:center;gap:8px">
               <span class="jogo-conf ${cc}"><span class="dot ${dc}"></span>${cl}</span>
               <div style="text-align:right">
-                ${j.odd_mercado?`<div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber)">${j.odd_mercado}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3)">mercado</div>`:`<div class="jogo-odd">${j.odd_sugerida||'-'}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3)">estimada</div>`}
+                ${j.odd_mercado?`<div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber)">${j.odd_mercado}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3)">mercado</div>`:`<div class="jogo-odd">${j.odd_sugerida||'-'}</div>`}
               </div>
               <span class="chev" id="cv${i}">▾</span>
             </div>
@@ -361,133 +440,8 @@ function render(jogos){
       i++;
     });
   });
-
   document.getElementById('tw').innerHTML=`<div class="jogos-wrap">${html}</div>`;
   exp=new Set();
-}
-
-// ─── Múltiplas ───────────────────────────────────────────────
-function mudarTab(tab) {
-  const isApostas = tab === 'apostas';
-  document.getElementById('conteudo-apostas').style.display = isApostas ? 'block' : 'none';
-  document.getElementById('conteudo-multiplas').style.display = isApostas ? 'none' : 'block';
-  const btnA = document.getElementById('tab-apostas');
-  const btnM = document.getElementById('tab-multiplas');
-  btnA.style.background = isApostas ? 'rgba(110,231,183,0.1)' : 'transparent';
-  btnA.style.color = isApostas ? 'var(--green)' : 'var(--text2)';
-  btnM.style.background = !isApostas ? 'rgba(110,231,183,0.1)' : 'transparent';
-  btnM.style.color = !isApostas ? 'var(--green)' : 'var(--text2)';
-  if (!isApostas) renderDiasMult();
-}
-
-function renderDiasMult() {
-  const nav = document.getElementById('dias-mult');
-  if (nav.children.length > 0) return;
-  const dias = [{l:'Ontem',o:-1},{l:'Hoje',o:0},{l:'Amanhã',o:1}];
-  nav.innerHTML = dias.map(d => {
-    const dt = offsetData(hojeStr, d.o);
-    return `<button class="dia-btn" data-dtm="${dt}" onclick="carregarMultiplas('${dt}','${d.l}')">
-      <span class="dia-lbl">${d.l}</span>
-      <span class="dia-dt">${fmtD(dt)}</span>
-    </button>`;
-  }).join('');
-}
-
-let dataMultAtual = null;
-
-async function carregarMultiplas(data, label) {
-  dataMultAtual = data;
-  document.querySelectorAll('[data-dtm]').forEach(b=>b.classList.remove('active'));
-  document.querySelector(`[data-dtm="${data}"]`)?.classList.add('active');
-  document.getElementById('tw-mult').innerHTML = `<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando múltiplas de ${label}...</div></div>`;
-  try {
-    const r = await fetch(`${BACKEND_URL}/multiplas/${data}`);
-    const j = await r.json();
-    if (!j.multiplas) {
-      document.getElementById('tw-mult').innerHTML = `
-        <div class="aviso" style="text-align:center;padding:2rem">
-          ⚠ Múltiplas de ${fmtDL(data)} ainda não foram geradas.
-          <br><br>
-          <button onclick="gerarMultiplas('${data}')" style="background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.3);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 20px;border-radius:8px;cursor:pointer;">
-            🎯 Gerar múltiplas agora
-          </button>
-        </div>`;
-      return;
-    }
-    renderMultiplas(j.multiplas, j.resultados_multiplas);
-  } catch(e) {
-    document.getElementById('tw-mult').innerHTML = `<div class="aviso">Sem múltiplas para este dia.</div>`;
-  }
-}
-
-async function gerarMultiplas(data) {
-  document.getElementById('tw-mult').innerHTML = `<div class="loading-state"><div class="spin"></div><div class="loading-txt">Gerando múltiplas... pode levar ~1 min</div></div>`;
-  try {
-    await fetch(`${BACKEND_URL}/gerar-multiplas/${data}`, { method: 'POST' });
-    // Aguardar processamento
-    await new Promise(r => setTimeout(r, 70000));
-    const r = await fetch(`${BACKEND_URL}/multiplas/${data}`);
-    const j = await r.json();
-    if (j.multiplas) renderMultiplas(j.multiplas, j.resultados_multiplas);
-    else document.getElementById('tw-mult').innerHTML = `<div class="aviso">Tente novamente em alguns instantes.</div>`;
-  } catch(e) {
-    document.getElementById('tw-mult').innerHTML = `<div class="errmsg">❌ ${e.message}</div>`;
-  }
-}
-
-function renderMultiplas(multiplas, resultados) {
-  const rA = resultados?.multipla_a;
-  const rB = resultados?.multipla_b;
-
-  const renderJogo = (jogo, resJogos) => {
-    const rj = resJogos?.find(r => r.time_casa === jogo.time_casa && r.time_fora === jogo.time_fora);
-    const res = rj?.resultado || null;
-    const badge = res === 'green'
-      ? '<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px">✓ GREEN</span>'
-      : res === 'red'
-      ? '<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px">✗ RED</span>'
-      : '';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);gap:8px">
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:500">${jogo.time_casa} x ${jogo.time_fora}</div>
-        <div style="font-size:10px;color:var(--text2);font-family:var(--mono)">${jogo.liga} · ${jogo.horario} · ${jogo.aposta}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:3px">${jogo.justificativa||''}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber)">${jogo.odd}</span>
-        ${badge}
-      </div>
-    </div>`;
-  };
-
-  const renderCard = (mult, res, label, corOdd) => {
-    if (!mult) return '';
-    const resultado = res?.resultado;
-    const cardBorder = resultado === 'green' ? 'border-color:rgba(0,230,118,.35)' : resultado === 'red' ? 'border-color:rgba(255,23,68,.35)' : '';
-    const resultadoBadge = resultado === 'green'
-      ? '<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px;font-weight:600">✓ GREEN</span>'
-      : resultado === 'red'
-      ? '<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px;font-weight:600">✗ RED</span>'
-      : '<span style="background:rgba(255,171,0,.08);color:var(--amber);border:1px solid rgba(255,171,0,.2);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px">⏳ Aguardando</span>';
-
-    return `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:12px;${cardBorder}">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid var(--border)">
-        <div>
-          <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:4px">${label}</div>
-          <div style="font-family:var(--display,sans-serif);font-size:36px;font-weight:600;color:${corOdd};line-height:1">@${mult.odd_total}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px">${mult.jogos?.length} jogos</div>
-        </div>
-        ${resultadoBadge}
-      </div>
-      ${(mult.jogos||[]).map(j => renderJogo(j, res?.jogos_resultado)).join('')}
-    </div>`;
-  };
-
-  document.getElementById('tw-mult').innerHTML = `
-    <div style="margin-bottom:1rem">
-      ${renderCard(multiplas.multipla_a, rA, 'Múltipla A — Maior odd', 'var(--red)')}
-      ${renderCard(multiplas.multipla_b, rB, 'Múltipla B — Mais segura', 'var(--amber)')}
-    </div>`;
 }
 
 function tog(i){
