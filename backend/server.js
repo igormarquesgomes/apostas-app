@@ -1214,6 +1214,30 @@ app.post('/validar/:data', async (req, res) => {
   agentValidar(data).then(() => agentDiario(data)).catch(console.error);
 });
 
+// Validar hoje em tempo real — atualiza pendentes sem bloquear já validados
+app.post('/validar-agora', async (req, res) => {
+  const data = hojeStr();
+  const row = await dbGet(data);
+  if (!row?.apostas?.jogos) {
+    return res.json({ mensagem: 'Sem apostas para hoje ainda.', data });
+  }
+
+  res.json({ mensagem: `Atualizando resultados de ${data}...`, data });
+
+  // Forçar revalidação limpando resultados pendentes
+  if (row.resultados) {
+    const pendentes = row.resultados.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
+    if (pendentes.length === 0) {
+      console.log('Todos os jogos já validados hoje');
+      return;
+    }
+    // Limpar para revalidar
+    await dbSaveResultados(data, null);
+  }
+
+  agentValidar(data).catch(console.error);
+});
+
 app.get('/calibracao', async (req, res) => {
   const [semestral, mensal, semanal, diario] = await Promise.all([
     dbGetCalibracao('semestral'), dbGetCalibracao('mensal'),
