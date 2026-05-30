@@ -125,7 +125,19 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 
 <div class="page">
 
-  <div class="dias" id="dias"></div>
+  <!-- Subabas -->
+  <div style="display:flex;gap:4px;margin-bottom:1rem;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:4px;">
+    <button id="tab-apostas" onclick="mudarTab('apostas')" style="flex:1;font-family:var(--mono);font-size:11px;padding:8px;border-radius:7px;border:none;background:rgba(110,231,183,0.1);color:var(--green);cursor:pointer;">
+      📋 Apostas do dia
+    </button>
+    <button id="tab-multiplas" onclick="mudarTab('multiplas')" style="flex:1;font-family:var(--mono);font-size:11px;padding:8px;border-radius:7px;border:none;background:transparent;color:var(--text2);cursor:pointer;">
+      🎯 Múltiplas do dia
+    </button>
+  </div>
+
+  <!-- Conteúdo apostas -->
+  <div id="conteudo-apostas">
+    <div class="dias" id="dias"></div>
 
   <div class="controles">
     <div class="field">
@@ -159,6 +171,18 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
     <div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       <p>Selecione a data ou use os atalhos acima</p>
+    </div>
+  </div>
+
+  </div><!-- fim conteudo-apostas -->
+
+  <!-- Conteúdo múltiplas -->
+  <div id="conteudo-multiplas" style="display:none">
+    <div class="dias" id="dias-mult"></div>
+    <div id="tw-mult">
+      <div class="empty-state">
+        <p>Selecione a data para ver as múltiplas do dia</p>
+      </div>
     </div>
   </div>
 
@@ -411,6 +435,105 @@ function render(jogos){
 
   document.getElementById('tw').innerHTML=`<div class="jogos-wrap">${html}</div>`;
   exp=new Set();
+}
+
+// ─── Múltiplas ───────────────────────────────────────────────
+function mudarTab(tab) {
+  const isApostas = tab === 'apostas';
+  document.getElementById('conteudo-apostas').style.display = isApostas ? 'block' : 'none';
+  document.getElementById('conteudo-multiplas').style.display = isApostas ? 'none' : 'block';
+  const btnA = document.getElementById('tab-apostas');
+  const btnM = document.getElementById('tab-multiplas');
+  btnA.style.background = isApostas ? 'rgba(110,231,183,0.1)' : 'transparent';
+  btnA.style.color = isApostas ? 'var(--green)' : 'var(--text2)';
+  btnM.style.background = !isApostas ? 'rgba(110,231,183,0.1)' : 'transparent';
+  btnM.style.color = !isApostas ? 'var(--green)' : 'var(--text2)';
+  if (!isApostas) renderDiasMult();
+}
+
+function renderDiasMult() {
+  const nav = document.getElementById('dias-mult');
+  if (nav.children.length > 0) return;
+  const dias = [{l:'Ontem',o:-1},{l:'Hoje',o:0},{l:'Amanhã',o:1}];
+  nav.innerHTML = dias.map(d => {
+    const dt = offsetData(hojeStr, d.o);
+    return `<button class="dia-btn" data-dtm="${dt}" onclick="carregarMultiplas('${dt}','${d.l}')">
+      <span class="dia-lbl">${d.l}</span>
+      <span class="dia-dt">${fmtD(dt)}</span>
+    </button>`;
+  }).join('');
+}
+
+async function carregarMultiplas(data, label) {
+  document.querySelectorAll('[data-dtm]').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`[data-dtm="${data}"]`)?.classList.add('active');
+  document.getElementById('tw-mult').innerHTML = `<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando múltiplas de ${label}...</div></div>`;
+  try {
+    const r = await fetch(`${BACKEND_URL}/multiplas/${data}`);
+    const j = await r.json();
+    if (!j.multiplas) {
+      document.getElementById('tw-mult').innerHTML = `<div class="aviso">⚠ Múltiplas de ${fmtDL(data)} ainda não foram geradas.<br><small>Gere as apostas do dia primeiro.</small></div>`;
+      return;
+    }
+    renderMultiplas(j.multiplas, j.resultados_multiplas);
+  } catch(e) {
+    document.getElementById('tw-mult').innerHTML = `<div class="errmsg">❌ ${e.message}</div>`;
+  }
+}
+
+function renderMultiplas(multiplas, resultados) {
+  const rA = resultados?.multipla_a;
+  const rB = resultados?.multipla_b;
+
+  const renderJogo = (jogo, resJogos) => {
+    const rj = resJogos?.find(r => r.time_casa === jogo.time_casa && r.time_fora === jogo.time_fora);
+    const res = rj?.resultado || null;
+    const badge = res === 'green'
+      ? '<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px">✓ GREEN</span>'
+      : res === 'red'
+      ? '<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px">✗ RED</span>'
+      : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);gap:8px">
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:500">${jogo.time_casa} x ${jogo.time_fora}</div>
+        <div style="font-size:10px;color:var(--text2);font-family:var(--mono)">${jogo.liga} · ${jogo.horario} · ${jogo.aposta}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">${jogo.justificativa||''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber)">${jogo.odd}</span>
+        ${badge}
+      </div>
+    </div>`;
+  };
+
+  const renderCard = (mult, res, label, corOdd) => {
+    if (!mult) return '';
+    const resultado = res?.resultado;
+    const cardBorder = resultado === 'green' ? 'border-color:rgba(0,230,118,.35)' : resultado === 'red' ? 'border-color:rgba(255,23,68,.35)' : '';
+    const resultadoBadge = resultado === 'green'
+      ? '<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px;font-weight:600">✓ GREEN</span>'
+      : resultado === 'red'
+      ? '<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px;font-weight:600">✗ RED</span>'
+      : '<span style="background:rgba(255,171,0,.08);color:var(--amber);border:1px solid rgba(255,171,0,.2);font-family:var(--mono);font-size:11px;padding:3px 12px;border-radius:20px">⏳ Aguardando</span>';
+
+    return `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:12px;${cardBorder}">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:4px">${label}</div>
+          <div style="font-family:var(--display,sans-serif);font-size:36px;font-weight:600;color:${corOdd};line-height:1">@${mult.odd_total}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">${mult.jogos?.length} jogos</div>
+        </div>
+        ${resultadoBadge}
+      </div>
+      ${(mult.jogos||[]).map(j => renderJogo(j, res?.jogos_resultado)).join('')}
+    </div>`;
+  };
+
+  document.getElementById('tw-mult').innerHTML = `
+    <div style="margin-bottom:1rem">
+      ${renderCard(multiplas.multipla_a, rA, 'Múltipla A — Maior odd', 'var(--red)')}
+      ${renderCard(multiplas.multipla_b, rB, 'Múltipla B — Mais segura', 'var(--amber)')}
+    </div>`;
 }
 
 function tog(i){
