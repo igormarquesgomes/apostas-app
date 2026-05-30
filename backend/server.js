@@ -54,24 +54,38 @@ async function buscarOddsDia(data) {
 
   try {
     const todasOdds = {};
-    const sports = Object.keys(ODDS_SPORT_KEYS);
+    // Só buscar ligas prioritárias que têm mais chance de ter odds
+    const sports = [
+      'soccer_brazil_campeonato',
+      'soccer_brazil_serie_b',
+      'soccer_conmebol_copa_libertadores',
+      'soccer_conmebol_copa_sudamericana',
+      'soccer_uefa_champs_league',
+      'soccer_uefa_europa_league',
+      'soccer_spain_la_liga',
+      'soccer_italy_serie_a',
+      'soccer_epl',
+    ];
 
     for (const sport of sports) {
+      if (oddsReqHoje >= ODDS_LIMITE) break;
+
       const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal&dateFormat=iso`;
       const res = await fetch(url);
 
       if (!res.ok) {
+        if (res.status === 422) continue; // Liga sem jogos hoje — normal
         console.log(`⚠️ Odds API ${sport}: HTTP ${res.status}`);
         continue;
       }
 
       const remaining = res.headers.get('x-requests-remaining');
       const used = res.headers.get('x-requests-used');
-      console.log(`📊 Odds API: ${used} usados, ${remaining} restantes`);
+      if (used || remaining) console.log(`📊 Odds API: ${used} usados, ${remaining} restantes`);
 
       if (remaining && parseInt(remaining) < 50) {
         console.warn(`⚠️ Odds API: apenas ${remaining} créditos restantes!`);
-        oddsReqHoje = ODDS_LIMITE; // bloquear mais chamadas
+        oddsReqHoje = ODDS_LIMITE;
         break;
       }
 
@@ -79,15 +93,13 @@ async function buscarOddsDia(data) {
       oddsReqHoje++;
 
       for (const jogo of jogos) {
-        // Filtrar por data aproximada
         const jogoData = jogo.commence_time?.substring(0, 10);
         if (jogoData !== data) continue;
-
         const key = `${jogo.home_team}|${jogo.away_team}`;
         todasOdds[key] = jogo.bookmakers || [];
       }
 
-      await sleep(200);
+      await sleep(300);
     }
 
     oddsCacheData = todasOdds;
@@ -201,7 +213,26 @@ const LIGAS_IGNORAR = new Set([
   936, 614, 619, 620, 613, // Estaduais div 2
   1073, 1076, 1086, 1100, 1107, 1128, 1069, 1071, // Sub-20 e U17
   1148, 1158, 1096, 1097,  // Copas regionais
+  1146, 1143,  // Alagoano-2, Estadual Junior
 ]);
+
+// Filtro adicional por nome para ligas regionais brasileiras que escapam pelo ID
+function ligaBrasileiraNaoRelevante(ligaNome, pais) {
+  if (pais !== 'Brazil' && pais !== 'Brasil') return false;
+  const l = ligaNome?.toLowerCase() || '';
+  return (
+    l.includes('alagoano') || l.includes('baiano') || l.includes('carioca') ||
+    l.includes('cearense') || l.includes('catarinense') || l.includes('gaúcho') ||
+    l.includes('gaucho') || l.includes('goiano') || l.includes('maranhense') ||
+    l.includes('matogrossense') || l.includes('mineiro') || l.includes('paraense') ||
+    l.includes('paranaense') || l.includes('paulista') || l.includes('pernambucano') ||
+    l.includes('potiguar') || l.includes('rondoniense') || l.includes('roraimense') ||
+    l.includes('sergipano') || l.includes('tocantinense') || l.includes('capixaba') ||
+    l.includes('piauiense') || l.includes('amazonense') || l.includes('acreano') ||
+    l.includes('estadual') || l.includes('copa espirito') || l.includes('copa gaucha') ||
+    l.includes('- 2') || l.includes('serie d') || l.includes('serie c')
+  );
+}
 
 // Sem NOMES_PRIORITY — usamos apenas IDs para máxima precisão
 const NOMES_PRIORITY = [];
@@ -669,6 +700,9 @@ async function gerarApostas(data, horaMin, metaJogos) {
 
     // Ignorar ligas explicitamente marcadas
     if (LIGAS_IGNORAR.has(ligaId)) continue;
+
+    // Ignorar ligas regionais brasileiras pelo nome
+    if (ligaBrasileiraNaoRelevante(ligaNome, pais)) continue;
 
     // Identificar liga por ID
     const ligaMatch = LIGAS_PRIORITY[ligaId];
