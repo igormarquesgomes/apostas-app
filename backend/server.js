@@ -1035,13 +1035,32 @@ async function agentValidar(data) {
   console.log(`\n🔍 Validando ${data}`);
   const row = await dbGet(data);
   if (!row?.apostas?.jogos) { console.log('Sem apostas'); return; }
-  if (row.resultados) { console.log('Já validado'); return; }
+
+  // Se já validado, verificar se tem pendentes para revalidar
+  if (row.resultados) {
+    const pendentes = row.resultados.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
+    if (pendentes.length === 0) {
+      console.log('Já validado completamente — sem pendentes');
+      return;
+    }
+    console.log(`Revalidando ${pendentes.length} apostas pendentes...`);
+  }
 
   const jogos = row.apostas.jogos;
+  // Manter resultados já confirmados e revalidar apenas pendentes
+  const resultadosExistentes = row.resultados?.apostas || [];
   const resultados = [];
-  let cacheFixtures = null; // Cache das fixtures do dia para evitar múltiplas chamadas
+  let cacheFixtures = null;
 
   for (const jogo of jogos) {
+    // Se já tem resultado confirmado (green/red), manter e pular
+    const resExistente = resultadosExistentes.find(r => r.jogo_id === jogo.id);
+    if (resExistente && resExistente.resultado_aposta !== 'pendente') {
+      console.log(`  ✅ Mantendo: ${jogo.time_casa} x ${jogo.time_fora} → ${resExistente.resultado_aposta.toUpperCase()}`);
+      resultados.push(resExistente);
+      continue;
+    }
+
     console.log(`  Verificando: ${jogo.time_casa} x ${jogo.time_fora}`);
     let placar = null, golsCasa = null, golsFora = null, fixtureIdUsado = jogo.fixtureId || null;
 
