@@ -311,9 +311,9 @@ async function buscar(){
 
 const ml={gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
 const lc={a:'p-a',b:'p-b',eu:'p-eu',it:'p-it',es:'p-es',copa:'p-copa'};
-const ln={a:'Série A',b:'Série B',eu:'Europa',it:'Serie A 🇮🇹',es:'La Liga 🇪🇸',copa:'Copa'};
+const ln={a:'Série A',b:'Série B',eu:'Internacional',it:'Serie A 🇮🇹',es:'La Liga 🇪🇸',copa:'Copa'};
 const mc={gols:'p-gols',escanteios:'p-esc',cartoes:'p-car',resultado:'p-res'};
-const gN={a:'🇧🇷 Série A',b:'🇧🇷 Série B',it:'🇮🇹 Serie A',es:'🇪🇸 La Liga',eu:'🌍 Europeias',copa:'🏆 Copas'};
+const gN={a:'🇧🇷 Série A',b:'🇧🇷 Série B',copa:'🏆 Copas',it:'🇮🇹 Serie A Italiana',es:'🇪🇸 La Liga',eu:'🌍 Internacionais'};
 
 let exp=new Set();
 
@@ -336,7 +336,9 @@ function render(jogos){
     if(!grupos[gNorm])grupos[gNorm]=[];
     grupos[gNorm].push(j);
   });
-  const ordem=['a','b','copa','it','es','eu'];
+  const ordem=['a','b','copa','it','es','eu','other'];
+  // Agrupar tipos desconhecidos em 'other' temporariamente, depois mover para 'eu'
+  if(grupos['other']) { if(!grupos['eu']) grupos['eu']=[]; grupos['eu']=[...grupos['eu'],...grupos['other']]; }
   let html='',i=0;
   ordem.forEach(g=>{
     if(!grupos[g]?.length) return;
