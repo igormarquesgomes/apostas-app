@@ -187,22 +187,45 @@ function selecionarOdd(oddsJogo, aposta, timeCasa, timeFora) {
 }
 
 // IDs de liga na API-Football
+// Times que participam de Champions League ou Europa League nas grandes ligas
+// Quando esses times jogam na liga nacional, têm prioridade extra
+const TIMES_CHAMPIONS = new Set([
+  // Serie A Italiana
+  'inter','inter milan','internazionale','milan','ac milan','juventus','napoli','atalanta','lazio','roma','fiorentina',
+  // La Liga
+  'real madrid','barcelona','atletico madrid','athletic bilbao','real sociedad','villarreal','sevilla','betis',
+  // Premier League
+  'manchester city','arsenal','liverpool','chelsea','manchester united','tottenham','newcastle','aston villa',
+  // Bundesliga
+  'bayer leverkusen','bayer 04 leverkusen','borussia dortmund','dortmund','rb leipzig','leipzig','bayern munich','bayern munchen','eintracht frankfurt','wolfsburg',
+  // Ligue 1
+  'paris saint germain','psg','marseille','monaco','lille','lyon','brest',
+  // Liga Portugal
+  'benfica','porto','sporting cp','sporting','braga',
+]);
+
+function isTimesChampions(timeCasa, timeFora) {
+  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+  const nc = n(timeCasa), nf = n(timeFora);
+  return [...TIMES_CHAMPIONS].some(t => nc?.includes(t) || nf?.includes(t) || t.includes(nc?.split(' ')[0]) || t.includes(nf?.split(' ')[0]));
+}
+
 const LIGAS_PRIORITY = {
-  // Brasil
+  // Brasil — máxima prioridade
   71:  { nome:'Série A',          tipo:'a',    pri:1 },
   72:  { nome:'Série B',          tipo:'b',    pri:2 },
-  // Europeias
-  135: { nome:'Serie A 🇮🇹',      tipo:'it',   pri:3 },
+  // Copas internacionais — acima das ligas nacionais
+  13:  { nome:'Libertadores',     tipo:'copa', pri:3 },
+  11:  { nome:'Sul-Americana',    tipo:'copa', pri:3 },
+  3:   { nome:'Europa League',    tipo:'copa', pri:3 },
+  2:   { nome:'Champions League', tipo:'copa', pri:3 },
+  // Grandes ligas europeias — pri 4 base, mas times Champions ficam pri 4, outros pri 5
+  135: { nome:'Serie A 🇮🇹',      tipo:'it',   pri:4 },
   140: { nome:'La Liga 🇪🇸',       tipo:'es',   pri:4 },
-  39:  { nome:'Premier League',   tipo:'eu',   pri:5 },
-  78:  { nome:'Bundesliga',       tipo:'eu',   pri:6 },
-  61:  { nome:'Ligue 1',          tipo:'eu',   pri:6 },
-  94:  { nome:'Liga Portugal',    tipo:'eu',   pri:6 },
-  // Copas internacionais
-  13:  { nome:'Libertadores',     tipo:'copa', pri:7 },
-  11:  { nome:'Sul-Americana',    tipo:'copa', pri:7 },
-  3:   { nome:'Europa League',    tipo:'copa', pri:7 },
-  2:   { nome:'Champions League', tipo:'copa', pri:7 },
+  39:  { nome:'Premier League',   tipo:'eu',   pri:4 },
+  78:  { nome:'Bundesliga',       tipo:'eu',   pri:4 },
+  61:  { nome:'Ligue 1',          tipo:'eu',   pri:4 },
+  94:  { nome:'Liga Portugal',    tipo:'eu',   pri:4 },
 };
 
 // IDs a ignorar explicitamente (ligas brasileiras que NÃO são prioritárias)
@@ -232,6 +255,40 @@ function ligaBrasileiraNaoRelevante(ligaNome, pais) {
     l.includes('estadual') || l.includes('copa espirito') || l.includes('copa gaucha') ||
     l.includes('- 2') || l.includes('serie d') || l.includes('serie c')
   );
+}
+
+// Times europeus de segunda linha (Champions/Europa participantes)
+// Quando um desses times aparecer, prioridade sobre sul-americanos
+const TIMES_EUROPA_B = new Set([
+  // Holanda
+  'ajax','psv','psv eindhoven','feyenoord',
+  // Bélgica
+  'club brugge','anderlecht','genk',
+  // Turquia
+  'galatasaray','fenerbahce','fenerbahçe','besiktas','beşiktaş',
+  // Escócia
+  'celtic','rangers',
+  // Áustria
+  'red bull salzburg','salzburg','sturm graz',
+  // Suíça
+  'basel','young boys','bsc young boys',
+  // Dinamarca
+  'copenhagen','fc copenhagen','midtjylland','fc midtjylland',
+  // Sérvia
+  'red star belgrade','crvena zvezda','partizan',
+  // Ucrânia
+  'dynamo kyiv','shakhtar donetsk','shakhtar',
+  // Noruega
+  'bodo/glimt','bodø/glimt','rosenborg',
+  // Croácia
+  'dinamo zagreb',
+]);
+
+function isTimesEuropaB(timeCasa, timeFora) {
+  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+  const nc = n(timeCasa), nf = n(timeFora);
+  return TIMES_EUROPA_B.has(nc) || TIMES_EUROPA_B.has(nf) ||
+    [...TIMES_EUROPA_B].some(t => nc?.includes(t) || nf?.includes(t));
 }
 
 // Sem NOMES_PRIORITY — usamos apenas IDs para máxima precisão
@@ -708,16 +765,23 @@ async function gerarApostas(data, horaMin, metaJogos) {
     const ligaMatch = LIGAS_PRIORITY[ligaId];
 
     if (ligaMatch) {
+      // Times Champions nas grandes ligas ficam pri 4, outros pri 6
+      let priFinal = ligaMatch.pri;
+      if (ligaMatch.pri === 4 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
       if (!jogosMap.has(key))
-        jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: ligaMatch.pri, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+        jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
-      // Complementares — ordenar por região
+      // Complementares — ordenar por região e times conhecidos
       const paisLower = pais.toLowerCase();
       let priComp = 20;
-      if (["brazil","argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"].includes(paisLower)) priComp = 9;
-      else if (["egypt","morocco","algeria","saudi-arabia","uae","qatar","kuwait"].includes(paisLower)) priComp = 10;
-      else if (["turkey","netherlands","belgium","scotland","greece","russia","ukraine"].includes(paisLower)) priComp = 11;
-      else if (["austria","czech-republic","poland","norway","finland","sweden","denmark"].includes(paisLower)) priComp = 18;
+
+      // Times Europa B
+      if (isTimesEuropaB(timeCasa, timeFora)) priComp = 5;
+      else if (["brazil","argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"].includes(paisLower)) priComp = 7;
+      else if (["egypt","morocco","algeria","saudi-arabia","uae","qatar","kuwait"].includes(paisLower)) priComp = 8;
+      else if (["turkey","netherlands","belgium","scotland","greece","russia","ukraine","austria","switzerland","denmark","norway","croatia","serbia"].includes(paisLower)) priComp = 9;
+      else if (["czech-republic","poland","finland","sweden"].includes(paisLower)) priComp = 14;
+
       if (!jogosComp.has(key))
         jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: 'eu', pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     }
