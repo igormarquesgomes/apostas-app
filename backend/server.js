@@ -901,11 +901,16 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   }
 
   if (lote2.length > 0) {
-    console.log(`\n⏳ Aguardando 15s antes do lote 2...`);
-    await sleep(15000); // 15s para garantir reset do rate limit
+    console.log(`\n⏳ Aguardando 60s antes do lote 2 (rate limit)...`);
+    await sleep(60000); // 60s para garantir reset do rate limit de tokens/min
     console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
-    const txt2 = await chamarIAComBusca(prompt2);
+    // Tentar com web_search primeiro, fallback sem web_search
+    let txt2 = await chamarIAComBusca(prompt2);
+    if (!txt2) {
+      console.log('Tentando lote 2 sem web_search...');
+      txt2 = await chamarIA(prompt2, 8000);
+    }
     if (txt2) {
       try {
         const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
