@@ -1284,7 +1284,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   console.log(`✅ Total apostas geradas: ${jogosResultado.length}`);
   const resultado = { jogos: jogosResultado };
 
-  // Corrigir tipo_liga e liga usando dados originais dos jogos selecionados
+  // Corrigir tipo_liga, liga e recuperar fixtureId dos jogos originais
   if (resultado.jogos) {
     resultado.jogos = resultado.jogos.map((j) => {
       // Encontrar jogo original pelo time casa/fora
@@ -1292,7 +1292,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
         jg.timeCasa === j.time_casa && jg.timeFora === j.time_fora
       ) || jogos[j.id - 1];
 
-      // Sempre usar tipo e liga do original — nunca confiar na IA para isso
+      // Sempre usar tipo, liga e fixtureId do original
       const tipoCorreto = jogoOriginal?.tipo || j.tipo_liga || 'eu';
       const ligaCorreta = jogoOriginal?.liga || j.liga || 'Internacional';
 
@@ -1300,12 +1300,19 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
         ...j,
         tipo_liga: tipoCorreto,
         liga: ligaCorreta,
-        pri: jogoOriginal?.pri || 20, // guardar prioridade para ordenar no frontend
+        pri: jogoOriginal?.pri || 20,
+        fixtureId: j.fixtureId || jogoOriginal?.fixtureId || null, // CRÍTICO para validação
+        teamCasaId: j.teamCasaId || jogoOriginal?.teamCasaId || null,
+        teamForaId: j.teamForaId || jogoOriginal?.teamForaId || null,
       };
     });
 
     // Ordenar por prioridade original
     resultado.jogos.sort((a, b) => (a.pri || 20) - (b.pri || 20));
+
+    // Log de fixtureIds para debug
+    const semFixture = resultado.jogos.filter(j => !j.fixtureId);
+    if (semFixture.length) console.log(`⚠️ Jogos sem fixtureId: ${semFixture.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
   }
 
   // Buscar odds reais da The Odds API (1 chamada/dia, cached)
@@ -1698,9 +1705,15 @@ async function agentValidar(data) {
         const fixture = cacheFixtures.find(f => {
           const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
           const status = f.fixture?.status?.short;
+          // Log do status para debug
+          if (hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0])) {
+            console.log(`    📊 Match encontrado: ${f.teams?.home?.name} x ${f.teams?.away?.name} | Status: ${status}`);
+          }
           if (!['FT','AET','PEN'].includes(status)) return false;
-          return (hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0])) &&
-                 (aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]));
+          // Match mais rigoroso — pelo menos 2 palavras devem coincidir
+          const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
+          const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
+          return casaMatch && foraMatch;
         });
 
         if (fixture) {
@@ -1708,6 +1721,7 @@ async function agentValidar(data) {
           golsFora = fixture.goals?.away;
           placar = `${golsCasa}-${golsFora}`;
           fixtureIdUsado = fixture.fixture?.id || fixtureIdUsado;
+          console.log(`    ✅ Placar encontrado via nome: ${placar}`);
         }
       }
 
