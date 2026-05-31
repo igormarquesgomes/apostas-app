@@ -1638,10 +1638,11 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     const apostaMencCasa = palavrasCasa.some(p => aposta.includes(p));
     const apostaMencFora = !apostaMencCasa && nomeFora.split(' ').filter(p => p.length > 3).some(p => aposta.includes(p));
 
-    if (aposta.includes('empate')) return empate ? 'green' : 'red';
-    if (aposta.includes('ou empata') || aposta.includes('vence ou empata') || aposta.includes('dupla chance')) {
-      if (apostaMencCasa) return (casaVence || empate) ? 'green' : 'red';
-      if (apostaMencFora) return (foraVence || empate) ? 'green' : 'red';
+    if (aposta.includes('empate') && !aposta.includes('vence') && !aposta.includes('dupla')) return empate ? 'green' : 'red';
+    if (aposta.includes('ou empat') || aposta.includes('vence ou empat') || aposta.includes('dupla chance') || aposta.includes('x2') || aposta.includes('1x') || aposta.includes('12')) {
+      if (aposta.includes('x2') || apostaMencFora) return (foraVence || empate) ? 'green' : 'red';
+      if (aposta.includes('1x') || apostaMencCasa) return (casaVence || empate) ? 'green' : 'red';
+      if (aposta.includes('12')) return (casaVence || foraVence) ? 'green' : 'red';
     }
     if (aposta.includes('vence') || aposta.includes('vitória') || aposta.includes('vitoria')) {
       if (apostaMencCasa) return casaVence ? 'green' : 'red';
@@ -1725,6 +1726,26 @@ async function agentValidar(data) {
           fixtureIdUsado = fixture.fixture?.id || fixtureIdUsado;
           console.log(`    ✅ Placar encontrado via nome: ${placar}`);
         }
+      }
+
+      // Fallback Manus: buscar resultado se não encontrou na API-Football
+      if (golsCasa === null && MANUS_API_KEY) {
+        try {
+          console.log(`    🔍 Buscando resultado via Manus: ${jogo.time_casa} x ${jogo.time_fora}`);
+          const resultadoManus = await chamarManus(
+            `Qual foi o placar final do jogo ${jogo.time_casa} x ${jogo.time_fora} do dia ${data}? Responda APENAS com o placar no formato "X-Y" onde X é gols do time da casa e Y é gols do visitante. Se o jogo não terminou ainda, responda "pendente".`,
+            30000
+          );
+          if (resultadoManus && resultadoManus.trim() !== 'pendente') {
+            const match = resultadoManus.match(/(\d+)\s*[-x]\s*(\d+)/);
+            if (match) {
+              golsCasa = parseInt(match[1]);
+              golsFora = parseInt(match[2]);
+              placar = `${golsCasa}-${golsFora}`;
+              console.log(`    ✅ Placar via Manus: ${placar}`);
+            }
+          }
+        } catch(e) { console.log(`    ⚠️ Manus falhou: ${e.message}`); }
       }
 
       if (golsCasa !== null && golsFora !== null) {
