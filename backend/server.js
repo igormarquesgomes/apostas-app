@@ -992,7 +992,7 @@ async function gerarApostas(data, horaMin, metaJogos) {
       }
 
       if (!jogosMap.has(key))
-        jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+        jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
       // Complementares — definir tipo CORRETO e prioridade pelo país
       const paisLower = pais.toLowerCase();
@@ -1022,7 +1022,7 @@ async function gerarApostas(data, horaMin, metaJogos) {
       }
 
       if (!jogosComp.has(key))
-        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+        jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     }
   }
 
@@ -1291,7 +1291,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   for (const jg of jogos) {
     const key = `${norm(jg.timeCasa)}|${norm(jg.timeFora)}`;
     fixtureMap.set(key, jg.fixtureId);
-    metaMap.set(key, { tipo: jg.tipo, liga: jg.liga, pri: jg.pri, teamCasaId: jg.teamCasaId, teamForaId: jg.teamForaId });
+    metaMap.set(key, { tipo: jg.tipo, liga: jg.liga, pri: jg.pri, ligaId: jg.ligaId, teamCasaId: jg.teamCasaId, teamForaId: jg.teamForaId });
   }
 
   // Corrigir tipo_liga, liga e recuperar fixtureId dos jogos originais
@@ -1308,6 +1308,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
         liga: meta.liga || j.liga || 'Internacional',
         pri: meta.pri || 20,
         fixtureId: fixtureId || j.fixtureId || null,
+        ligaId: meta.ligaId || j.ligaId || null,
         teamCasaId: meta.teamCasaId || j.teamCasaId || null,
         teamForaId: meta.teamForaId || j.teamForaId || null,
       };
@@ -1715,24 +1716,42 @@ async function agentValidar(data) {
 
         const normalizar = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
         const nCasa = normalizar(jogo.time_casa), nFora = normalizar(jogo.time_fora);
-        const fixture = cacheFixtures.find(f => {
-          const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
-          const status = f.fixture?.status?.short;
-          if (!['FT','AET','PEN'].includes(status)) return false;
-          const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
-          const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
-          if (casaMatch && foraMatch) {
-            console.log(`    📊 Match: ${f.teams?.home?.name} x ${f.teams?.away?.name} | ${status}`);
-          }
-          return casaMatch && foraMatch;
-        });
+        // 1. Tentar pelo ligaId — mais preciso que pool geral
+        let fixture = null;
+        if (jogo.ligaId) {
+          const fixturasLiga = cacheFixtures.filter(f => f.league?.id === jogo.ligaId);
+          fixture = fixturasLiga.find(f => {
+            const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
+            const status = f.fixture?.status?.short;
+            if (!['FT','AET','PEN'].includes(status)) return false;
+            const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
+            const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
+            return casaMatch && foraMatch;
+          });
+          if (fixture) console.log(`    📊 Match via ligaId ${jogo.ligaId}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name}`);
+        }
+
+        // 2. Fallback: pool geral se não encontrou pela liga
+        if (!fixture) {
+          fixture = cacheFixtures.find(f => {
+            const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
+            const status = f.fixture?.status?.short;
+            if (!['FT','AET','PEN'].includes(status)) return false;
+            const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
+            const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
+            if (casaMatch && foraMatch) {
+              console.log(`    📊 Match pool geral: ${f.teams?.home?.name} x ${f.teams?.away?.name} | liga:${f.league?.id}`);
+            }
+            return casaMatch && foraMatch;
+          });
+        }
 
         if (fixture) {
           golsCasa = fixture.goals?.home;
           golsFora = fixture.goals?.away;
           placar = `${golsCasa}-${golsFora}`;
           fixtureIdUsado = fixture.fixture?.id || fixtureIdUsado;
-          console.log(`    ✅ Placar encontrado via nome: ${placar}`);
+          console.log(`    ✅ Placar encontrado: ${placar}`);
         }
       }
 
