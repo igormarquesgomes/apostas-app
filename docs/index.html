@@ -423,7 +423,11 @@ function render(jogos){
       const dc=j.confianca==='alta'?'d-a':j.confianca==='media'?'d-m':'d-b';
       const cc=j.confianca==='alta'?'c-a':j.confianca==='media'?'c-m':'c-b';
       const cl=j.confianca?(j.confianca[0].toUpperCase()+j.confianca.slice(1)):'-';
-      const resBadge=j.resultado==='green'?'<span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span>':j.resultado==='red'?'<span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span>':'';
+      const resBadge=j.resultado==='green'
+        ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span><button onclick="editarResultado(event,${i},'${dv}',${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
+        :j.resultado==='red'
+        ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span><button onclick="editarResultado(event,${i},'${dv}',${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
+        :'';
       const cardStyle=j.resultado==='green'?'border-color:rgba(0,230,118,.35)':j.resultado==='red'?'border-color:rgba(255,23,68,.35)':'';
       html+=`<div class="jogo-card" id="jc${i}" style="${cardStyle}">
         <div class="jogo-main" onclick="tog(${i})">
@@ -466,6 +470,33 @@ function render(jogos){
   });
   document.getElementById('tw').innerHTML=`<div class="jogos-wrap">${html}</div>`;
   exp=new Set();
+}
+
+async function editarResultado(event, idx, data, jogoId, resultadoAtual){
+  event.stopPropagation();
+  const novo = resultadoAtual === 'green' ? 'red' : 'green';
+  if (!confirm(`Trocar de ${resultadoAtual.toUpperCase()} para ${novo.toUpperCase()}?`)) return;
+  try {
+    const r = await fetch(`${BACKEND_URL}/corrigir-resultado`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ data, jogo_id: jogoId, resultado: novo })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      // Recarregar apostas do dia
+      const r2 = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const d2 = await r2.json();
+      if (d2.apostas?.jogos?.length > 0) {
+        const resultados = d2.resultados?.apostas || [];
+        const jogosComRes = d2.apostas.jogos.map(jg => {
+          const res = resultados.find(x => x.jogo_id === jg.id);
+          return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null};
+        });
+        render(jogosComRes);
+      }
+    }
+  } catch(e) { alert('Erro: ' + e.message); }
 }
 
 function tog(i){
