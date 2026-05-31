@@ -1705,14 +1705,24 @@ async function agentValidar(data) {
         const fixture = cacheFixtures.find(f => {
           const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
           const status = f.fixture?.status?.short;
-          // Log do status para debug
-          if (hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0])) {
+
+          // Match rigoroso: usar palavras com 4+ caracteres para evitar falsos positivos
+          const palavrasCasa = nCasa?.split(' ').filter(p => p.length >= 4) || [];
+          const palavrasFora = nFora?.split(' ').filter(p => p.length >= 4) || [];
+
+          // Pelo menos 1 palavra significativa deve coincidir em cada time
+          const casaMatch = palavrasCasa.length > 0 && palavrasCasa.some(p =>
+            hN?.includes(p) || p.includes(hN?.split(' ').find(w => w.length >= 4) || '')
+          );
+          const foraMatch = palavrasFora.length > 0 && palavrasFora.some(p =>
+            aN?.includes(p) || p.includes(aN?.split(' ').find(w => w.length >= 4) || '')
+          );
+
+          if (casaMatch && foraMatch) {
             console.log(`    📊 Match encontrado: ${f.teams?.home?.name} x ${f.teams?.away?.name} | Status: ${status}`);
           }
+
           if (!['FT','AET','PEN'].includes(status)) return false;
-          // Match mais rigoroso — pelo menos 2 palavras devem coincidir
-          const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
-          const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
           return casaMatch && foraMatch;
         });
 
