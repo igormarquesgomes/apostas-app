@@ -1731,12 +1731,18 @@ async function agentValidar(data) {
           if (fixture) console.log(`    📊 Match via ligaId ${jogo.ligaId}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name}`);
         }
 
-        // 2. Fallback: pool geral se não encontrou pela liga
+        // 2. Fallback: pool geral — excluindo ligas ignoradas (sub-20, U17 etc)
         if (!fixture) {
           fixture = cacheFixtures.find(f => {
             const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
             const status = f.fixture?.status?.short;
             if (!['FT','AET','PEN'].includes(status)) return false;
+            // Ignorar ligas de sub-categorias no fallback
+            if (LIGAS_IGNORAR.has(f.league?.id)) return false;
+            // Ignorar times com U17, U20, Sub etc no nome
+            const nomeH = f.teams?.home?.name?.toLowerCase() || '';
+            const nomeA = f.teams?.away?.name?.toLowerCase() || '';
+            if (nomeH.match(/u\d{2}|sub-?\d{2}|junior|juvenil/) || nomeA.match(/u\d{2}|sub-?\d{2}|junior|juvenil/)) return false;
             const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
             const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
             if (casaMatch && foraMatch) {
