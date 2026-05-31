@@ -1784,16 +1784,18 @@ Máx 400 palavras.`;
 
 async function agentSemanal() {
   const hoje = hojeStr();
-  const diarios = await dbGetCalibracoes('diario', 7);
+  // Buscar TODOS os diários disponíveis
+  const diarios = await dbGetCalibracoes('diario', 100);
   if (!diarios.length) return;
+  console.log(`📊 Semanal: consolidando ${diarios.length} diário(s)...`);
   const media = (diarios.reduce((s,d)=>s+(parseFloat(d.assertividade)||0),0)/diarios.length).toFixed(2);
   const inicio = diarios[diarios.length-1].periodo_inicio;
   const textos = diarios.map((d,i)=>`Dia ${i+1} (${d.periodo_inicio}) — ${d.assertividade}%:\n${d.relatorio}`).join('\n---\n');
   const relatorio = await chamarIA(`Consolide relatórios diários em semanal. Período: ${inicio} a ${hoje} | Média: ${media}%\n\n${textos}\n\nPatterns, recomendações. Máx 400 palavras.`, 2000);
   if (!relatorio) return;
   await dbSaveCalibracao('semanal', inicio, hoje, relatorio, parseFloat(media));
-  await dbDeleteCalibracaoAntiga('diario');
-  console.log(`✅ Semanal — ${media}%`);
+  // Diários apagados na rotina de terça (1 dia depois)
+  console.log(`✅ Semanal — ${media}% (${diarios.length} dias consolidados)`);
 }
 
 async function agentMensal() {
@@ -1806,7 +1808,7 @@ async function agentMensal() {
   const relatorio = await chamarIA(`Consolide semanais em mensal. Período: ${inicio} a ${hoje} | Média: ${media}%\n\n${textos}\n\n${parseFloat(media)>=80?'Acima de 80% — mantenha.':'Abaixo de 80% — o que mudar?'} Máx 500 palavras.`, 3000);
   if (!relatorio) return;
   await dbSaveCalibracao('mensal', inicio, hoje, relatorio, parseFloat(media));
-  await dbDeleteCalibracaoAntiga('semanal');
+  // Semanais apagados na rotina do dia 02 (1 dia depois)
   console.log(`✅ Mensal — ${media}%`);
 }
 
@@ -1820,20 +1822,71 @@ async function agentSemestral() {
   const relatorio = await chamarIA(`Consolide mensais em semestral. Período: ${inicio} a ${hoje} | Média: ${media}%\n\n${textos}\n\nEvolução, padrões, estratégias. Máx 600 palavras.`, 4000);
   if (!relatorio) return;
   await dbSaveCalibracao('semestral', inicio, hoje, relatorio, parseFloat(media));
-  await dbDeleteCalibracaoAntiga('mensal');
+  // Mensais apagados na rotina do dia 02 do mês seguinte (1 dia depois)
   console.log(`✅ Semestral — ${media}%`);
 }
 
 async function rotinaNoturna() {
   const hoje = hojeStr();
   const ontem = diaOffset(hoje, -1);
+  const diaDaSemana = diaSemana(hoje); // 0=dom, 1=seg, 2=ter...
+  const diaDoMes = parseInt(hoje.substring(8,10));
   console.log(`\n🌙 Rotina noturna — ${hoje}`);
+
+  // 1. Validar e gerar relatório do dia anterior
   await agentValidar(ontem);
   await agentDiario(ontem);
-  if (diaSemana(hoje) === 0) await agentSemanal();
-  if (hoje.substring(8,10) === ultimoDiaMes(hoje)) await agentMensal();
-  const mensais = await dbGetCalibracoes('mensal', 6);
-  if (mensais.length >= 6) await agentSemestral();
+
+  // 2. Semanal: rodar na rotina de domingo→segunda (diaSemana===1 = segunda)
+  if (diaDaSemana === 1) {
+    console.log('📅 Segunda-feira — gerando semanal...');
+    await agentSemanal();
+  }
+
+  // 3. Apagar diários: na terça, apagar apenas os da semana anterior (antes de segunda)
+  if (diaDaSemana === 2) {
+    console.log('🗑️ Terça-feira — apagando diários da semana anterior...');
+    const segunda = diaOffset(hoje, -1); // segunda = ontem
+    try {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/calibracao?tipo=eq.diario&periodo_inicio=lt.${segunda}`,
+        { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' } }
+      );
+      console.log(`✅ Diários anteriores a ${segunda} apagados`);
+    } catch(e) { console.error('Erro ao apagar diários:', e.message); }
+  }
+
+  // 4. Mensal: no último dia do mês
+  const ultimoDia = ultimoDiaMes(hoje);
+  if (hoje.substring(8,10) === ultimoDia) {
+    console.log('📅 Último dia do mês — gerando mensal...');
+    await agentMensal();
+  }
+
+  // 5. Apagar semanais: dia 02 do mês (1 dia após o mensal do último dia)
+  if (diaDoMes === 2) {
+    console.log('🗑️ Dia 02 — apagando semanais consolidados...');
+    await dbDeleteCalibracaoAntiga('semanal');
+  }
+
+  // 6. Semestral: após 6 mensais disponíveis
+  const mensais = await dbGetCalibracoes('mensal', 100);
+  if (mensais.length >= 6) {
+    console.log('📅 6 mensais disponíveis — gerando semestral...');
+    await agentSemestral();
+  }
+
+  // 7. Apagar mensais: 1 dia após o semestral (dia 02 do mês após semestral)
+  // O semestral é gerado no último dia do 6º mês, então apagar no dia 02 do 7º mês
+  // Reusa a condição do dia 02 mas só se já tiver semestral
+  if (diaDoMes === 2) {
+    const semestral = await dbGetCalibracao('semestral');
+    if (semestral) {
+      console.log('🗑️ Dia 02 — apagando mensais consolidados no semestral...');
+      await dbDeleteCalibracaoAntiga('mensal');
+    }
+  }
+
   if (apiSuspensa && apiErrorMsg.includes('Limite')) {
     apiSuspensa = false; apiErrorMsg = ''; reqHoje = 0;
     console.log('✅ Bloqueio de API resetado');
