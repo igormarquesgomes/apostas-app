@@ -1284,30 +1284,32 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   console.log(`✅ Total apostas geradas: ${jogosResultado.length}`);
   const resultado = { jogos: jogosResultado };
 
+  // Criar mapa de fixtureId por nome dos times (normalizado)
+  const norm = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+  const fixtureMap = new Map();
+  const metaMap = new Map();
+  for (const jg of jogos) {
+    const key = `${norm(jg.timeCasa)}|${norm(jg.timeFora)}`;
+    fixtureMap.set(key, jg.fixtureId);
+    metaMap.set(key, { tipo: jg.tipo, liga: jg.liga, pri: jg.pri, teamCasaId: jg.teamCasaId, teamForaId: jg.teamForaId });
+  }
+
   // Corrigir tipo_liga, liga e recuperar fixtureId dos jogos originais
   if (resultado.jogos) {
     resultado.jogos = resultado.jogos.map((j) => {
-      // Encontrar jogo original — primeiro por índice (mais confiável), depois por nome
-      const porIndice = jogos[j.id - 1];
-      const porNome = jogos.find(jg =>
-        jg.timeCasa === j.time_casa && jg.timeFora === j.time_fora
-      );
-      // Usar índice se o fixtureId bater, senão usar match por nome
-      const jogoOriginal = (porIndice?.fixtureId ? porIndice : null) || porNome || porIndice;
-      if (!jogoOriginal?.fixtureId) console.log(`⚠️ Sem fixtureId: ${j.time_casa} x ${j.time_fora} (id=${j.id})`);
-
-      // Sempre usar tipo, liga e fixtureId do original
-      const tipoCorreto = jogoOriginal?.tipo || j.tipo_liga || 'eu';
-      const ligaCorreta = jogoOriginal?.liga || j.liga || 'Internacional';
+      const key = `${norm(j.time_casa)}|${norm(j.time_fora)}`;
+      const fixtureId = fixtureMap.get(key) || null;
+      const meta = metaMap.get(key) || {};
+      if (!fixtureId) console.log(`⚠️ Sem fixtureId: ${j.time_casa} x ${j.time_fora}`);
 
       return {
         ...j,
-        tipo_liga: tipoCorreto,
-        liga: ligaCorreta,
-        pri: jogoOriginal?.pri || 20,
-        fixtureId: j.fixtureId || jogoOriginal?.fixtureId || null, // CRÍTICO para validação
-        teamCasaId: j.teamCasaId || jogoOriginal?.teamCasaId || null,
-        teamForaId: j.teamForaId || jogoOriginal?.teamForaId || null,
+        tipo_liga: meta.tipo || j.tipo_liga || 'eu',
+        liga: meta.liga || j.liga || 'Internacional',
+        pri: meta.pri || 20,
+        fixtureId: fixtureId || j.fixtureId || null,
+        teamCasaId: meta.teamCasaId || j.teamCasaId || null,
+        teamForaId: meta.teamForaId || j.teamForaId || null,
       };
     });
 
@@ -1728,26 +1730,6 @@ async function agentValidar(data) {
         }
       }
 
-      // Fallback Manus: buscar resultado se não encontrou na API-Football
-      if (golsCasa === null && MANUS_API_KEY) {
-        try {
-          console.log(`    🔍 Buscando resultado via Manus: ${jogo.time_casa} x ${jogo.time_fora}`);
-          const resultadoManus = await chamarManus(
-            `Qual foi o placar final do jogo ${jogo.time_casa} x ${jogo.time_fora} do dia ${data}? Responda APENAS com o placar no formato "X-Y" onde X é gols do time da casa e Y é gols do visitante. Se o jogo não terminou ainda, responda "pendente".`,
-            30000
-          );
-          if (resultadoManus && resultadoManus.trim() !== 'pendente') {
-            const match = resultadoManus.match(/(\d+)\s*[-x]\s*(\d+)/);
-            if (match) {
-              golsCasa = parseInt(match[1]);
-              golsFora = parseInt(match[2]);
-              placar = `${golsCasa}-${golsFora}`;
-              console.log(`    ✅ Placar via Manus: ${placar}`);
-            }
-          }
-        } catch(e) { console.log(`    ⚠️ Manus falhou: ${e.message}`); }
-      }
-
       if (golsCasa !== null && golsFora !== null) {
         // Buscar stats detalhadas se precisar (cartões/escanteios)
         let stats = null;
@@ -1767,6 +1749,42 @@ async function agentValidar(data) {
       console.log(`    ❌ Erro: ${err.message}`);
       resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: err.message, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
     }
+  }
+
+  // Manus: buscar todos os pendentes de uma vez
+  const pendentes = resultados.filter(r => r.resultado_aposta === 'pendente');
+  if (pendentes.length > 0 && MANUS_API_KEY) {
+    try {
+      const lista = pendentes.map(r => `${r.time_casa} x ${r.time_fora}`).join(', ');
+      console.log(`🔍 Manus: buscando ${pendentes.length} resultados pendentes...`);
+      const resposta = await chamarManus(
+        `Busque o placar final dos seguintes jogos do dia ${data}. Para cada jogo retorne no formato "Time Casa X-Y Time Fora" ou "pendente" se ainda não terminou.
+
+Jogos: ${lista}`,
+        120000
+      );
+      if (resposta) {
+        for (const pend of pendentes) {
+          const nCasa = pend.time_casa?.split(' ')[0]?.toLowerCase();
+          const nFora = pend.time_fora?.split(' ')[0]?.toLowerCase();
+          const regex = new RegExp(`${nCasa}[^\d]*(\d+)[^\d]+(\d+)`, 'i');
+          const match = resposta.toLowerCase().match(regex);
+          if (match) {
+            const gC = parseInt(match[1]), gF = parseInt(match[2]);
+            const placarM = `${gC}-${gF}`;
+            const jogo = jogos.find(j => j.time_casa === pend.time_casa);
+            if (jogo) {
+              const res = verificarAposta(jogo, gC, gF, null);
+              const idx = resultados.findIndex(r => r.jogo_id === pend.jogo_id);
+              if (idx !== -1) {
+                resultados[idx] = { ...resultados[idx], placar: placarM, resultado_aposta: res, motivo: `Via Manus: ${pend.time_casa} ${gC} x ${gF} ${pend.time_fora}` };
+                console.log(`    ✅ Manus: ${pend.time_casa} x ${pend.time_fora} → ${placarM} → ${res.toUpperCase()}`);
+              }
+            }
+          }
+        }
+      }
+    } catch(e) { console.error('❌ Manus validação:', e.message); }
   }
 
   await dbSaveResultados(data, { validado_em: new Date().toISOString(), apostas: resultados });
