@@ -1257,9 +1257,8 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 const PRIORIDADES_MULTIPLA = new Set([1,2,3,4,5,6]); // Só até pri 6
 
 async function gerarMultiplas(data, jogosDodia) {
-  // Filtrar apenas jogos elegíveis para múltiplas
-  const jogosElegiveis = jogosDodia.filter(j => {
-    // Filtrar horário >= 13:00 (campo pode ser horario ou hora)
+  // Filtrar por horário >= 13:00 (único filtro obrigatório)
+  const comHorario = jogosDodia.filter(j => {
     const h = j.horario || j.hora || '00:00';
     const [hh, mm] = h.split(':').map(Number);
     const totalMin = hh * 60 + (mm || 0);
@@ -1267,19 +1266,18 @@ async function gerarMultiplas(data, jogosDodia) {
       console.log(`  ⏰ Excluído das múltiplas (horário ${h}): ${j.time_casa||j.timeCasa} x ${j.time_fora||j.timeFora}`);
       return false;
     }
-
-    // Filtrar por tipo de liga (pri pode estar ausente nos jogos do banco)
-    const tipo = j.tipo_liga || j.tipo || '';
-    const priOk = PRIORIDADES_MULTIPLA.has(j.pri || 99) ||
-                  ['a','b','copa','it','es','eu'].includes(tipo);
-    if (!priOk) {
-      console.log(`  🚫 Excluído das múltiplas (liga ${tipo}): ${j.time_casa||j.timeCasa} x ${j.time_fora||j.timeFora}`);
-      return false;
-    }
-
     return true;
   });
-  console.log(`🎯 Jogos elegíveis para múltiplas: ${jogosElegiveis.length}`);
+
+  // Preferir jogos prioritários (pri 1-6 ou tipo a/b/copa/it/es/eu)
+  const prioritarios = comHorario.filter(j => {
+    const tipo = j.tipo_liga || j.tipo || '';
+    return PRIORIDADES_MULTIPLA.has(j.pri || 99) || ['a','b','copa','it','es','eu'].includes(tipo);
+  });
+
+  // Se tiver 4+ prioritários, usar só eles. Senão, usar todos os jogos do dia
+  const jogosElegiveis = prioritarios.length >= 4 ? prioritarios : comHorario;
+  console.log(`🎯 Jogos elegíveis para múltiplas: ${jogosElegiveis.length} (${prioritarios.length} prioritários, ${comHorario.length} total)`);
   if (jogosElegiveis.length < 2) {
     console.log('Poucos jogos elegíveis para múltiplas');
     return null;
