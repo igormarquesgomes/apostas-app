@@ -202,9 +202,15 @@ const SELECOES_CAMPEAS = new Set([
 ]);
 
 function isSelecaoCampea(timeCasa, timeFora) {
-  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
   const nc = n(timeCasa), nf = n(timeFora);
-  return [...SELECOES_CAMPEAS].some(s => nc?.includes(s) || nf?.includes(s));
+  // Verificar match exato ou parcial
+  return [...SELECOES_CAMPEAS].some(s => {
+    const sn = n(s);
+    return nc === sn || nf === sn ||
+           nc?.includes(sn) || nf?.includes(sn) ||
+           sn.includes(nc?.split(' ')[0]) || sn.includes(nf?.split(' ')[0]);
+  });
 }
 
 // Times que participam de Champions League ou Europa League nas grandes ligas
@@ -641,15 +647,20 @@ async function buscarFixturesPorData(data) {
     if (ligasBR.length) console.log(`🇧🇷 Ligas Brasil:\n  ${ligasBR.join('\n  ')}`);
 
     // Log de seleções/amistosos para descobrir IDs
-    const ligasSelecoes = [...new Set(
+    // Log de TODAS as ligas internacionais (país=World ou tipo=international)
+    const ligasInternacionais = [...new Set(
       fixtures.filter(f => {
         const nome = f.league?.name?.toLowerCase() || '';
-        return nome.includes('world cup') || nome.includes('qualification') ||
+        const pais = f.league?.country?.toLowerCase() || '';
+        return pais === 'world' || pais === '' ||
+               nome.includes('world cup') || nome.includes('qualification') ||
                nome.includes('friendly') || nome.includes('amistoso') ||
-               nome.includes('nations league') || nome.includes('eliminat');
-      }).map(f => `ID:${f.league?.id} — ${f.league?.name} (${f.league?.country})`)
+               nome.includes('nations') || nome.includes('eliminat') ||
+               nome.includes('international') || nome.includes('copa do mundo');
+      }).map(f => `ID:${f.league?.id} — ${f.league?.name} (${f.league?.country}) | ${f.teams?.home?.name} x ${f.teams?.away?.name}`)
     )];
-    if (ligasSelecoes.length) console.log(`🌍 Seleções/Amistosos encontrados:\n  ${ligasSelecoes.join('\n  ')}`);
+    if (ligasInternacionais.length) console.log(`🌍 Ligas internacionais encontradas:\n  ${ligasInternacionais.join('\n  ')}`);
+    else console.log('🌍 Nenhuma liga internacional encontrada nos fixtures');
     // Log detalhado jogos brasileiros NS
     const jogosBR = fixtures.filter(f => f.league?.country === "Brazil" && f.fixture?.status?.short === "NS");
     if (jogosBR.length) {
@@ -1073,17 +1084,49 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   }
 
   if (lote2.length > 0) {
-    console.log(`\n⏳ Aguardando 60s antes do lote 2 (rate limit)...`);
-    await sleep(60000); // 60s para garantir reset do rate limit de tokens/min
+    console.log(`\n⏳ Aguardando 90s antes do lote 2 (rate limit)...`);
+    await sleep(90000); // 90s para garantir reset do rate limit de tokens/min
     console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
-    // Tentar com web_search primeiro, fallback sem web_search
-    let txt2 = await chamarIAComBusca(prompt2);
+    console.log('🤖 Lote 2: Sonnet sem web_search...');
+    let txt2 = await chamarIA(prompt2, 8000);
+
+    // Se falhou, dividir lote 2 em 2a e 2b
     if (!txt2) {
-      console.log('Tentando lote 2 sem web_search...');
-      txt2 = await chamarIA(prompt2, 8000);
-    }
-    if (txt2) {
+      console.log('⚠️ Lote 2 falhou — dividindo em sublotes 2a e 2b...');
+      const lote2a = lote2.slice(0, Math.ceil(lote2.length / 2));
+      const lote2b = lote2.slice(Math.ceil(lote2.length / 2));
+
+      // Sublote 2a
+      const prompt2a = montarPrompt(montarListaJogos(lote2a, LOTE), blocoMem, df);
+      const txt2a = await chamarIA(prompt2a, 6000);
+      if (txt2a) {
+        try {
+          const s = txt2a.indexOf('{'), e = txt2a.lastIndexOf('}');
+          if (s !== -1) {
+            const r = JSON.parse(txt2a.slice(s, e+1));
+            jogosResultado = [...jogosResultado, ...(r.jogos || [])];
+            console.log(`✅ Sublote 2a: ${r.jogos?.length || 0} apostas`);
+          }
+        } catch(e) { console.error('❌ Erro parse 2a:', e.message); }
+      }
+
+      await sleep(30000);
+
+      // Sublote 2b
+      const prompt2b = montarPrompt(montarListaJogos(lote2b, LOTE + lote2a.length), blocoMem, df);
+      const txt2b = await chamarIA(prompt2b, 6000);
+      if (txt2b) {
+        try {
+          const s = txt2b.indexOf('{'), e = txt2b.lastIndexOf('}');
+          if (s !== -1) {
+            const r = JSON.parse(txt2b.slice(s, e+1));
+            jogosResultado = [...jogosResultado, ...(r.jogos || [])];
+            console.log(`✅ Sublote 2b: ${r.jogos?.length || 0} apostas`);
+          }
+        } catch(e) { console.error('❌ Erro parse 2b:', e.message); }
+      }
+    } else {
       try {
         const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
         if (s2 !== -1) {
@@ -1093,8 +1136,6 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
           console.log(`✅ Lote 2: ${jogos2.length} apostas geradas`);
         }
       } catch(e) { console.error('❌ Erro parse lote 2:', e.message); }
-    } else {
-      console.error('❌ Lote 2: sem resposta da IA');
     }
   }
 
