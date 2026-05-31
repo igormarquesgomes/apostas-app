@@ -215,7 +215,18 @@ function fmtDL(iso){const[a,m,d]=iso.split('-');return `${d}/${m}/${a}`;}
 
 async function load(){
   const h=hoje(),ps=[];
-  for(let i=0;i<30;i++) ps.push(fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null));
+  for(let i=0;i<30;i++) ps.push(
+    fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null)
+    .then(async d => {
+      if(!d?.apostas) return null;
+      // Buscar múltiplas do dia
+      try {
+        const m=await fetch(`${B}/multiplas/${off(h,-i)}`).then(r=>r.ok?r.json():null);
+        if(m) { d.multiplas=m.multiplas; d.resultados_multiplas=m.resultados_multiplas; }
+      } catch(e){}
+      return d;
+    })
+  );
   const dias=(await Promise.all(ps)).filter(d=>d&&d.apostas);
   processar(dias,h);
 }
@@ -225,6 +236,8 @@ function processar(dias,h){
   const ligasMap={};
   const ontem=off(h,-1),sw=off(h,-6),sm=h.substring(0,8)+'01';
   let oG=0,oR=0,sG=0,sR=0,mG=0,mR=0;
+  // Múltiplas
+  let mAG=0,mAR=0,mBG=0,mBR=0,mAP=0,mBP=0;
   const diasP=[];
 
   for(const dia of dias){
@@ -245,16 +258,27 @@ function processar(dias,h){
     if(dia.data===ontem){oG+=dG;oR+=dR;}
     if(dia.data>=sw){sG+=dG;sR+=dR;}
     if(dia.data>=sm){mG+=dG;mR+=dR;}
-    diasP.push({data:dia.data,apostas:apR,green:dG,red:dR,pendente:dP,total:ap.length,assert:da});
+
+    // Contar múltiplas
+    const rM=dia.resultados_multiplas;
+    if(rM?.multipla_a?.resultado==='green') mAG++;
+    else if(rM?.multipla_a?.resultado==='red') mAR++;
+    else if(dia.multiplas?.multipla_a) mAP++;
+    if(rM?.multipla_b?.resultado==='green') mBG++;
+    else if(rM?.multipla_b?.resultado==='red') mBR++;
+    else if(dia.multiplas?.multipla_b) mBP++;
+
+    diasP.push({data:dia.data,apostas:apR,green:dG,red:dR,pendente:dP,total:ap.length,assert:da,multiplas:dia.multiplas,resultados_multiplas:rM});
   }
 
   const tv=tG+tR,ag=tv>0?Math.round(tG/tv*100):null;
   const ligas=Object.entries(ligasMap).filter(([,v])=>v.total>=1).map(([n,v])=>({nome:n,...v,pct:Math.round(v.green/v.total*100)})).sort((a,b)=>b.pct-a.pct);
   const saude={ontem:{g:oG,r:oR,pct:oG+oR>0?Math.round(oG/(oG+oR)*100):null},semana:{g:sG,r:sR,pct:sG+sR>0?Math.round(sG/(sG+sR)*100):null},mes:{g:mG,r:mR,pct:mG+mR>0?Math.round(mG/(mG+mR)*100):null}};
+  const multiplas={a:{green:mAG,red:mAR,pendente:mAP,total:mAG+mAR},b:{green:mBG,red:mBR,pendente:mBP,total:mBG+mBR}};
 
   dadosGlobais=diasP;
   window._diasCache=diasP;
-  renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR);renderDiario(diasP);
+  renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR,multiplas);renderDiario(diasP);
 }
 
 function renderSaude(s){
@@ -291,12 +315,25 @@ function renderHealth(ag,ligas,tG,tR){
       </div>`).join('')||'<div class="empty" style="padding:.5rem 0">Aguardando dados...</div>'}`;
 }
 
-function renderStats(ag,t,g,r){
+function renderStats(ag,t,g,r,multiplas){
+  const mA=multiplas?.a, mB=multiplas?.b;
+  const pctA=mA?.total>0?Math.round(mA.green/mA.total*100):null;
+  const pctB=mB?.total>0?Math.round(mB.green/mB.total*100):null;
+  const metaA=mA?.green||0, metaB=mB?.green||0;
   document.getElementById('stats-grid').innerHTML=`
     <div class="stat-card"><div class="stat-lbl">Assertividade</div><div class="stat-val" style="color:${corP(ag??0)}">${ag!==null?ag+'%':'--'}</div></div>
     <div class="stat-card"><div class="stat-lbl">Total apostas</div><div class="stat-val" style="color:var(--blue)">${t}</div></div>
     <div class="stat-card"><div class="stat-lbl">Green</div><div class="stat-val" style="color:var(--green)">${g}</div></div>
-    <div class="stat-card"><div class="stat-lbl">Red</div><div class="stat-val" style="color:var(--red)">${r}</div></div>`;
+    <div class="stat-card"><div class="stat-lbl">Red</div><div class="stat-val" style="color:var(--red)">${r}</div></div>
+    <div class="stat-card" style="border-top:1px solid var(--border);padding-top:8px;grid-column:1/-1">
+      <div class="stat-lbl" style="margin-bottom:8px">🎯 Múltiplas do mês</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div><div class="stat-lbl">Múltipla A</div><div class="stat-val" style="font-size:18px;color:${corP(pctA??0)}">${pctA!==null?pctA+'%':'--'}</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${mA?.green||0}G · ${mA?.red||0}R</div></div>
+        <div><div class="stat-lbl">Múltipla B</div><div class="stat-val" style="font-size:18px;color:${corP(pctB??0)}">${pctB!==null?pctB+'%':'--'}</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${mB?.green||0}G · ${mB?.red||0}R</div></div>
+        <div><div class="stat-lbl">Meta A (10 greens)</div><div class="stat-val" style="font-size:18px;color:${metaA>=10?'var(--green)':'var(--amber)'}">  ${metaA}/10</div></div>
+        <div><div class="stat-lbl">Meta B (15 greens)</div><div class="stat-val" style="font-size:18px;color:${metaB>=15?'var(--green)':'var(--amber)'}">  ${metaB}/15</div></div>
+      </div>
+    </div>`;
 }
 
 function renderDiario(dias){
