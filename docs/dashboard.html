@@ -173,9 +173,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
     <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);">📡 Hoje em tempo real</div>
-      <button id="btn-hoje" onclick="validarHoje()" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(68,138,255,.3);background:rgba(68,138,255,.08);color:var(--blue);cursor:pointer;">
-        🔄 Atualizar resultados
-      </button>
+      <div style="display:flex;gap:6px;">
+        <button id="btn-hoje" onclick="validarHoje(false)" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(68,138,255,.3);background:rgba(68,138,255,.08);color:var(--blue);cursor:pointer;">
+          🔄 Atualizar
+        </button>
+        <button onclick="validarHoje(true)" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,171,0,.3);background:rgba(255,171,0,.08);color:var(--amber);cursor:pointer;" title="Revalida todos os jogos do zero">
+          ⚡ Forçar
+        </button>
+      </div>
     </div>
     <div id="hoje-conteudo">
       <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:center;padding:1rem;">
@@ -326,13 +331,13 @@ function togD(i){
   document.getElementById('dc'+i).classList.toggle('open');
 }
 
-async function validarHoje(){
+async function validarHoje(forcar=false){
   const btn=document.getElementById('btn-hoje');
   btn.disabled=true;btn.textContent='⏳ Validando...';
 
   try{
     // Disparar validação
-    await fetch(`${B}/validar-agora`,{method:'POST'});
+    await fetch(`${B}/validar-agora${forcar?'?forcar=true':''}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forcar})});
 
     // Aguardar 8 segundos e buscar resultado atualizado
     await new Promise(r=>setTimeout(r,8000));
