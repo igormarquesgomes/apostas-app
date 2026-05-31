@@ -1692,7 +1692,7 @@ async function agentValidar(data) {
       continue;
     }
 
-    console.log(`  Verificando: ${jogo.time_casa} x ${jogo.time_fora}`);
+    console.log(`  Verificando: ${jogo.time_casa} x ${jogo.time_fora} | fixtureId:${jogo.fixtureId||'?'} ligaId:${jogo.ligaId||'?'}`);
     let placar = null, golsCasa = null, golsFora = null, fixtureIdUsado = jogo.fixtureId || null;
 
     try {
