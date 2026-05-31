@@ -1005,6 +1005,14 @@ async function gerarApostas(data, horaMin, metaJogos) {
   // Montar lista de jogos com estatísticas para o prompt
   const memoria = await buscarMemoria();
   const blocoMem = memoria ? `\nHISTÓRICO DE CALIBRAÇÃO (use para melhorar as apostas):\n${memoria.substring(0,3000)}\n` : '';
+  if (memoria) {
+    const nDiarios = (memoria.match(/\[DIÁRIO/g) || []).length;
+    const temSemanal = memoria.includes('[SEMANAL');
+    const temMensal = memoria.includes('[MENSAL');
+    console.log(`📚 Memória carregada: ${nDiarios} diário(s)${temSemanal?' + semanal':''}${temMensal?' + mensal':''} — ${memoria.length} chars`);
+  } else {
+    console.log('📚 Sem memória de calibração disponível');
+  }
 
   function montarListaJogos(lista, offsetId = 0) {
     return lista.map((j, i) => {
@@ -1204,8 +1212,7 @@ async function gerarMultiplas(data, jogosDodia) {
 
   const lista = jogosElegiveis.map((j,i) =>
     `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario} | pri:${j.pri}`
-  ).join('
-');
+  ).join('\n');
 
   const prompt = `Você é especialista em apostas múltiplas. Analise os jogos elegíveis abaixo e monte 2 sugestões de múltiplas para a Estrela Bet.
 
