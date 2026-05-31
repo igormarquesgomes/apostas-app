@@ -1677,8 +1677,14 @@ async function agentValidar(data) {
   let cacheFixtures = null;
 
   for (const jogo of jogos) {
-    // Se já tem resultado confirmado (green/red), manter e pular
+    // Se foi corrigido manualmente, nunca revalidar
     const resExistente = resultadosExistentes.find(r => r.jogo_id === jogo.id);
+    if (resExistente?.corrigido_manualmente) {
+      console.log(`  ✏️ Mantendo correção manual: ${jogo.time_casa} x ${jogo.time_fora} → ${resExistente.resultado_aposta.toUpperCase()}`);
+      resultados.push(resExistente);
+      continue;
+    }
+    // Se já tem resultado confirmado (green/red), manter e pular
     if (resExistente && resExistente.resultado_aposta !== 'pendente') {
       console.log(`  ✅ Mantendo: ${jogo.time_casa} x ${jogo.time_fora} → ${resExistente.resultado_aposta.toUpperCase()}`);
       resultados.push(resExistente);
@@ -2093,6 +2099,11 @@ app.post('/analisar', async (req, res) => {
     const resultado = await gerarApostas(data, horaMin, metaJogos);
     if (!resultado) return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado.' });
     if (SUPABASE_URL && SUPABASE_KEY) {
+      // Verificar fixtureIds antes de salvar
+      const comFix = resultado.jogos?.filter(j => j.fixtureId)?.length || 0;
+      const semFix = resultado.jogos?.filter(j => !j.fixtureId)?.length || 0;
+      console.log(`💾 Salvando: ${comFix} jogos com fixtureId, ${semFix} sem`);
+      if (semFix > 0) console.log(`⚠️ Sem fixtureId: ${resultado.jogos?.filter(j=>!j.fixtureId).map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
       await dbSave(data, resultado);
       console.log('✅ Salvo no banco');
 
@@ -2224,6 +2235,27 @@ app.post('/validar-pendentes', async (req, res) => {
       console.log(`✅ Hoje (${hoje}): todos validados`);
     }
   }
+});
+
+// Corrigir resultado de uma aposta manualmente
+app.post('/corrigir-resultado', async (req, res) => {
+  const { data, jogo_id, resultado } = req.body;
+  if (!data || !jogo_id || !['green','red','pendente'].includes(resultado)) {
+    return res.status(400).json({ error: 'Parâmetros inválidos' });
+  }
+  const row = await dbGet(data);
+  if (!row?.resultados?.apostas) return res.status(404).json({ error: 'Sem resultados para esta data' });
+
+  const apostas = row.resultados.apostas.map(a => {
+    if (a.jogo_id === jogo_id) {
+      console.log(`✏️ Corrigindo ${a.time_casa} x ${a.time_fora}: ${a.resultado_aposta} → ${resultado}`);
+      return { ...a, resultado_aposta: resultado, corrigido_manualmente: true };
+    }
+    return a;
+  });
+
+  await dbSaveResultados(data, { ...row.resultados, apostas });
+  res.json({ ok: true, mensagem: `Resultado corrigido para ${resultado}` });
 });
 
 app.get('/calibracao', async (req, res) => {
