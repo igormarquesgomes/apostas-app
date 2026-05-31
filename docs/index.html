@@ -490,17 +490,19 @@ function render(jogos,data){
 
 async function editarResultado(event, idx, data, jogoId, resultadoAtual){
   event.stopPropagation();
-  const novo = resultadoAtual === 'green' ? 'red' : 'green';
-  if (!confirm(`Trocar de ${resultadoAtual.toUpperCase()} para ${novo.toUpperCase()}?`)) return;
+  const placarAtual = document.getElementById(`jc${idx}`)?.querySelector('.jogo-hora')?.nextSibling?.textContent || '';
+  const novosPlacar = prompt(`Placar real (ex: 4-3):
+Deixe em branco para manter o placar atual.`, placarAtual.trim() || '');
+  if (novosPlacar === null) return; // cancelou
+
   try {
     const r = await fetch(`${BACKEND_URL}/corrigir-resultado`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ data, jogo_id: jogoId, resultado: novo })
+      body: JSON.stringify({ data, jogo_id: jogoId, placar: novosPlacar.trim() || null })
     });
     const j = await r.json();
     if (j.ok) {
-      // Recarregar apostas do dia
       const r2 = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
       const d2 = await r2.json();
       if (d2.apostas?.jogos?.length > 0) {
@@ -509,9 +511,9 @@ async function editarResultado(event, idx, data, jogoId, resultadoAtual){
           const res = resultados.find(x => x.jogo_id === jg.id);
           return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null};
         });
-        render(jogosComRes);
+        render(jogosComRes, data);
       }
-    }
+    } else { alert('Erro: ' + j.error); }
   } catch(e) { alert('Erro: ' + e.message); }
 }
 
