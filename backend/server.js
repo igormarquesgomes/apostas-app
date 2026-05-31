@@ -1928,13 +1928,19 @@ app.post('/analisar', async (req, res) => {
       console.log('✅ Salvo no banco');
 
       // Gerar múltiplas com os jogos do dia
-      console.log('\n🎯 Gerando múltiplas...');
-      await sleep(60000); // Aguardar rate limit
-      const multiplas = await gerarMultiplas(data, resultado.jogos);
-      if (multiplas) {
-        await dbSaveMultiplas(data, multiplas);
-        console.log(`✅ Múltiplas salvas — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
-      }
+      console.log('\n🎯 Gerando múltiplas... aguardando 90s (rate limit)');
+      await sleep(90000); // Aguardar rate limit resetar após lotes 1 e 2
+      // Gerar múltiplas em background — não bloqueia a resposta
+      setTimeout(async () => {
+        try {
+          console.log('\n🎯 Gerando múltiplas em background...');
+          const multiplas = await gerarMultiplas(data, resultado.jogos);
+          if (multiplas) {
+            await dbSaveMultiplas(data, multiplas);
+            console.log(`✅ Múltiplas salvas — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
+          }
+        } catch(e) { console.error('❌ Erro múltiplas:', e.message); }
+      }, 90000); // 90s depois — rate limit já resetou
     }
     res.json({ ...resultado, multiplas: resultado.multiplas });
   } catch (err) {
