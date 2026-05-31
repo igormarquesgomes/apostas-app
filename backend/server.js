@@ -275,10 +275,10 @@ const LIGAS_IGNORAR = new Set([
 ]);
 
 // Países com ligas muito fracas — evitar como complementar
+// Só os piores — manter lista pequena para não bloquear demais em dias fracos
 const PAISES_IGNORAR_COMP = new Set([
-  'aruba','malta','andorra','san marino','gibraltar','faroe islands',
-  'liechtenstein','moldova','armenia','azerbaijan','georgia',
-  'timor-leste','myanmar','palestine','tajikistan','fyr macedonia',
+  'aruba','andorra','san marino','gibraltar','liechtenstein',
+  'timor-leste','fyr macedonia',
 ]);
 
 // Filtro adicional por nome para ligas regionais brasileiras que escapam pelo ID
@@ -953,15 +953,16 @@ async function gerarApostas(data, horaMin, metaJogos) {
 
       if (EUROPEUS.includes(paisLower)) {
         tipoComp = 'eu';
-        // Times Europa B = pri 5 (entre copas pri4 e grandes ligas sem champions pri6)
-        // Outras europeias = pri 9
         priComp = isTimesEuropaB(timeCasa, timeFora) ? 50 : 90;
       } else if (SUL_AMERICANOS.includes(paisLower)) {
         tipoComp = 'sul';
-        priComp = 70; // Pri 7 — após eliminatórias/amistosos (65/66)
+        priComp = 70;
       } else if (AFRICA_ORIENTE.includes(paisLower)) {
         tipoComp = 'af';
-        priComp = 80; // Pri 8
+        priComp = 80;
+      } else {
+        // Todo o resto — menor prioridade possível
+        priComp = 200;
       }
 
       if (!jogosComp.has(key))
@@ -1256,8 +1257,15 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 const PRIORIDADES_MULTIPLA = new Set([1,2,3,4,5,6]); // Só até pri 6
 
 async function gerarMultiplas(data, jogosDodia) {
-  // Filtrar apenas jogos de prioridade 1-6
-  const jogosElegiveis = jogosDodia.filter(j => PRIORIDADES_MULTIPLA.has(j.pri || 99));
+  // Filtrar apenas jogos de prioridade 1-6 E horário >= 13:00
+  const jogosElegiveis = jogosDodia.filter(j => {
+    if (!PRIORIDADES_MULTIPLA.has(j.pri || 99)) return false;
+    // Filtrar por horário mínimo 13:00
+    const h = j.horario || '00:00';
+    const [hh, mm] = h.split(':').map(Number);
+    const totalMin = hh * 60 + (mm || 0);
+    return totalMin >= 13 * 60; // >= 13:00
+  });
   if (jogosElegiveis.length < 2) {
     console.log('Poucos jogos elegíveis para múltiplas');
     return null;
