@@ -312,7 +312,10 @@ function renderDiasMult(){
   }).join('');
 }
 
+let dataMultAtual = null;
+
 async function carregarMultiplas(data,label){
+  dataMultAtual = data;
   document.querySelectorAll('[data-dtm]').forEach(b=>b.classList.remove('active'));
   document.querySelector(`[data-dtm="${data}"]`)?.classList.add('active');
   document.getElementById('tw-mult').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando múltiplas de ${label}...</div></div>`;
@@ -320,12 +323,33 @@ async function carregarMultiplas(data,label){
     const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
     const j=await r.json();
     if(!j.multiplas){
-      document.getElementById('tw-mult').innerHTML=`<div class="aviso">Sem múltiplas para este dia.</div>`;
+      document.getElementById('tw-mult').innerHTML=`
+        <div style="text-align:center;padding:2rem;">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:16px">Múltiplas de ${fmtDL(data)} não foram geradas</div>
+          <button onclick="gerarMultiplasManual('${data}')" style="background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.3);color:var(--green);font-family:var(--mono);font-size:12px;padding:12px 24px;border-radius:8px;cursor:pointer;">
+            🎯 Gerar múltiplas agora
+          </button>
+        </div>`;
       return;
     }
     renderMultiplas(j.multiplas,j.resultados_multiplas);
   }catch(e){
     document.getElementById('tw-mult').innerHTML=`<div class="aviso">Sem múltiplas para este dia.</div>`;
+  }
+}
+
+async function gerarMultiplasManual(data){
+  document.getElementById('tw-mult').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Gerando múltiplas...</div></div>`;
+  try{
+    await fetch(`${BACKEND_URL}/gerar-multiplas/${data}`,{method:'POST'});
+    // Aguardar processamento
+    await new Promise(r=>setTimeout(r,35000));
+    const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
+    const j=await r.json();
+    if(j.multiplas) renderMultiplas(j.multiplas,j.resultados_multiplas);
+    else document.getElementById('tw-mult').innerHTML=`<div class="aviso">Não foi possível gerar. Tente novamente.</div>`;
+  }catch(e){
+    document.getElementById('tw-mult').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
   }
 }
 
