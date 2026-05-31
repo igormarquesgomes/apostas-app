@@ -1459,7 +1459,11 @@ async function buscarResultadoFixture(fixtureId) {
     const f = json.response?.[0];
     if (!f) return null;
     const status = f.fixture?.status?.short;
-    if (!['FT','AET','PEN'].includes(status)) return null; // Jogo não terminou
+    console.log(`    📊 Status fixture ${fixtureId}: ${status}`);
+    if (!['FT','AET','PEN'].includes(status)) {
+      console.log(`    ⏳ Jogo não finalizado (${status}) — pendente`);
+      return null;
+    }
     return {
       placar: `${f.goals?.home}-${f.goals?.away}`,
       golsCasa: f.goals?.home,
