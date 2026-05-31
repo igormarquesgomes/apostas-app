@@ -253,6 +253,7 @@ function processar(dias,h){
   const saude={ontem:{g:oG,r:oR,pct:oG+oR>0?Math.round(oG/(oG+oR)*100):null},semana:{g:sG,r:sR,pct:sG+sR>0?Math.round(sG/(sG+sR)*100):null},mes:{g:mG,r:mR,pct:mG+mR>0?Math.round(mG/(mG+mR)*100):null}};
 
   dadosGlobais=diasP;
+  window._diasCache=diasP;
   renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR);renderDiario(diasP);
 }
 
@@ -330,6 +331,23 @@ function togD(i){
   document.getElementById('da'+i).classList.toggle('open');
   document.getElementById('dc'+i).classList.toggle('open');
 }
+
+// Auto-refresh do dia atual a cada 3 minutos
+setInterval(async () => {
+  try {
+    const r = await fetch(`${B}/apostas-resultado/${hoje()}`);
+    const d = await r.json();
+    if (!d.apostas?.jogos) return;
+    // Atualizar apenas o card de hoje no histórico sem recarregar tudo
+    const diasP = window._diasCache || [];
+    const idx = diasP.findIndex(x => x.data === hoje());
+    if (idx !== -1) {
+      diasP[idx] = d;
+      window._diasCache = diasP;
+      renderDiario(diasP);
+    }
+  } catch(e) {}
+}, 3 * 60 * 1000);
 
 async function validarHoje(forcar=false){
   const btn=document.getElementById('btn-hoje');
