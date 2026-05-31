@@ -248,7 +248,7 @@ async function carregarDia(data,label){
         const res=resultados.find(x=>x.jogo_id===jg.id);
         return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
       });
-      render(jogosComRes);
+      render(jogosComRes,data);
     }else{
       document.getElementById('tw').innerHTML=`<div class="aviso">⚠ Sem apostas para ${fmtDL(data)}.<br><small>Use "Analisar" para gerar.</small></div>`;
     }
@@ -278,7 +278,7 @@ async function buscar(){
         const res=resultados.find(x=>x.jogo_id===jg.id);
         return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
       });
-      render(jogosComRes);
+      render(jogosComRes,dv);
       document.getElementById('btn-b').disabled=false;
       return;
     }
@@ -291,8 +291,22 @@ async function buscar(){
     if(!r.ok){const e=await r.json();throw new Error(e.error||`Erro ${r.status}`);}
     const p=await r.json();
     clearInterval(iv);
-    if(p.aviso) document.getElementById('tw').innerHTML=`<div class="aviso">⚠ ${p.aviso}</div>`;
-    else render(p.jogos||[]);
+    if(p.aviso){ document.getElementById('tw').innerHTML=`<div class="aviso">⚠ ${p.aviso}</div>`; return; }
+    // Buscar resultados já validados antes de renderizar
+    try{
+      const rv=await fetch(`${BACKEND_URL}/apostas-resultado/${dv}`);
+      const jv=await rv.json();
+      if(jv.resultados?.apostas?.length){
+        const resultados=jv.resultados.apostas;
+        const jogosComRes=(p.jogos||[]).map(jg=>{
+          const res=resultados.find(x=>x.jogo_id===jg.id);
+          return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
+        });
+        render(jogosComRes,dv);
+        return;
+      }
+    }catch(e){}
+    render(p.jogos||[],dv);
   }catch(e){
     clearInterval(iv);
     document.getElementById('tw').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
@@ -399,7 +413,9 @@ const mc={gols:'p-gols',escanteios:'p-esc',cartoes:'p-car',resultado:'p-res'};
 const gN={a:'🇧🇷 Série A',b:'🇧🇷 Série B',copa:'🏆 Copas',it:'🇮🇹 Serie A Italiana',es:'🇪🇸 La Liga',eu:'🌍 Europeias',sul:'🌎 Sul-Americanas',af:'🌍 África & Oriente Médio',other:'🌐 Outras'};
 
 let exp=new Set();
-function render(jogos){
+let dataAtual='';
+function render(jogos,data){
+  if(data) dataAtual=data;
   if(!jogos.length){document.getElementById('tw').innerHTML='<div class="empty-state"><p>Nenhum jogo encontrado.</p></div>';return;}
   const alta=jogos.filter(j=>j.confianca==='alta').length;
   const odds=jogos.map(j=>parseFloat(j.odd_mercado||j.odd_sugerida)).filter(Boolean);
@@ -424,9 +440,9 @@ function render(jogos){
       const cc=j.confianca==='alta'?'c-a':j.confianca==='media'?'c-m':'c-b';
       const cl=j.confianca?(j.confianca[0].toUpperCase()+j.confianca.slice(1)):'-';
       const resBadge=j.resultado==='green'
-        ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span><button onclick="editarResultado(event,${i},'${dv}',${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
+        ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span><button onclick="editarResultado(event,${i},dataAtual,${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
         :j.resultado==='red'
-        ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span><button onclick="editarResultado(event,${i},'${dv}',${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
+        ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span><button onclick="editarResultado(event,${i},dataAtual,${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
         :'';
       const cardStyle=j.resultado==='green'?'border-color:rgba(0,230,118,.35)':j.resultado==='red'?'border-color:rgba(255,23,68,.35)':'';
       html+=`<div class="jogo-card" id="jc${i}" style="${cardStyle}">
