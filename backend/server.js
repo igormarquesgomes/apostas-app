@@ -187,6 +187,26 @@ function selecionarOdd(oddsJogo, aposta, timeCasa, timeFora) {
 }
 
 // IDs de liga na API-Football
+// Seleções campeãs do mundo (para filtrar eliminatórias e amistosos)
+const SELECOES_CAMPEAS = new Set([
+  // Brasil (5x), Alemanha (4x), Itália (4x), Argentina (3x), França (2x),
+  // Uruguai (2x), Inglaterra (1x), Espanha (1x)
+  'brazil','brasil',
+  'germany','deutschland','alemanha',
+  'italy','italia','itália',
+  'argentina',
+  'france','franca','frança',
+  'uruguay','uruguai',
+  'england','inglaterra',
+  'spain','espanha','españa',
+]);
+
+function isSelecaoCampea(timeCasa, timeFora) {
+  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const nc = n(timeCasa), nf = n(timeFora);
+  return [...SELECOES_CAMPEAS].some(s => nc?.includes(s) || nf?.includes(s));
+}
+
 // Times que participam de Champions League ou Europa League nas grandes ligas
 // Quando esses times jogam na liga nacional, têm prioridade extra
 const TIMES_CHAMPIONS = new Set([
@@ -211,21 +231,28 @@ function isTimesChampions(timeCasa, timeFora) {
 }
 
 const LIGAS_PRIORITY = {
-  // Brasil — máxima prioridade
-  71:  { nome:'Série A',          tipo:'a',    pri:1 },
-  72:  { nome:'Série B',          tipo:'b',    pri:2 },
-  // Copas internacionais — acima das ligas nacionais
-  13:  { nome:'Libertadores',     tipo:'copa', pri:3 },
-  11:  { nome:'Sul-Americana',    tipo:'copa', pri:3 },
-  3:   { nome:'Europa League',    tipo:'copa', pri:3 },
-  2:   { nome:'Champions League', tipo:'copa', pri:3 },
-  // Grandes ligas europeias — pri 4 base, mas times Champions ficam pri 4, outros pri 5
-  135: { nome:'Serie A 🇮🇹',      tipo:'it',   pri:4 },
-  140: { nome:'La Liga 🇪🇸',       tipo:'es',   pri:4 },
-  39:  { nome:'Premier League',   tipo:'eu',   pri:4 },
-  78:  { nome:'Bundesliga',       tipo:'eu',   pri:4 },
-  61:  { nome:'Ligue 1',          tipo:'eu',   pri:4 },
-  94:  { nome:'Liga Portugal',    tipo:'eu',   pri:4 },
+  // Brasil
+  71:  { nome:'Série A',               tipo:'a',    pri:1 },
+  72:  { nome:'Série B',               tipo:'b',    pri:2 },
+  // Copa do Mundo
+  1:   { nome:'Copa do Mundo',         tipo:'copa', pri:3 },
+  // Copas internacionais
+  13:  { nome:'Libertadores',          tipo:'copa', pri:4 },
+  11:  { nome:'Sul-Americana',         tipo:'copa', pri:4 },
+  3:   { nome:'Europa League',         tipo:'copa', pri:4 },
+  2:   { nome:'Champions League',      tipo:'copa', pri:4 },
+  // Grandes ligas europeias (pri 5 com times Champions, pri 6 sem)
+  135: { nome:'Serie A 🇮🇹',           tipo:'it',   pri:5 },
+  140: { nome:'La Liga 🇪🇸',            tipo:'es',   pri:5 },
+  39:  { nome:'Premier League',        tipo:'eu',   pri:5 },
+  78:  { nome:'Bundesliga',            tipo:'eu',   pri:5 },
+  61:  { nome:'Ligue 1',               tipo:'eu',   pri:5 },
+  94:  { nome:'Liga Portugal',         tipo:'eu',   pri:5 },
+  // Eliminatórias Copa do Mundo (só seleções campeãs) — entre pri6 e sul-americanas
+  29:  { nome:'Eliminatórias CONMEBOL',tipo:'copa', pri:65, selecaoCampea:true },
+  34:  { nome:'Eliminatórias UEFA',    tipo:'copa', pri:65, selecaoCampea:true },
+  // Amistosos internacionais (só seleções campeãs)
+  10:  { nome:'Amistoso Internacional',tipo:'copa', pri:66, selecaoCampea:true },
 };
 
 // IDs a ignorar explicitamente (ligas brasileiras que NÃO são prioritárias)
@@ -612,6 +639,17 @@ async function buscarFixturesPorData(data) {
               .map(f => `ID:${f.league?.id} — ${f.league?.name}`)
     )];
     if (ligasBR.length) console.log(`🇧🇷 Ligas Brasil:\n  ${ligasBR.join('\n  ')}`);
+
+    // Log de seleções/amistosos para descobrir IDs
+    const ligasSelecoes = [...new Set(
+      fixtures.filter(f => {
+        const nome = f.league?.name?.toLowerCase() || '';
+        return nome.includes('world cup') || nome.includes('qualification') ||
+               nome.includes('friendly') || nome.includes('amistoso') ||
+               nome.includes('nations league') || nome.includes('eliminat');
+      }).map(f => `ID:${f.league?.id} — ${f.league?.name} (${f.league?.country})`)
+    )];
+    if (ligasSelecoes.length) console.log(`🌍 Seleções/Amistosos encontrados:\n  ${ligasSelecoes.join('\n  ')}`);
     // Log detalhado jogos brasileiros NS
     const jogosBR = fixtures.filter(f => f.league?.country === "Brazil" && f.fixture?.status?.short === "NS");
     if (jogosBR.length) {
@@ -855,9 +893,20 @@ async function gerarApostas(data, horaMin, metaJogos) {
     const ligaMatch = LIGAS_PRIORITY[ligaId];
 
     if (ligaMatch) {
-      // Times Champions nas grandes ligas ficam pri 4, outros pri 6
       let priFinal = ligaMatch.pri;
-      if (ligaMatch.pri === 4 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
+
+      // Copa do Mundo — sempre pri 3
+      if (ligaMatch.pri === 3) priFinal = 3;
+
+      // Grandes ligas: times Champions pri 5, outros pri 6
+      else if (ligaMatch.pri === 5 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
+
+      // Eliminatórias e Amistosos: só seleções campeãs
+      else if (ligaMatch.selecaoCampea) {
+        if (!isSelecaoCampea(timeCasa, timeFora)) continue; // Ignorar se não for seleção campeã
+        priFinal = ligaMatch.pri; // 7=eliminatórias, 8=amistosos
+      }
+
       if (!jogosMap.has(key))
         jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
@@ -872,13 +921,15 @@ async function gerarApostas(data, horaMin, metaJogos) {
 
       if (EUROPEUS.includes(paisLower)) {
         tipoComp = 'eu';
-        priComp = isTimesEuropaB(timeCasa, timeFora) ? 5 : 9;
+        // Times Europa B = pri 5 (entre copas pri4 e grandes ligas sem champions pri6)
+        // Outras europeias = pri 9
+        priComp = isTimesEuropaB(timeCasa, timeFora) ? 50 : 90;
       } else if (SUL_AMERICANOS.includes(paisLower)) {
         tipoComp = 'sul';
-        priComp = 7;
+        priComp = 70; // Pri 7 — após eliminatórias/amistosos (65/66)
       } else if (AFRICA_ORIENTE.includes(paisLower)) {
         tipoComp = 'af';
-        priComp = 8;
+        priComp = 80; // Pri 8
       }
 
       if (!jogosComp.has(key))
@@ -956,25 +1007,44 @@ async function gerarApostas(data, horaMin, metaJogos) {
   }
 
   function montarPrompt(listaJogos, blocoMem, df) {
-    return `Você é um analista de apostas esportivas especializado. Analise os jogos abaixo com as estatísticas reais já coletadas da API-Football e gere 1 aposta por jogo para a Estrela Bet.
+    return `Você é um analista de apostas esportivas experiente. Para cada jogo, raciocine como um apostador profissional que busca a melhor relação entre confiança e risco.
 
 DATA: ${df}
 ${blocoMem}
 JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
 ${listaJogos}
 
-INSTRUÇÕES:
+PROCESSO DE ANÁLISE para cada jogo (raciocine internamente antes de decidir):
+
+PASSO 1 — Entenda o perfil do jogo:
+- Qual time tem vantagem clara? Existe vantagem real ou é equilibrado?
+- O histórico H2H e forma recente confirmam essa vantagem?
+- Use web_search para verificar lesões, escalações e contexto atual
+
+PASSO 2 — Avalie a aposta mais natural:
+- Se encontrou uma aposta clara, ela é segura o suficiente?
+- Existe uma forma de manter a mesma direção com mais segurança?
+  (ex: time tem vantagem mas jogo é imprevisível → dupla chance em vez de vitória simples)
+  (ex: jogo deve ter poucos gols mas há incerteza → Under 3.5 em vez de Under 2.5)
+  (ex: time favorito provavelmente marca → "time X marca" como segurança)
+
+PASSO 3 — Se o jogo for imprevisível em resultado/gols:
+- Analise os padrões de escanteios: ambos os times têm média consistente? O padrão é claro?
+- Analise os padrões de cartões: jogos entre esses times costumam ter mais ou menos cartões?
+- Se escanteios ou cartões tiverem padrão mais confiável que resultado/gols, prefira esses mercados
+
+PASSO 4 — Decisão final:
+- Escolha a aposta com maior confiança real, não a mais óbvia
+- Nunca force uma aposta arriscada só para seguir o mercado mais comum
+- A justificativa deve explicar POR QUE essa aposta específica foi escolhida em vez de alternativas
+
+REGRAS:
 - Série A e Série B têm análise OBRIGATÓRIA
-- Use os dados fornecidos (forma, gols/jogo, escanteios, cartões, H2H) para fundamentar cada aposta
-- Pode usar web_search para confirmar ou complementar (lesões, escalações)
-- Use o histórico de calibração para evitar padrões que erram
 - Preencha TODOS os campos com valores numéricos reais — nunca use "-"
-- IMPORTANTE: Se não encontrar aposta segura (alta confiança) em resultado ou gols, verifique escanteios e cartões antes de forçar uma aposta ruim
-- Quando o histórico indicar "red flag" em um tipo de jogo, prefira mercados alternativos (escanteios/cartões)
-- Confiança BAIXA só quando realmente não há opção segura
+- Use o histórico de calibração para evitar padrões que já erraram
 
 Retorne SOMENTE JSON válido:
-{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"Casa marca 1.8 gols/jogo, fora sofre 1.2. H2H último ano: 3 jogos com Over 2.5."}]}
+{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"Analisei vitória do time casa mas jogo é equilibrado. Optei por dupla chance pois casa tem leve vantagem sem garantia. Escanteios também considerados mas média inconsistente (7-11 nos últimos jogos)."}]}
 
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
   }
