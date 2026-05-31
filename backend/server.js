@@ -1318,7 +1318,8 @@ Retorne SOMENTE JSON:
   }
 }`;
 
-  const txt = await chamarIAComBusca(prompt, 4000);
+  // Múltiplas não precisam de web_search — dados já vêm das estatísticas
+  const txt = await chamarIA(prompt, 4000);
   if (!txt) return null;
   try {
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
@@ -1940,7 +1941,7 @@ app.post('/analisar', async (req, res) => {
             console.log(`✅ Múltiplas salvas — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
           }
         } catch(e) { console.error('❌ Erro múltiplas:', e.message); }
-      }, 90000); // 90s depois — rate limit já resetou
+      }, 30000); // 30s depois — sem web_search, tokens menores
     }
     res.json({ ...resultado, multiplas: resultado.multiplas });
   } catch (err) {
