@@ -7,6 +7,62 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const MANUS_API_KEY = process.env.MANUS_API_KEY;
+
+// ─── Manus AI ────────────────────────────────────────────────
+async function chamarManus(prompt, timeoutMs = 120000) {
+  if (!MANUS_API_KEY) {
+    console.log('⚠️ MANUS_API_KEY não configurada — pulando');
+    return null;
+  }
+  try {
+    console.log('🔍 Manus: buscando dados na web...');
+    // Criar tarefa
+    const res = await fetch('https://api.manus.ai/v1/tasks', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'API_KEY': MANUS_API_KEY
+      },
+      body: JSON.stringify({ prompt })
+    });
+    if (!res.ok) {
+      console.error(`❌ Manus erro: ${res.status}`);
+      return null;
+    }
+    const task = await res.json();
+    const taskId = task.task_id || task.id;
+    if (!taskId) { console.error('❌ Manus: sem task_id'); return null; }
+    console.log(`🔍 Manus task: ${taskId}`);
+
+    // Aguardar conclusão com polling
+    const inicio = Date.now();
+    while (Date.now() - inicio < timeoutMs) {
+      await sleep(5000);
+      const statusRes = await fetch(`https://api.manus.ai/v1/tasks/${taskId}`, {
+        headers: { 'accept': 'application/json', 'API_KEY': MANUS_API_KEY }
+      });
+      if (!statusRes.ok) continue;
+      const status = await statusRes.json();
+      const estado = status.status || status.state;
+      if (estado === 'completed' || estado === 'stopped') {
+        console.log(`✅ Manus concluído: ${taskId}`);
+        return status.result || status.output || status.message || JSON.stringify(status);
+      }
+      if (estado === 'failed' || estado === 'error') {
+        console.error(`❌ Manus falhou: ${taskId}`);
+        return null;
+      }
+      console.log(`🔍 Manus aguardando... (${Math.round((Date.now()-inicio)/1000)}s)`);
+    }
+    console.error(`❌ Manus timeout após ${timeoutMs/1000}s`);
+    return null;
+  } catch(e) {
+    console.error('❌ Manus erro:', e.message);
+    return null;
+  }
+}
 const APIFOOTBALL_KEY = process.env.APIFOOTBALL_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -1025,7 +1081,31 @@ async function gerarApostas(data, horaMin, metaJogos) {
   const df = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano}`;
 
   // Montar lista de jogos com estatísticas para o prompt
+  // ─── Manus: buscar odds Estrela Bet + lesões + escalações ───
+  let dadosManus = '';
+  if (MANUS_API_KEY) {
+    const listaJogosManus = jogos.map(j =>
+      `${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`
+    ).join('\n');
+
+    const promptManus = `Você é analista de apostas esportivas. Para os jogos abaixo, busque na web:
+1. Odds atuais na Estrela Bet para cada jogo (mercados: resultado, over/under 2.5 gols, ambas marcam)
+2. Lesões e desfalques confirmados de cada time
+3. Escalações prováveis se disponíveis
+4. Algum contexto relevante (motivação, sequência recente, clima do clube)
+
+JOGOS:
+${listaJogosManus}
+
+Retorne um resumo estruturado por jogo com os dados encontrados. Seja conciso e objetivo.`;
+
+    dadosManus = await chamarManus(promptManus, 180000) || '';
+    if (dadosManus) console.log(`✅ Manus: dados recebidos (${dadosManus.length} chars)`);
+    else console.log('⚠️ Manus: sem dados — seguindo sem');
+  }
+
   const memoria = await buscarMemoria();
+  const blocoManus = dadosManus ? `\nDADOS WEB (Manus — odds Estrela Bet, lesões, escalações):\n${dadosManus.substring(0,3000)}\n` : '';
   const blocoMem = memoria ? `\nHISTÓRICO DE CALIBRAÇÃO (use para melhorar as apostas):\n${memoria.substring(0,3000)}\n` : '';
   if (memoria) {
     const nDiarios = (memoria.match(/\[DIÁRIO/g) || []).length;
@@ -1047,11 +1127,11 @@ async function gerarApostas(data, horaMin, metaJogos) {
     }).join('\n');
   }
 
-  function montarPrompt(listaJogos, blocoMem, df) {
+  function montarPrompt(listaJogos, blocoMem, df, blocoManusParam='') {
     return `Você é um analista de apostas esportivas experiente. Para cada jogo, raciocine como um apostador profissional que busca a melhor relação entre confiança e risco.
 
 DATA: ${df}
-${blocoMem}
+${blocoMem}${blocoManusParam}
 JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
 ${listaJogos}
 
@@ -1095,7 +1175,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   const lote1 = jogos.slice(0, LOTE);
   const lote2 = jogos.slice(LOTE);
 
-  const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
+  const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df, blocoManus);
   console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
   const txt1 = await chamarIAComBusca(prompt1);
   
@@ -1117,7 +1197,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
     console.log(`\n⏳ Aguardando 90s antes do lote 2 (rate limit)...`);
     await sleep(90000); // 90s para garantir reset do rate limit de tokens/min
     console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
-    const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
+    const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df, blocoManus);
     // Lote 2: tentar com web_search primeiro (mantém qualidade), fallback sem
     console.log('🤖 Lote 2: tentando com web_search...');
     let txt2 = await chamarIAComBusca(prompt2, 8000);
@@ -1775,7 +1855,36 @@ Máx 400 palavras.`;
   Jogos: ${rB?.jogos_resultado?.map(j=>`${j.time_casa} x ${j.time_fora} (${j.aposta}) → ${j.resultado?.toUpperCase()||'?'}`).join(', ')||'-'}`;
   }
 
-  const relatorio = await chamarIA(promptDiario + blocoMultiplas + '\n\nSe as múltiplas deram RED, identifique qual jogo quebrou e sugira alternativa de mercado para próximas múltiplas.', 3000);
+  // Manus gera relatório paralelo com contexto web
+  let relatorioManus = '';
+  if (MANUS_API_KEY) {
+    const greens = resultados.filter(r=>r.resultado_aposta==='green').map(r=>`✅ ${r.time_casa} x ${r.time_fora} (${r.placar})`).join('\n');
+    const reds = resultados.filter(r=>r.resultado_aposta==='red').map(r=>`❌ ${r.time_casa} x ${r.time_fora} (${r.placar})`).join('\n');
+    const promptManus = `Você é analista de apostas esportivas. Analise os resultados do dia ${data} e gere um relatório conciso.
+
+GREENS (${g}):
+${greens || 'nenhum'}
+
+REDS (${r}):
+${reds || 'nenhum'}
+
+Assertividade: ${assert}%
+
+Para cada jogo RED, busque na web o que aconteceu (lesões, arbitragem, contexto) que pode explicar o resultado inesperado.
+Para os jogos GREEN, confirme o que foi acertado na análise.
+Identifique padrões: quais tipos de aposta/liga estão performando melhor ou pior?
+Máx 300 palavras.`;
+
+    relatorioManus = await chamarManus(promptManus, 120000) || '';
+    if (relatorioManus) console.log('✅ Manus: relatório diário gerado');
+  }
+
+  // Consolidar relatórios Anthropic + Manus
+  const promptFinal = relatorioManus
+    ? `${promptDiario}${blocoMultiplas}\n\nRELATÓRIO DA MANUS (contexto web):\n${relatorioManus}\n\nConsolide os dois relatórios em um único. Máx 500 palavras.`
+    : `${promptDiario}${blocoMultiplas}\n\nSe as múltiplas deram RED, identifique qual jogo quebrou e sugira alternativa de mercado para próximas múltiplas.`;
+
+  const relatorio = await chamarIA(promptFinal, 3000);
   if (!relatorio) return;
   await dbSaveCalibracao('diario', data, data, relatorio, parseFloat(assert));
   console.log(`✅ Relatório diário — ${assert}%`);
