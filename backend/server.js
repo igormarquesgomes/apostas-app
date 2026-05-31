@@ -270,6 +270,15 @@ const LIGAS_IGNORAR = new Set([
   1073, 1076, 1086, 1100, 1107, 1128, 1069, 1071, // Sub-20 e U17
   1148, 1158, 1096, 1097,  // Copas regionais
   1146, 1143,  // Alagoano-2, Estadual Junior
+  // Competições internacionais sub-categorias
+  921, 928, 914, 973, // UEFA U17, ASEAN U19, Tournoi Revello, CAF U17
+]);
+
+// Países com ligas muito fracas — evitar como complementar
+const PAISES_IGNORAR_COMP = new Set([
+  'aruba','malta','andorra','san marino','gibraltar','faroe islands',
+  'liechtenstein','moldova','armenia','azerbaijan','georgia',
+  'timor-leste','myanmar','palestine','tajikistan','fyr macedonia',
 ]);
 
 // Filtro adicional por nome para ligas regionais brasileiras que escapam pelo ID
@@ -647,7 +656,7 @@ async function buscarFixturesPorData(data) {
     if (ligasBR.length) console.log(`🇧🇷 Ligas Brasil:\n  ${ligasBR.join('\n  ')}`);
 
     // Log de seleções/amistosos para descobrir IDs
-    // Log de TODAS as ligas internacionais (país=World ou tipo=international)
+    // Log de TODAS as ligas internacionais
     const ligasInternacionais = [...new Set(
       fixtures.filter(f => {
         const nome = f.league?.name?.toLowerCase() || '';
@@ -657,10 +666,18 @@ async function buscarFixturesPorData(data) {
                nome.includes('friendly') || nome.includes('amistoso') ||
                nome.includes('nations') || nome.includes('eliminat') ||
                nome.includes('international') || nome.includes('copa do mundo');
-      }).map(f => `ID:${f.league?.id} — ${f.league?.name} (${f.league?.country}) | ${f.teams?.home?.name} x ${f.teams?.away?.name}`)
+      }).map(f => `ID:${f.league?.id} — ${f.league?.name} (${f.league?.country}) | ${f.teams?.home?.name} x ${f.teams?.away?.name} | ${new Date(f.fixture?.timestamp*1000).toISOString()}`)
     )];
     if (ligasInternacionais.length) console.log(`🌍 Ligas internacionais encontradas:\n  ${ligasInternacionais.join('\n  ')}`);
     else console.log('🌍 Nenhuma liga internacional encontrada nos fixtures');
+
+    // Log específico: buscar Brasil e Alemanha independente do dia
+    const selFocus = fixtures.filter(f => {
+      const h = f.teams?.home?.name?.toLowerCase() || '';
+      const a = f.teams?.away?.name?.toLowerCase() || '';
+      return ['brazil','germany','france','argentina','spain','italy','england','uruguay'].some(s => h.includes(s) || a.includes(s));
+    });
+    if (selFocus.length) console.log(`⚽ Seleções encontradas:\n  ${selFocus.map(f => `ID_LIGA:${f.league?.id} [${f.league?.name}] ${f.teams?.home?.name} x ${f.teams?.away?.name} | ${new Date(f.fixture?.timestamp*1000).toISOString()}`).join('\n  ')}`);
     // Log detalhado jogos brasileiros NS
     const jogosBR = fixtures.filter(f => f.league?.country === "Brazil" && f.fixture?.status?.short === "NS");
     if (jogosBR.length) {
@@ -923,6 +940,10 @@ async function gerarApostas(data, horaMin, metaJogos) {
     } else {
       // Complementares — definir tipo CORRETO e prioridade pelo país
       const paisLower = pais.toLowerCase();
+
+      // Ignorar países com ligas muito fracas
+      if (PAISES_IGNORAR_COMP.has(paisLower)) continue;
+
       let priComp = 20;
       let tipoComp = 'other';
 
@@ -1096,10 +1117,15 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
     await sleep(90000); // 90s para garantir reset do rate limit de tokens/min
     console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
-    console.log('🤖 Lote 2: Sonnet sem web_search...');
-    let txt2 = await chamarIA(prompt2, 8000);
+    // Lote 2: tentar com web_search primeiro (mantém qualidade), fallback sem
+    console.log('🤖 Lote 2: tentando com web_search...');
+    let txt2 = await chamarIAComBusca(prompt2, 8000);
+    if (!txt2) {
+      console.log('🤖 Lote 2: fallback sem web_search...');
+      txt2 = await chamarIA(prompt2, 8000);
+    }
 
-    // Se falhou, dividir lote 2 em 2a e 2b
+    // Se ainda falhou, dividir lote 2 em 2a e 2b
     if (!txt2) {
       console.log('⚠️ Lote 2 falhou — dividindo em sublotes 2a e 2b...');
       const lote2a = lote2.slice(0, Math.ceil(lote2.length / 2));
@@ -1136,14 +1162,41 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
       }
     } else {
       try {
-        const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
-        if (s2 !== -1) {
-          const r2 = JSON.parse(txt2.slice(s2, e2+1));
-          const jogos2 = r2.jogos || [];
-          jogosResultado = [...jogosResultado, ...jogos2];
-          console.log(`✅ Lote 2: ${jogos2.length} apostas geradas`);
+        // Parse robusto — pega o JSON completo mesmo com texto extra
+        let jsonTxt = txt2;
+        const s2 = txt2.indexOf('{"jogos"');
+        const e2 = txt2.lastIndexOf('}');
+        if (s2 !== -1) jsonTxt = txt2.slice(s2, e2+1);
+        else {
+          const s2b = txt2.indexOf('{');
+          if (s2b !== -1) jsonTxt = txt2.slice(s2b, e2+1);
         }
-      } catch(e) { console.error('❌ Erro parse lote 2:', e.message); }
+        const r2 = JSON.parse(jsonTxt);
+        const jogos2 = r2.jogos || [];
+        jogosResultado = [...jogosResultado, ...jogos2];
+        console.log(`✅ Lote 2: ${jogos2.length} apostas geradas`);
+      } catch(e) {
+        console.error('❌ Erro parse lote 2:', e.message);
+        // Tentar sublotes como último recurso
+        console.log('⚠️ Tentando sublotes...');
+        const lote2aF = lote2.slice(0, Math.ceil(lote2.length/2));
+        const lote2bF = lote2.slice(Math.ceil(lote2.length/2));
+        for (const [idx, sublote] of [[0, lote2aF],[lote2aF.length, lote2bF]]) {
+          const pt = montarPrompt(montarListaJogos(sublote, LOTE+idx), blocoMem, df);
+          const tx = await chamarIA(pt, 5000);
+          if (tx) {
+            try {
+              const s = tx.indexOf('{'), e = tx.lastIndexOf('}');
+              if (s !== -1) {
+                const r = JSON.parse(tx.slice(s,e+1));
+                jogosResultado = [...jogosResultado, ...(r.jogos||[])];
+                console.log(`✅ Sublote: ${r.jogos?.length||0} apostas`);
+              }
+            } catch(err) { console.error('❌ Erro sublote:', err.message); }
+            await sleep(20000);
+          }
+        }
+      }
     }
   }
 
@@ -1804,7 +1857,7 @@ app.post('/analisar', async (req, res) => {
       // Gerar múltiplas com os jogos do dia
       console.log('\n🎯 Gerando múltiplas...');
       await sleep(60000); // Aguardar rate limit
-      const multiplas = await gerarMultiplas(data, jogos);
+      const multiplas = await gerarMultiplas(data, resultado.jogos);
       if (multiplas) {
         await dbSaveMultiplas(data, multiplas);
         console.log(`✅ Múltiplas salvas — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
