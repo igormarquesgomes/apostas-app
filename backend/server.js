@@ -1287,10 +1287,14 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   // Corrigir tipo_liga, liga e recuperar fixtureId dos jogos originais
   if (resultado.jogos) {
     resultado.jogos = resultado.jogos.map((j) => {
-      // Encontrar jogo original pelo time casa/fora
-      const jogoOriginal = jogos.find(jg =>
+      // Encontrar jogo original — primeiro por índice (mais confiável), depois por nome
+      const porIndice = jogos[j.id - 1];
+      const porNome = jogos.find(jg =>
         jg.timeCasa === j.time_casa && jg.timeFora === j.time_fora
-      ) || jogos[j.id - 1];
+      );
+      // Usar índice se o fixtureId bater, senão usar match por nome
+      const jogoOriginal = (porIndice?.fixtureId ? porIndice : null) || porNome || porIndice;
+      if (!jogoOriginal?.fixtureId) console.log(`⚠️ Sem fixtureId: ${j.time_casa} x ${j.time_fora} (id=${j.id})`);
 
       // Sempre usar tipo, liga e fixtureId do original
       const tipoCorreto = jogoOriginal?.tipo || j.tipo_liga || 'eu';
@@ -1732,7 +1736,7 @@ async function agentValidar(data) {
           await sleep(300);
         }
         const resultado = verificarAposta(jogo, golsCasa, golsFora, stats);
-        console.log(`    ✅ ${placar} → ${resultado.toUpperCase()}`);
+        console.log(`    ✅ ${placar} | mercado:${jogo.mercado} | aposta:${jogo.aposta} → ${resultado.toUpperCase()}`);
         resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
       } else {
         console.log(`    ⏳ Resultado não encontrado`);
