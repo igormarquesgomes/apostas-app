@@ -500,6 +500,41 @@ async function dbGet(data) {
   } catch(e) { return null; }
 }
 
+// ─── Banco de ligas conhecidas ───────────────────────────────
+const cacheLigas = new Map(); // Cache em memória para evitar requisições repetidas
+
+async function dbGetLiga(nomeLiga) {
+  if (cacheLigas.has(nomeLiga)) return cacheLigas.get(nomeLiga);
+  try {
+    const nome = encodeURIComponent(nomeLiga);
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?nome=eq.${nome}&select=liga_id,pais`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await res.json();
+    if (rows?.length > 0) {
+      cacheLigas.set(nomeLiga, rows[0]);
+      return rows[0];
+    }
+    return null;
+  } catch(e) { return null; }
+}
+
+async function dbSaveLiga(nomeLiga, ligaId, pais) {
+  if (!nomeLiga || !ligaId) return;
+  cacheLigas.set(nomeLiga, { liga_id: ligaId, pais });
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ nome: nomeLiga, liga_id: ligaId, pais })
+    });
+  } catch(e) { console.error('Erro dbSaveLiga:', e.message); }
+}
+
 // ─── Múltiplas ───────────────────────────────────────────────
 async function dbSaveMultiplas(data, multiplas) {
   try {
@@ -992,6 +1027,8 @@ async function gerarApostas(data, horaMin, metaJogos) {
       }
 
       if (!jogosMap.has(key))
+        // Salvar liga no banco automaticamente
+        dbSaveLiga(ligaMatch.nome, ligaId, pais).catch(()=>{});
         jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
       // Complementares — definir tipo CORRETO e prioridade pelo país
@@ -1022,6 +1059,8 @@ async function gerarApostas(data, horaMin, metaJogos) {
       }
 
       if (!jogosComp.has(key))
+        // Salvar liga complementar no banco automaticamente
+        dbSaveLiga(`${ligaNome} (${pais})`, ligaId, pais).catch(()=>{});
         jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     }
   }
@@ -1300,7 +1339,20 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
       const key = `${norm(j.time_casa)}|${norm(j.time_fora)}`;
       const fixtureId = fixtureMap.get(key) || null;
       const meta = metaMap.get(key) || {};
-      if (!fixtureId) console.log(`⚠️ Sem fixtureId: ${j.time_casa} x ${j.time_fora}`);
+      if (!fixtureId) {
+    console.log(`⚠️ Sem fixtureId: ${j.time_casa} x ${j.time_fora} | key buscada: ${key}`);
+    // Tentar match parcial — primeira palavra de cada time
+    const keyAlt = jogos.find(jg => {
+      const nc = norm(jg.timeCasa), nf = norm(jg.timeFora);
+      const jc = norm(j.time_casa), jf = norm(j.time_fora);
+      return (nc?.split(' ')[0] === jc?.split(' ')[0]) && (nf?.split(' ')[0] === jf?.split(' ')[0]);
+    });
+    if (keyAlt) {
+      console.log(`  → Match parcial encontrado: ${keyAlt.timeCasa} x ${keyAlt.timeFora} | fixtureId:${keyAlt.fixtureId} ligaId:${keyAlt.ligaId}`);
+      fixtureId = keyAlt.fixtureId;
+      meta.ligaId = keyAlt.ligaId;
+    }
+  }
 
       return {
         ...j,
@@ -1716,10 +1768,20 @@ async function agentValidar(data) {
 
         const normalizar = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
         const nCasa = normalizar(jogo.time_casa), nFora = normalizar(jogo.time_fora);
-        // 1. Tentar pelo ligaId — mais preciso que pool geral
+        // 1. Resolver ligaId — do jogo ou do banco de ligas conhecidas
+        let ligaIdResolvido = jogo.ligaId;
+        if (!ligaIdResolvido && jogo.liga) {
+          const ligaConhecida = await dbGetLiga(jogo.liga);
+          if (ligaConhecida?.liga_id) {
+            ligaIdResolvido = ligaConhecida.liga_id;
+            console.log(`    🗂️ Liga resolvida do banco: ${jogo.liga} → ID ${ligaIdResolvido}`);
+          }
+        }
+
+        // 2. Tentar pelo ligaId — mais preciso que pool geral
         let fixture = null;
-        if (jogo.ligaId) {
-          const fixturasLiga = cacheFixtures.filter(f => f.league?.id === jogo.ligaId);
+        if (ligaIdResolvido) {
+          const fixturasLiga = cacheFixtures.filter(f => f.league?.id === ligaIdResolvido);
           fixture = fixturasLiga.find(f => {
             const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
             const status = f.fixture?.status?.short;
@@ -1728,7 +1790,7 @@ async function agentValidar(data) {
             const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
             return casaMatch && foraMatch;
           });
-          if (fixture) console.log(`    📊 Match via ligaId ${jogo.ligaId}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name}`);
+          if (fixture) console.log(`    📊 Match via ligaId ${ligaIdResolvido}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name}`);
         }
 
         // 2. Fallback: pool geral — excluindo ligas ignoradas (sub-20, U17 etc)
