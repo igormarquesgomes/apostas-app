@@ -2239,23 +2239,40 @@ app.post('/validar-pendentes', async (req, res) => {
 
 // Corrigir resultado de uma aposta manualmente
 app.post('/corrigir-resultado', async (req, res) => {
-  const { data, jogo_id, resultado } = req.body;
-  if (!data || !jogo_id || !['green','red','pendente'].includes(resultado)) {
-    return res.status(400).json({ error: 'Parâmetros inválidos' });
-  }
+  const { data, jogo_id, placar } = req.body;
+  if (!data || !jogo_id) return res.status(400).json({ error: 'Parâmetros inválidos' });
+
   const row = await dbGet(data);
   if (!row?.resultados?.apostas) return res.status(404).json({ error: 'Sem resultados para esta data' });
 
+  // Encontrar aposta e jogo correspondente
+  const apostaRes = row.resultados.apostas.find(a => a.jogo_id === jogo_id);
+  const jogo = row.apostas?.jogos?.find(j => j.id === jogo_id);
+  if (!apostaRes) return res.status(404).json({ error: 'Aposta não encontrada' });
+
+  let novoResultado = apostaRes.resultado_aposta;
+  let novoPlacar = apostaRes.placar;
+
+  // Se forneceu placar, recalcular green/red
+  if (placar && placar.match(/^\d+-\d+$/)) {
+    const partes = placar.split('-');
+    const gC = parseInt(partes[0]), gF = parseInt(partes[1]);
+    novoPlacar = placar;
+    if (jogo) {
+      novoResultado = verificarAposta(jogo, gC, gF, null);
+    }
+    console.log(`✏️ Corrigindo placar ${apostaRes.time_casa} x ${apostaRes.time_fora}: ${apostaRes.placar} → ${placar} | ${apostaRes.resultado_aposta} → ${novoResultado}`);
+  }
+
   const apostas = row.resultados.apostas.map(a => {
     if (a.jogo_id === jogo_id) {
-      console.log(`✏️ Corrigindo ${a.time_casa} x ${a.time_fora}: ${a.resultado_aposta} → ${resultado}`);
-      return { ...a, resultado_aposta: resultado, corrigido_manualmente: true };
+      return { ...a, placar: novoPlacar, resultado_aposta: novoResultado, corrigido_manualmente: true };
     }
     return a;
   });
 
   await dbSaveResultados(data, { ...row.resultados, apostas });
-  res.json({ ok: true, mensagem: `Resultado corrigido para ${resultado}` });
+  res.json({ ok: true, mensagem: `Corrigido: ${novoPlacar} → ${novoResultado}`, resultado: novoResultado, placar: novoPlacar });
 });
 
 app.get('/calibracao', async (req, res) => {
