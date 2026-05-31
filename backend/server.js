@@ -2108,21 +2108,17 @@ app.post('/validar/:data', async (req, res) => {
 // Validar hoje em tempo real — atualiza pendentes sem bloquear já validados
 app.post('/validar-agora', async (req, res) => {
   const data = hojeStr();
+  const forcar = req.query.forcar === 'true' || req.body?.forcar === true;
   const row = await dbGet(data);
   if (!row?.apostas?.jogos) {
     return res.json({ mensagem: 'Sem apostas para hoje ainda.', data });
   }
 
-  res.json({ mensagem: `Atualizando resultados de ${data}...`, data });
+  res.json({ mensagem: `Atualizando resultados de ${data}...${forcar?' (forçado)':''}`, data });
 
-  // Forçar revalidação limpando resultados pendentes
-  if (row.resultados) {
-    const pendentes = row.resultados.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
-    if (pendentes.length === 0) {
-      console.log('Todos os jogos já validados hoje');
-      return;
-    }
-    // Limpar para revalidar
+  // Se forçar, limpar todos os resultados e revalidar do zero
+  if (forcar) {
+    console.log('🔄 Revalidação forçada — limpando todos os resultados');
     await dbSaveResultados(data, null);
   }
 
