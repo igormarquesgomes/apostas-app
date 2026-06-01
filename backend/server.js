@@ -1658,6 +1658,26 @@ async function agentValidar(data) {
     const pendentes = row.resultados.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
     if (pendentes.length === 0) {
       console.log('Já validado completamente — sem pendentes');
+      // Mesmo sem pendentes, verificar se múltiplas precisam ser validadas
+      const rowM = await dbGetComMultiplas(data);
+      const resMultExistente = rowM?.resultados_multiplas;
+      const multPendente = !resMultExistente || 
+        resMultExistente?.multipla_a?.resultado === 'pendente' || 
+        resMultExistente?.multipla_b?.resultado === 'pendente';
+      console.log(`🎯 rowM.multiplas: ${rowM?.multiplas ? 'sim' : 'não'} | multPendente: ${multPendente}`);
+      if (rowM?.multiplas && multPendente) {
+        console.log('🎯 Validando múltiplas pendentes...');
+        const resA = await validarMultipla(rowM.multiplas.multipla_a, row.resultados.apostas || []);
+        const resB = await validarMultipla(rowM.multiplas.multipla_b, row.resultados.apostas || []);
+        if (resA || resB) {
+          await dbSaveResultadosMultiplas(data, {
+            validado_em: new Date().toISOString(),
+            multipla_a: resA,
+            multipla_b: resB
+          });
+          console.log(`✅ Múltiplas: A=${resA?.resultado||'?'} B=${resB?.resultado||'?'}`);
+        }
+      }
       return;
     }
     console.log(`Revalidando ${pendentes.length} apostas pendentes...`);
