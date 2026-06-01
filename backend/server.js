@@ -1429,8 +1429,11 @@ async function validarMultipla(multipla, resultadosApostas) {
   };
 
   const resultadosJogos = multipla.jogos.map(j => {
+    // Buscar por casa+fora OU fora+casa (ordem pode variar)
     const res = resultadosApostas.find(r =>
       match(r.time_casa, j.time_casa) && match(r.time_fora, j.time_fora)
+    ) || resultadosApostas.find(r =>
+      match(r.time_fora, j.time_casa) && match(r.time_casa, j.time_fora)
     );
     if (!res) {
       console.log(`  ⚠️ Não encontrado: "${j.time_casa}" x "${j.time_fora}"`);
@@ -1439,31 +1442,35 @@ async function validarMultipla(multipla, resultadosApostas) {
     if (res.resultado_aposta === 'pendente' || !res.placar) return 'pendente';
     const [gC, gF] = res.placar.split('-').map(Number);
     const resultado = verificarAposta({...j}, gC, gF, null);
-    console.log(`  📊 Múltipla: ${j.time_casa} x ${j.time_fora} | ${res.placar} | ${j.aposta} → ${resultado.toUpperCase()}`);
+    console.log(`  📊 Múltipla: ${j.time_casa} x ${j.time_fora} | ${res.placar} | mercado:${j.mercado} | ${j.aposta} → ${resultado.toUpperCase()}`);
     return resultado;
   });
 
   // Buscar via web search para jogos não encontrados
-  const naoEncontrados = multipla.jogos.filter((j, i) => resultadosJogos[i] === 'nao_encontrado');
-  if (naoEncontrados.length > 0) {
-    const lista = naoEncontrados.map(j => `${j.time_casa} x ${j.time_fora}`).join(', ');
+  // Web search individual para cada jogo não encontrado
+  for (let idx = 0; idx < multipla.jogos.length; idx++) {
+    if (resultadosJogos[idx] !== 'nao_encontrado') continue;
+    const j = multipla.jogos[idx];
     try {
-      const prompt = `Qual foi o placar final dos seguintes jogos de futebol? Responda APENAS com o formato "Time Casa X-Y Time Fora" para cada jogo. Jogos: ${lista}`;
-      const txt = await chamarIAComBusca(prompt, 500);
+      console.log(`  🔍 Web search múltipla: ${j.time_casa} x ${j.time_fora}`);
+      const txt = await chamarIAComBusca(
+        `Placar final do jogo ${j.time_casa} x ${j.time_fora}. Responda apenas X-Y ou "cancelado".`,
+        300
+      );
       if (txt) {
-        multipla.jogos.forEach((j, i) => {
-          if (resultadosJogos[i] !== 'nao_encontrado') return;
-          const nc = j.time_casa.split(' ')[0].toLowerCase();
-          const match = txt.toLowerCase().match(new RegExp(`${nc}[^\n]*?(\d+)[^\d]+(\d+)`));
-          if (match) {
-            const gC = parseInt(match[1]), gF = parseInt(match[2]);
-            const jogoFake = { ...j };
-            resultadosJogos[i] = verificarAposta(jogoFake, gC, gF, null);
-            console.log(`  ✅ Web search: ${j.time_casa} x ${j.time_fora} → ${gC}-${gF} → ${resultadosJogos[i].toUpperCase()}`);
+        if (/cancelado|adiado|suspens/i.test(txt)) {
+          resultadosJogos[idx] = 'cancelado';
+        } else {
+          const m = txt.match(/(\d+)\s*[-x]\s*(\d+)/);
+          if (m) {
+            const gC = parseInt(m[1]), gF = parseInt(m[2]);
+            resultadosJogos[idx] = verificarAposta({...j}, gC, gF, null);
+            console.log(`  ✅ Web search: ${j.time_casa} x ${j.time_fora} → ${gC}-${gF} → ${resultadosJogos[idx].toUpperCase()}`);
           }
-        });
+        }
       }
     } catch(e) { console.log(`  ⚠️ Web search falhou: ${e.message}`); }
+  }
   }
 
   // Converter nao_encontrado restantes para pendente
