@@ -1407,13 +1407,14 @@ async function validarMultipla(multipla, resultadosApostas) {
   const resultadosJogos = multipla.jogos.map(j => {
     // Buscar resultado do jogo nos resultados do dia — match exato ou parcial
     const normM = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
-    const res = resultadosApostas.find(r =>
-      r.time_casa === j.time_casa && r.time_fora === j.time_fora
-    ) || resultadosApostas.find(r =>
-      normM(r.time_casa).includes(normM(j.time_casa).split(' ')[0]) &&
-      normM(r.time_fora).includes(normM(j.time_fora).split(' ')[0])
-    );
-    if (!res) { console.log(`  ⚠️ Múltipla: jogo não encontrado nos resultados: ${j.time_casa} x ${j.time_fora}`); return 'pendente'; }
+    const nc = normM(j.time_casa), nf = normM(j.time_fora);
+    const res = resultadosApostas.find(r => r.time_casa === j.time_casa && r.time_fora === j.time_fora)
+      || resultadosApostas.find(r => normM(r.time_casa) === nc && normM(r.time_fora) === nf)
+      || resultadosApostas.find(r =>
+          normM(r.time_casa).split(' ')[0] === nc.split(' ')[0] &&
+          normM(r.time_fora).split(' ')[0] === nf.split(' ')[0]
+        );
+    if (!res) { console.log(`  ⚠️ Múltipla: jogo não encontrado nos resultados: ${j.time_casa} x ${j.time_fora}`); return 'nao_encontrado'; }
     if (res.resultado_aposta === 'pendente') { console.log(`  ⏳ Múltipla: jogo pendente: ${j.time_casa} x ${j.time_fora}`); return 'pendente'; }
 
     // Verificar se a aposta específica da múltipla bateu
@@ -1427,15 +1428,39 @@ async function validarMultipla(multipla, resultadosApostas) {
     return resultado;
   });
 
-  const todosGreen = resultadosJogos.every(r => r === 'green');
-  const algumRed = resultadosJogos.some(r => r === 'red');
-  const temPendente = resultadosJogos.some(r => r === 'pendente');
+  // Buscar via web search para jogos não encontrados
+  const naoEncontrados = multipla.jogos.filter((j, i) => resultadosJogos[i] === 'nao_encontrado');
+  if (naoEncontrados.length > 0) {
+    const lista = naoEncontrados.map(j => `${j.time_casa} x ${j.time_fora}`).join(', ');
+    try {
+      const prompt = `Qual foi o placar final dos seguintes jogos de futebol? Responda APENAS com o formato "Time Casa X-Y Time Fora" para cada jogo. Jogos: ${lista}`;
+      const txt = await chamarIAComBusca(prompt, 500);
+      if (txt) {
+        multipla.jogos.forEach((j, i) => {
+          if (resultadosJogos[i] !== 'nao_encontrado') return;
+          const nc = j.time_casa.split(' ')[0].toLowerCase();
+          const match = txt.toLowerCase().match(new RegExp(`${nc}[^\n]*?(\d+)[^\d]+(\d+)`));
+          if (match) {
+            const gC = parseInt(match[1]), gF = parseInt(match[2]);
+            const jogoFake = { ...j };
+            resultadosJogos[i] = verificarAposta(jogoFake, gC, gF, null);
+            console.log(`  ✅ Web search: ${j.time_casa} x ${j.time_fora} → ${gC}-${gF} → ${resultadosJogos[i].toUpperCase()}`);
+          }
+        });
+      }
+    } catch(e) { console.log(`  ⚠️ Web search falhou: ${e.message}`); }
+  }
+
+  // Converter nao_encontrado restantes para pendente
+  const resultadosFinais = resultadosJogos.map(r => r === 'nao_encontrado' ? 'pendente' : r);
+  const todosGreen = resultadosFinais.every(r => r === 'green');
+  const algumRed = resultadosFinais.some(r => r === 'red');
 
   return {
     resultado: algumRed ? 'red' : todosGreen ? 'green' : 'pendente',
     jogos_resultado: multipla.jogos.map((j, i) => ({
       ...j,
-      resultado: resultadosJogos[i]
+      resultado: resultadosFinais[i]
     }))
   };
 }
@@ -1783,6 +1808,26 @@ async function agentValidar(data) {
         }
       }
 
+      // Web search como último fallback se não encontrou na API
+      if (golsCasa === null) {
+        try {
+          console.log(`    🔍 Web search: ${jogo.time_casa} x ${jogo.time_fora}`);
+          const txt = await chamarIAComBusca(
+            `Qual foi o placar final do jogo ${jogo.time_casa} x ${jogo.time_fora} de ${data}? Responda APENAS o placar no formato X-Y.`,
+            300
+          );
+          if (txt) {
+            const m = txt.match(/(\d+)\s*[-x]\s*(\d+)/);
+            if (m) {
+              golsCasa = parseInt(m[1]);
+              golsFora = parseInt(m[2]);
+              placar = `${golsCasa}-${golsFora}`;
+              console.log(`    ✅ Placar via web search: ${placar}`);
+            }
+          }
+        } catch(e) { console.log(`    ⚠️ Web search falhou: ${e.message}`); }
+      }
+
       if (golsCasa !== null && golsFora !== null) {
         // Buscar stats detalhadas se precisar (cartões/escanteios)
         let stats = null;
@@ -1796,7 +1841,7 @@ async function agentValidar(data) {
         resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
       } else {
         console.log(`    ⏳ Resultado não encontrado`);
-        resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: 'resultado não encontrado na API', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+        resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: 'resultado não encontrado', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
       }
     } catch(err) {
       console.log(`    ❌ Erro: ${err.message}`);
