@@ -1718,7 +1718,11 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     const apostaNorm = normStr(jogo.aposta);
     // Montar lista de palavras incluindo equivalências
     const palavrasDoTime = (nome) => {
-      const ps = nome.split(' ').filter(p => p.length > 3);
+      const todas = nome.split(' ').filter(p => p.length >= 2);
+      // Se todas as palavras são curtas (siglas como ADT, CSA, CRB), usar todas
+      // Senão, filtrar palavras com 4+ letras para evitar falsos positivos
+      const temPalavraLonga = todas.some(p => p.length > 3);
+      const ps = temPalavraLonga ? todas.filter(p => p.length > 3) : todas;
       const extras = ps.map(p => equiv[p]).filter(Boolean);
       return [...new Set([...ps, ...extras])];
     };
