@@ -1405,11 +1405,16 @@ async function validarMultipla(multipla, resultadosApostas) {
   if (!multipla?.jogos?.length) return null;
 
   const resultadosJogos = multipla.jogos.map(j => {
-    // Buscar resultado do jogo nos resultados do dia
+    // Buscar resultado do jogo nos resultados do dia — match exato ou parcial
+    const normM = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
     const res = resultadosApostas.find(r =>
       r.time_casa === j.time_casa && r.time_fora === j.time_fora
+    ) || resultadosApostas.find(r =>
+      normM(r.time_casa).includes(normM(j.time_casa).split(' ')[0]) &&
+      normM(r.time_fora).includes(normM(j.time_fora).split(' ')[0])
     );
-    if (!res || res.resultado_aposta === 'pendente') return 'pendente';
+    if (!res) { console.log(`  ⚠️ Múltipla: jogo não encontrado nos resultados: ${j.time_casa} x ${j.time_fora}`); return 'pendente'; }
+    if (res.resultado_aposta === 'pendente') { console.log(`  ⏳ Múltipla: jogo pendente: ${j.time_casa} x ${j.time_fora}`); return 'pendente'; }
 
     // Verificar se a aposta específica da múltipla bateu
     if (!res.placar) return 'pendente';
