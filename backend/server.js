@@ -1444,14 +1444,25 @@ async function validarMultipla(multipla, resultadosApostas) {
     // Inferir mercado pela aposta quando não está definido
     const inferirMercado = (aposta) => {
       const a = aposta?.toLowerCase() || '';
-      if (a.includes('over') || a.includes('under') || a.includes('gols') ||
+      if (a.includes('over') || a.includes('under') ||
           a.includes('marca') || a.includes('ambas') || a.includes('ambos') ||
           a.includes('btts') || a.includes('menos de') || a.includes('mais de')) return 'gols';
       if (a.includes('escanteio') || a.includes('canto') || a.includes('corner')) return 'escanteios';
       if (a.includes('cartão') || a.includes('cartao') || a.includes('amarelo')) return 'cartoes';
+      // dupla chance, vence, não perde, empate = mercado resultado
       return 'resultado';
     };
-    const mercadoFinal = j.mercado || inferirMercado(j.aposta);
+    // Normalizar mercado — dupla chance = resultado
+    const normalizarMercado = m => {
+      if (!m) return inferirMercado(j.aposta);
+      const ml = m.toLowerCase();
+      if (ml.includes('dupla') || ml.includes('chance') || ml.includes('resultado') || ml.includes('vence') || ml.includes('empate')) return 'resultado';
+      if (ml.includes('gol') || ml.includes('over') || ml.includes('under') || ml.includes('marca')) return 'gols';
+      if (ml.includes('escanteio') || ml.includes('canto')) return 'escanteios';
+      if (ml.includes('cartao') || ml.includes('cartão')) return 'cartoes';
+      return m;
+    };
+    const mercadoFinal = normalizarMercado(j.mercado);
     const jogoComMercado = {...j, mercado: mercadoFinal};
     const resultado = verificarAposta(jogoComMercado, gC, gF, null);
     console.log(`  📊 Múltipla: ${j.time_casa} x ${j.time_fora} | ${res.placar} | mercado:${j.mercado||'resultado'} | ${j.aposta} → ${resultado.toUpperCase()}`);
