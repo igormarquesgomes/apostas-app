@@ -2189,10 +2189,9 @@ async function rotinaNoturna() {
 async function rotina04h() {
   const hoje = hojeStr();
   const amanha = diaOffset(hoje, 1);
-  const depois = diaOffset(hoje, 2);
-  console.log(`\n⏰ Rotina 04h — verificando ${amanha} e ${depois}`);
+  console.log(`\n⏰ Rotina 04h — verificando ${hoje} e ${amanha}`);
 
-  for (const diaAlvo of [amanha, depois]) {
+  for (const diaAlvo of [hoje, amanha]) {
     const row = await dbGet(diaAlvo);
     const jogosExistentes = row?.apostas?.jogos || [];
     const total = jogosExistentes.length;
@@ -2254,10 +2253,9 @@ async function rotina04h() {
 async function rotina05h() {
   const hoje = hojeStr();
   const amanha = diaOffset(hoje, 1);
-  const depois = diaOffset(hoje, 2);
-  console.log(`\n⏰ Rotina 05h — verificando integridade de ${amanha} e ${depois}`);
+  console.log(`\n⏰ Rotina 05h — verificando integridade de ${hoje} e ${amanha}`);
 
-  for (const diaAlvo of [amanha, depois]) {
+  for (const diaAlvo of [hoje, amanha]) {
     const row = await dbGetComMultiplas(diaAlvo);
     const jogos = row?.apostas?.jogos || [];
     const multiplas = row?.multiplas;
