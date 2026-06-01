@@ -1431,7 +1431,13 @@ async function validarMultipla(multipla, resultadosApostas) {
       || resultadosApostas.find(r => semSufixo(normM(r.time_casa)) === ncS && semSufixo(normM(r.time_fora)) === nfS)
       || resultadosApostas.find(r => normNomeTime(normM(r.time_casa)) === ncN && normNomeTime(normM(r.time_fora)) === nfN)
       || resultadosApostas.find(r => semSufixo(normNomeTime(normM(r.time_casa))) === semSufixo(ncN) && semSufixo(normNomeTime(normM(r.time_fora))) === semSufixo(nfN))
-;
+      || resultadosApostas.find(r => {
+          const palavrasNC = nc.split(' ').filter(p => p.length >= 5);
+          const palavrasNF = nf.split(' ').filter(p => p.length >= 5);
+          if (!palavrasNC.length || !palavrasNF.length) return false;
+          const rNC = normM(r.time_casa), rNF = normM(r.time_fora);
+          return palavrasNC.every(p => rNC.includes(p)) && palavrasNF.every(p => rNF.includes(p));
+        });
     if (!res) { console.log(`  ⚠️ Múltipla: jogo não encontrado nos resultados: ${j.time_casa} x ${j.time_fora}`); return 'nao_encontrado'; }
     if (res.resultado_aposta === 'pendente') { console.log(`  ⏳ Múltipla: jogo pendente: ${j.time_casa} x ${j.time_fora}`); return 'pendente'; }
 
@@ -1445,6 +1451,16 @@ async function validarMultipla(multipla, resultadosApostas) {
     const resultado = verificarAposta(jogoFake, golsCasa, golsFora, null);
     return resultado;
   });
+
+  // Se já tem RED, marcar imediatamente sem esperar pendentes/não encontrados
+  if (resultadosJogos.some(r => r === 'red')) {
+    return {
+      resultado: 'red',
+      jogos_resultado: multipla.jogos.map((j, i) => ({
+        ...j, resultado: resultadosJogos[i] === 'nao_encontrado' ? 'pendente' : resultadosJogos[i]
+      }))
+    };
+  }
 
   // Buscar via web search para jogos não encontrados
   const naoEncontrados = multipla.jogos.filter((j, i) => resultadosJogos[i] === 'nao_encontrado');
