@@ -905,7 +905,7 @@ async function buscarMemoria() {
 }
 
 // ─── Geração de apostas ──────────────────────────────────────
-async function gerarApostas(data, horaMin, metaJogos) {
+async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) {
   const [hM, mM] = horaMin.split(':').map(Number);
   const minMinutos = hM * 60 + mM;
 
@@ -1030,6 +1030,17 @@ async function gerarApostas(data, horaMin, metaJogos) {
     }
     const faltam = metaJogos - jogos.length;
     jogos = [...jogos, ...compFiltrado.slice(0, faltam)];
+  }
+
+  // Filtrar times já selecionados (para complemento)
+  if (timesIgnorar.size > 0) {
+    const antes = jogos.length;
+    jogos = jogos.filter(j =>
+      !timesIgnorar.has(j.timeCasa?.toLowerCase()) &&
+      !timesIgnorar.has(j.timeFora?.toLowerCase())
+    );
+    if (antes !== jogos.length) console.log(`🚫 ${antes - jogos.length} jogos filtrados (duplicatas)`);
+    jogos = jogos.slice(0, metaJogos);
   }
 
   console.log(`\nJogos selecionados: ${jogos.length}`);
@@ -2173,6 +2184,127 @@ async function rotinaNoturna() {
   console.log('✅ Rotina noturna concluída');
 }
 
+// ─── Rotinas automáticas 04h e 05h ──────────────────────────
+
+async function rotina04h() {
+  const hoje = hojeStr();
+  const amanha = diaOffset(hoje, 1);
+  const depois = diaOffset(hoje, 2);
+  console.log(`\n⏰ Rotina 04h — verificando ${amanha} e ${depois}`);
+
+  for (const diaAlvo of [amanha, depois]) {
+    const row = await dbGet(diaAlvo);
+    const jogosExistentes = row?.apostas?.jogos || [];
+    const total = jogosExistentes.length;
+
+    if (total >= 15) {
+      console.log(`✅ ${diaAlvo}: já tem ${total} jogos — pulando`);
+      continue;
+    }
+
+    const faltam = 15 - total;
+    console.log(`🔄 ${diaAlvo}: tem ${total} jogos, faltam ${faltam}`);
+
+    // Times já selecionados — não repetir
+    const timesJaSelecionados = new Set(
+      jogosExistentes.flatMap(j => [
+        j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()
+      ]).filter(Boolean)
+    );
+
+    console.log(`🚫 Times já selecionados: ${[...timesJaSelecionados].join(', ')}`);
+
+    // Gerar apostas passando os times já selecionados para evitar duplicatas
+    const resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
+    if (!resultado?.jogos?.length) {
+      console.log(`⚠️ ${diaAlvo}: não foi possível gerar novos jogos`);
+      continue;
+    }
+
+    if (total === 0) {
+      // Primeiro preenchimento — salvar normalmente
+      await dbSave(diaAlvo, resultado);
+      console.log(`✅ ${diaAlvo}: ${resultado.jogos.length} jogos salvos`);
+    } else {
+      // Complemento — mesclar com jogos existentes
+      const jogosCompletos = {
+        jogos: [...jogosExistentes, ...resultado.jogos.map((j, i) => ({
+          ...j,
+          id: total + i + 1 // Continuar a numeração
+        }))]
+      };
+      await dbSave(diaAlvo, jogosCompletos);
+      console.log(`✅ ${diaAlvo}: complementado para ${jogosCompletos.jogos.length} jogos`);
+    }
+
+    // Gerar múltiplas em background
+    setTimeout(async () => {
+      try {
+        const rowAtual = await dbGet(diaAlvo);
+        const multiplas = await gerarMultiplas(diaAlvo, rowAtual?.apostas?.jogos || []);
+        if (multiplas) {
+          await dbSaveMultiplas(diaAlvo, multiplas);
+          console.log(`✅ ${diaAlvo}: múltiplas geradas — A:${multiplas.multipla_a?.odd_total} B:${multiplas.multipla_b?.odd_total}`);
+        }
+      } catch(e) { console.error(`❌ ${diaAlvo}: erro ao gerar múltiplas:`, e.message); }
+    }, 90000);
+  }
+}
+
+async function rotina05h() {
+  const hoje = hojeStr();
+  const amanha = diaOffset(hoje, 1);
+  const depois = diaOffset(hoje, 2);
+  console.log(`\n⏰ Rotina 05h — verificando integridade de ${amanha} e ${depois}`);
+
+  for (const diaAlvo of [amanha, depois]) {
+    const row = await dbGetComMultiplas(diaAlvo);
+    const jogos = row?.apostas?.jogos || [];
+    const multiplas = row?.multiplas;
+
+    // 1. Verificar jogos
+    if (jogos.length < 15) {
+      console.log(`⚠️ ${diaAlvo}: apenas ${jogos.length}/15 jogos — acionando complemento`);
+      const timesJaSelecionados = new Set(
+        jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+      );
+      const faltam = 15 - jogos.length;
+      const resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
+      if (resultado?.jogos?.length) {
+        const jogosCompletos = {
+          jogos: [...jogos, ...resultado.jogos.map((j, i) => ({...j, id: jogos.length + i + 1}))]
+        };
+        await dbSave(diaAlvo, jogosCompletos);
+        console.log(`✅ ${diaAlvo}: complementado para ${jogosCompletos.jogos.length} jogos`);
+      }
+    } else {
+      console.log(`✅ ${diaAlvo}: ${jogos.length} jogos OK`);
+    }
+
+    // 2. Verificar múltiplas
+    if (!multiplas?.multipla_a || !multiplas?.multipla_b) {
+      console.log(`⚠️ ${diaAlvo}: múltiplas ausentes — gerando`);
+      const rowAtual = await dbGet(diaAlvo);
+      const novasMultiplas = await gerarMultiplas(diaAlvo, rowAtual?.apostas?.jogos || []);
+      if (novasMultiplas) {
+        await dbSaveMultiplas(diaAlvo, novasMultiplas);
+        console.log(`✅ ${diaAlvo}: múltiplas OK — A:${novasMultiplas.multipla_a?.odd_total} B:${novasMultiplas.multipla_b?.odd_total}`);
+      }
+    } else {
+      console.log(`✅ ${diaAlvo}: múltiplas OK — A:${multiplas.multipla_a?.odd_total} B:${multiplas.multipla_b?.odd_total}`);
+    }
+
+    // 3. Verificar integridade dos dados
+    const semFixtureId = jogos.filter(j => !j.fixtureId).length;
+    const semLigaId = jogos.filter(j => !j.ligaId).length;
+    if (semFixtureId > 0) console.log(`⚠️ ${diaAlvo}: ${semFixtureId} jogos sem fixtureId`);
+    if (semLigaId > 0) console.log(`⚠️ ${diaAlvo}: ${semLigaId} jogos sem ligaId`);
+    if (semFixtureId === 0 && semLigaId === 0) console.log(`✅ ${diaAlvo}: dados de integridade OK`);
+  }
+
+  console.log('✅ Rotina 05h concluída');
+}
+
 // ─── Endpoints ───────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({
   status: 'ok', api: 'API-Football v3',
@@ -2249,6 +2381,16 @@ app.get('/apostas/:periodo', async (req, res) => {
     if (cached?.apostas) return res.json({ data: dataConsulta, ...cached.apostas, resultados: cached.resultados });
     return res.json({ data: dataConsulta, jogos: [], aviso: `Apostas para ${dataConsulta} ainda não foram geradas.` });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/rotina-04h', async (req, res) => {
+  res.json({ mensagem: 'Rotina 04h iniciada' });
+  rotina04h().catch(console.error);
+});
+
+app.post('/rotina-05h', async (req, res) => {
+  res.json({ mensagem: 'Rotina 05h iniciada' });
+  rotina05h().catch(console.error);
 });
 
 app.post('/rotina-noturna', async (req, res) => {
