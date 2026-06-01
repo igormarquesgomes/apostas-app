@@ -173,12 +173,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
     <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);">📡 Hoje em tempo real</div>
-      <div style="display:flex;gap:6px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button id="btn-hoje" onclick="validarHoje(false)" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(68,138,255,.3);background:rgba(68,138,255,.08);color:var(--blue);cursor:pointer;">
           🔄 Atualizar
         </button>
         <button onclick="validarHoje(true)" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,171,0,.3);background:rgba(255,171,0,.08);color:var(--amber);cursor:pointer;" title="Revalida todos os jogos do zero">
           ⚡ Forçar
+        </button>
+        <button onclick="validarDataEspecifica()" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(110,231,183,.3);background:rgba(110,231,183,.08);color:var(--green);cursor:pointer;" title="Validar uma data específica">
+          📅 Data específica
         </button>
       </div>
     </div>
@@ -385,6 +388,18 @@ setInterval(async () => {
     }
   } catch(e) {}
 }, 3 * 60 * 1000);
+
+async function validarDataEspecifica(){
+  const data = prompt('Data para validar (YYYY-MM-DD):', hoje());
+  if (!data || !data.match(/^\d{4}-\d{2}-\d{2}$/)) return;
+  const forcar = confirm(`Forçar revalidação completa de ${data}?
+OK = Forçar tudo
+Cancelar = Só pendentes`);
+  try {
+    await fetch(`${B}/validar/${data}${forcar?'?forcar=true':''}`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({forcar})});
+    alert(`Validação de ${data} iniciada! Aguarde alguns minutos e atualize o dashboard.`);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
 
 async function validarHoje(forcar=false){
   const btn=document.getElementById('btn-hoje');
