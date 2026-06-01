@@ -7,62 +7,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const MANUS_API_KEY = process.env.MANUS_API_KEY;
 
-// ─── Manus AI ────────────────────────────────────────────────
-async function chamarManus(prompt, timeoutMs = 120000) {
-  if (!MANUS_API_KEY) {
-    console.log('⚠️ MANUS_API_KEY não configurada — pulando');
-    return null;
-  }
-  try {
-    console.log('🔍 Manus: buscando dados na web...');
-    // Criar tarefa
-    const res = await fetch('https://api.manus.ai/v1/tasks', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'API_KEY': MANUS_API_KEY
-      },
-      body: JSON.stringify({ prompt })
-    });
-    if (!res.ok) {
-      console.error(`❌ Manus erro: ${res.status}`);
-      return null;
-    }
-    const task = await res.json();
-    const taskId = task.task_id || task.id;
-    if (!taskId) { console.error('❌ Manus: sem task_id'); return null; }
-    console.log(`🔍 Manus task: ${taskId}`);
-
-    // Aguardar conclusão com polling
-    const inicio = Date.now();
-    while (Date.now() - inicio < timeoutMs) {
-      await sleep(5000);
-      const statusRes = await fetch(`https://api.manus.ai/v1/tasks/${taskId}`, {
-        headers: { 'accept': 'application/json', 'API_KEY': MANUS_API_KEY }
-      });
-      if (!statusRes.ok) continue;
-      const status = await statusRes.json();
-      const estado = status.status || status.state;
-      if (estado === 'completed' || estado === 'stopped') {
-        console.log(`✅ Manus concluído: ${taskId}`);
-        return status.result || status.output || status.message || JSON.stringify(status);
-      }
-      if (estado === 'failed' || estado === 'error') {
-        console.error(`❌ Manus falhou: ${taskId}`);
-        return null;
-      }
-      console.log(`🔍 Manus aguardando... (${Math.round((Date.now()-inicio)/1000)}s)`);
-    }
-    console.error(`❌ Manus timeout após ${timeoutMs/1000}s`);
-    return null;
-  } catch(e) {
-    console.error('❌ Manus erro:', e.message);
-    return null;
-  }
-}
 const APIFOOTBALL_KEY = process.env.APIFOOTBALL_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -1122,31 +1067,7 @@ async function gerarApostas(data, horaMin, metaJogos) {
   const df = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano}`;
 
   // Montar lista de jogos com estatísticas para o prompt
-  // ─── Manus: buscar odds Estrela Bet + lesões + escalações ───
-  let dadosManus = '';
-  if (MANUS_API_KEY) {
-    const listaJogosManus = jogos.map(j =>
-      `${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`
-    ).join('\n');
-
-    const promptManus = `Você é analista de apostas esportivas. Para os jogos abaixo, busque na web:
-1. Odds atuais na Estrela Bet para cada jogo (mercados: resultado, over/under 2.5 gols, ambas marcam)
-2. Lesões e desfalques confirmados de cada time
-3. Escalações prováveis se disponíveis
-4. Algum contexto relevante (motivação, sequência recente, clima do clube)
-
-JOGOS:
-${listaJogosManus}
-
-Retorne um resumo estruturado por jogo com os dados encontrados. Seja conciso e objetivo.`;
-
-    dadosManus = await chamarManus(promptManus, 180000) || '';
-    if (dadosManus) console.log(`✅ Manus: dados recebidos (${dadosManus.length} chars)`);
-    else console.log('⚠️ Manus: sem dados — seguindo sem');
-  }
-
   const memoria = await buscarMemoria();
-  const blocoManus = dadosManus ? `\nDADOS WEB (Manus — odds Estrela Bet, lesões, escalações):\n${dadosManus.substring(0,3000)}\n` : '';
   const blocoMem = memoria ? `\nHISTÓRICO DE CALIBRAÇÃO (use para melhorar as apostas):\n${memoria.substring(0,3000)}\n` : '';
   if (memoria) {
     const nDiarios = (memoria.match(/\[DIÁRIO/g) || []).length;
@@ -1168,11 +1089,11 @@ Retorne um resumo estruturado por jogo com os dados encontrados. Seja conciso e 
     }).join('\n');
   }
 
-  function montarPrompt(listaJogos, blocoMem, df, blocoManusParam='') {
+  function montarPrompt(listaJogos, blocoMem, df) {
     return `Você é um analista de apostas esportivas experiente. Para cada jogo, raciocine como um apostador profissional que busca a melhor relação entre confiança e risco.
 
 DATA: ${df}
-${blocoMem}${blocoManusParam}
+${blocoMem}
 JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
 ${listaJogos}
 
@@ -1216,7 +1137,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   const lote1 = jogos.slice(0, LOTE);
   const lote2 = jogos.slice(LOTE);
 
-  const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df, blocoManus);
+  const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
   console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
   const txt1 = await chamarIAComBusca(prompt1);
   
@@ -1238,7 +1159,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
     console.log(`\n⏳ Aguardando 90s antes do lote 2 (rate limit)...`);
     await sleep(90000); // 90s para garantir reset do rate limit de tokens/min
     console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
-    const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df, blocoManus);
+    const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
     // Lote 2: tentar com web_search primeiro (mantém qualidade), fallback sem
     console.log('🤖 Lote 2: tentando com web_search...');
     let txt2 = await chamarIAComBusca(prompt2, 8000);
@@ -1622,6 +1543,24 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     return null;
   };
 
+  // Helper: palavras do time (funciona com siglas curtas como CRB, ADT, CSA)
+  const normStr = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
+  const equiv = {
+    'brazil':'brasil','brasil':'brazil','germany':'alemanha','alemanha':'germany',
+    'france':'franca','franca':'france','spain':'espanha','espanha':'spain',
+    'england':'inglaterra','inglaterra':'england','italy':'italia','italia':'italy',
+  };
+  const palavrasDoTime = (nome) => {
+    const n = normStr(nome);
+    const todas = n.split(' ').filter(p => p.length >= 2);
+    const temLonga = todas.some(p => p.length > 3);
+    const ps = temLonga ? todas.filter(p => p.length > 3) : todas;
+    return [...new Set([...ps, ...ps.map(p => equiv[p]).filter(Boolean)])];
+  };
+  const apostaNorm = normStr(aposta);
+  const palavrasCasa = palavrasDoTime(jogo.time_casa);
+  const palavrasFora = palavrasDoTime(jogo.time_fora);
+
   // ── MERCADO GOLS ──────────────────────────────────────────
   if (mercado === 'gols') {
     for (const linha of ['0.5','1.5','2.5','3.5','4.5']) {
@@ -1636,10 +1575,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     }
     // Time marca primeiro / anytime
     if (aposta.includes('marca')) {
-      const nomeCasa = jogo.time_casa?.toLowerCase() || '';
-      const nomeFora = jogo.time_fora?.toLowerCase() || '';
-      const palavrasCasa = nomeCasa.split(' ').filter(p => p.length > 3);
-      const palavrasFora = nomeFora.split(' ').filter(p => p.length > 3);
+      // Reusar a mesma lógica de palavrasDoTime do mercado resultado
       if (palavrasCasa.some(p => aposta.includes(p))) return golsCasa > 0 ? 'green' : 'red';
       if (palavrasFora.some(p => aposta.includes(p))) return golsFora > 0 ? 'green' : 'red';
     }
@@ -1689,45 +1625,6 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
 
   // ── MERCADO RESULTADO ─────────────────────────────────────
   if (mercado === 'resultado') {
-    // Normalizar nomes — incluir equivalências PT/EN
-    const normNome = s => {
-      const n = s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim() || '';
-      // Equivalências PT <-> EN
-      return n
-        .replace(/^brazil$/, 'brasil').replace(/^brasil$/, 'brazil')
-        .replace(/^germany$/, 'alemanha').replace(/^alemanha$/, 'germany')
-        .replace(/^france$/, 'franca').replace(/^franca$/, 'france')
-        .replace(/^spain$/, 'espanha').replace(/^espanha$/, 'spain')
-        .replace(/^england$/, 'inglaterra').replace(/^inglaterra$/, 'england')
-        .replace(/^italy$/, 'italia').replace(/^italia$/, 'italy')
-        .replace(/^argentina$/, 'argentina');
-    };
-    // Normalizar removendo acentos
-    const normStr = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
-    // Equivalências PT <-> EN para seleções
-    const equiv = {
-      'brazil':'brasil','brasil':'brazil',
-      'germany':'alemanha','alemanha':'germany',
-      'france':'franca','franca':'france',
-      'spain':'espanha','espanha':'spain',
-      'england':'inglaterra','inglaterra':'england',
-      'italy':'italia','italia':'italy',
-    };
-    const nomeCasa = normStr(jogo.time_casa);
-    const nomeFora = normStr(jogo.time_fora);
-    const apostaNorm = normStr(jogo.aposta);
-    // Montar lista de palavras incluindo equivalências
-    const palavrasDoTime = (nome) => {
-      const todas = nome.split(' ').filter(p => p.length >= 2);
-      // Se todas as palavras são curtas (siglas como ADT, CSA, CRB), usar todas
-      // Senão, filtrar palavras com 4+ letras para evitar falsos positivos
-      const temPalavraLonga = todas.some(p => p.length > 3);
-      const ps = temPalavraLonga ? todas.filter(p => p.length > 3) : todas;
-      const extras = ps.map(p => equiv[p]).filter(Boolean);
-      return [...new Set([...ps, ...extras])];
-    };
-    const palavrasCasa = palavrasDoTime(nomeCasa);
-    const palavrasFora = palavrasDoTime(nomeFora);
     const apostaMencCasa = palavrasCasa.some(p => apostaNorm.includes(p));
     const apostaMencFora = !apostaMencCasa && palavrasFora.some(p => apostaNorm.includes(p));
 
@@ -1882,42 +1779,6 @@ async function agentValidar(data) {
     }
   }
 
-  // Manus: buscar todos os pendentes de uma vez
-  const pendentes = resultados.filter(r => r.resultado_aposta === 'pendente');
-  if (pendentes.length > 0 && MANUS_API_KEY) {
-    try {
-      const lista = pendentes.map(r => `${r.time_casa} x ${r.time_fora}`).join(', ');
-      console.log(`🔍 Manus: buscando ${pendentes.length} resultados pendentes...`);
-      const resposta = await chamarManus(
-        `Busque o placar final dos seguintes jogos do dia ${data}. Para cada jogo retorne no formato "Time Casa X-Y Time Fora" ou "pendente" se ainda não terminou.
-
-Jogos: ${lista}`,
-        120000
-      );
-      if (resposta) {
-        for (const pend of pendentes) {
-          const nCasa = pend.time_casa?.split(' ')[0]?.toLowerCase();
-          const nFora = pend.time_fora?.split(' ')[0]?.toLowerCase();
-          const regex = new RegExp(`${nCasa}[^\d]*(\d+)[^\d]+(\d+)`, 'i');
-          const match = resposta.toLowerCase().match(regex);
-          if (match) {
-            const gC = parseInt(match[1]), gF = parseInt(match[2]);
-            const placarM = `${gC}-${gF}`;
-            const jogo = jogos.find(j => j.time_casa === pend.time_casa);
-            if (jogo) {
-              const res = verificarAposta(jogo, gC, gF, null);
-              const idx = resultados.findIndex(r => r.jogo_id === pend.jogo_id);
-              if (idx !== -1) {
-                resultados[idx] = { ...resultados[idx], placar: placarM, resultado_aposta: res, motivo: `Via Manus: ${pend.time_casa} ${gC} x ${gF} ${pend.time_fora}` };
-                console.log(`    ✅ Manus: ${pend.time_casa} x ${pend.time_fora} → ${placarM} → ${res.toUpperCase()}`);
-              }
-            }
-          }
-        }
-      }
-    } catch(e) { console.error('❌ Manus validação:', e.message); }
-  }
-
   await dbSaveResultados(data, { validado_em: new Date().toISOString(), apostas: resultados });
   const g = resultados.filter(r=>r.resultado_aposta==='green').length;
   const r = resultados.filter(r=>r.resultado_aposta==='red').length;
@@ -2045,36 +1906,7 @@ Máx 400 palavras.`;
   Jogos: ${rB?.jogos_resultado?.map(j=>`${j.time_casa} x ${j.time_fora} (${j.aposta}) → ${j.resultado?.toUpperCase()||'?'}`).join(', ')||'-'}`;
   }
 
-  // Manus gera relatório paralelo com contexto web
-  let relatorioManus = '';
-  if (MANUS_API_KEY) {
-    const greens = resultados.filter(r=>r.resultado_aposta==='green').map(r=>`✅ ${r.time_casa} x ${r.time_fora} (${r.placar})`).join('\n');
-    const reds = resultados.filter(r=>r.resultado_aposta==='red').map(r=>`❌ ${r.time_casa} x ${r.time_fora} (${r.placar})`).join('\n');
-    const promptManus = `Você é analista de apostas esportivas. Analise os resultados do dia ${data} e gere um relatório conciso.
-
-GREENS (${g}):
-${greens || 'nenhum'}
-
-REDS (${r}):
-${reds || 'nenhum'}
-
-Assertividade: ${assert}%
-
-Para cada jogo RED, busque na web o que aconteceu (lesões, arbitragem, contexto) que pode explicar o resultado inesperado.
-Para os jogos GREEN, confirme o que foi acertado na análise.
-Identifique padrões: quais tipos de aposta/liga estão performando melhor ou pior?
-Máx 300 palavras.`;
-
-    relatorioManus = await chamarManus(promptManus, 120000) || '';
-    if (relatorioManus) console.log('✅ Manus: relatório diário gerado');
-  }
-
-  // Consolidar relatórios Anthropic + Manus
-  const promptFinal = relatorioManus
-    ? `${promptDiario}${blocoMultiplas}\n\nRELATÓRIO DA MANUS (contexto web):\n${relatorioManus}\n\nConsolide os dois relatórios em um único. Máx 500 palavras.`
-    : `${promptDiario}${blocoMultiplas}\n\nSe as múltiplas deram RED, identifique qual jogo quebrou e sugira alternativa de mercado para próximas múltiplas.`;
-
-  const relatorio = await chamarIA(promptFinal, 3000);
+  const relatorio = await chamarIA(`${promptDiario}${blocoMultiplas}\n\nSe as múltiplas deram RED, identifique qual jogo quebrou e sugira alternativa de mercado para próximas múltiplas.`, 3000);
   if (!relatorio) return;
   await dbSaveCalibracao('diario', data, data, relatorio, parseFloat(assert));
   console.log(`✅ Relatório diário — ${assert}%`);
