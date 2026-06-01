@@ -2469,7 +2469,9 @@ app.post('/validar-pendentes', async (req, res) => {
     if (semResultado || pendentesOntem.length > 0) {
       console.log(`🔄 Pendentes ontem (${ontem}): ${semResultado ? 'sem validação' : pendentesOntem.length + ' pendentes'}`);
       await agentValidar(ontem);
+      // Atualizar relatório após validação
       await agentDiario(ontem);
+      console.log(`✅ Relatório de ${ontem} atualizado`);
     } else {
       console.log(`✅ Ontem (${ontem}): todos validados`);
     }
@@ -2483,6 +2485,9 @@ app.post('/validar-pendentes', async (req, res) => {
     if (semResultado || pendentesHoje.length > 0) {
       console.log(`🔄 Pendentes hoje (${hoje}): ${semResultado ? 'sem validação' : pendentesHoje.length + ' pendentes'}`);
       await agentValidar(hoje);
+      // Atualizar relatório após validação
+      await agentDiario(hoje);
+      console.log(`✅ Relatório de ${hoje} atualizado`);
     } else {
       console.log(`✅ Hoje (${hoje}): todos validados`);
     }
