@@ -1905,8 +1905,8 @@ async function agentValidar(data) {
       const lista = pendentesWS.map(r => `${r.time_casa} x ${r.time_fora}`).join(', ');
       console.log(`\n🔍 Web search em lote: ${pendentesWS.length} jogos (${lista})`);
       const txt = await chamarIAComBusca(
-        `Busque o placar final dos seguintes jogos de futebol do dia ${data}:\n${lista}\n\nPara cada jogo responda no formato:\n"Time Casa X-Y Time Fora" ou "Time Casa x Time Fora: cancelado/adiado"`,
-        800
+        `Busque o resultado final dos seguintes jogos de futebol do dia ${data}. Para cada jogo, responda APENAS com o placar no formato numérico "NomeTime1 N-M NomeTime2" onde N e M são números de 0-9. Se o jogo foi oficialmente cancelado ou adiado pela organização, escreva "cancelado". Se ainda não terminou ou não encontrou resultado, não inclua na resposta.\n\nJogos:\n${lista}`,
+        600
       );
       if (txt) {
         for (const pend of pendentesWS) {
@@ -1914,7 +1914,9 @@ async function agentValidar(data) {
           const nf = pend.time_fora.split(' ')[0].toLowerCase();
           // Verificar cancelado/adiado
           const linhaJogo = txt.toLowerCase().split('\n').find(l => l.includes(nc) && l.includes(nf));
-          if (linhaJogo && (linhaJogo.includes('cancelado') || linhaJogo.includes('adiado') || linhaJogo.includes('suspens'))) {
+          // Só marcar cancelado se explicitamente informado — "ainda não ocorreu" = pendente
+          if (linhaJogo && (linhaJogo.includes('cancelado') || linhaJogo.includes('adiado') || linhaJogo.includes('suspens')) &&
+              !linhaJogo.includes('ainda') && !linhaJogo.includes('not yet') && !linhaJogo.includes('nao ocorreu')) {
             pend.resultado_aposta = 'cancelado';
             pend.motivo = 'Jogo cancelado/adiado (web search)';
             console.log(`    ⚠️ Cancelado: ${pend.time_casa} x ${pend.time_fora}`);
