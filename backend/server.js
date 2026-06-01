@@ -2401,7 +2401,12 @@ app.post('/rotina-noturna', async (req, res) => {
 app.post('/validar/:data', async (req, res) => {
   const data = normalizarData(req.params.data);
   if (!data) return res.status(400).json({ error: 'Data inválida.' });
-  res.json({ mensagem: `Validação de ${data} iniciada` });
+  const forcar = req.query.forcar === 'true' || req.body?.forcar === true;
+  res.json({ mensagem: `Validação de ${data} iniciada${forcar?' (forçado)':''}` });
+  if (forcar) {
+    console.log(`🔄 Validação forçada de ${data} — limpando resultados`);
+    await dbSaveResultados(data, null).catch(()=>{});
+  }
   agentValidar(data).then(() => agentDiario(data)).catch(console.error);
 });
 
