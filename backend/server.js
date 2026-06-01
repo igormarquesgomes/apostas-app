@@ -1407,13 +1407,31 @@ async function validarMultipla(multipla, resultadosApostas) {
   const resultadosJogos = multipla.jogos.map(j => {
     // Buscar resultado do jogo nos resultados do dia — match exato ou parcial
     const normM = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
+    // Normalizar nomes conhecidos com apelidos/abreviações
+    const normNomeTime = s => {
+      let n = normM(s);
+      n = n.replace(/^red bull bragantino/, 'rb bragantino')
+           .replace(/^rb bragantino/, 'red bull bragantino')
+           .replace(/^atletico mineiro/, 'atletico-mg')
+           .replace(/^atletico-mg/, 'atletico mineiro')
+           .replace(/^atletico goianiense/, 'atletico goianiense')
+           .replace(/^sport recife/, 'sport')
+           .replace(/^nautico recife/, 'nautico')
+           .replace(/^vasco da gama/, 'vasco')
+           .replace(/^vasco$/, 'vasco da gama');
+      return n;
+    };
     const nc = normM(j.time_casa), nf = normM(j.time_fora);
+    const ncN = normNomeTime(nc), nfN = normNomeTime(nf);
+    // Remove sufixos estaduais (-sc, -pr, -mg, -rj etc) para comparação
+    const semSufixo = s => s.replace(/-[a-z]{2}$/,'').trim();
+    const ncS = semSufixo(nc), nfS = semSufixo(nf);
     const res = resultadosApostas.find(r => r.time_casa === j.time_casa && r.time_fora === j.time_fora)
       || resultadosApostas.find(r => normM(r.time_casa) === nc && normM(r.time_fora) === nf)
-      || resultadosApostas.find(r =>
-          normM(r.time_casa).split(' ')[0] === nc.split(' ')[0] &&
-          normM(r.time_fora).split(' ')[0] === nf.split(' ')[0]
-        );
+      || resultadosApostas.find(r => semSufixo(normM(r.time_casa)) === ncS && semSufixo(normM(r.time_fora)) === nfS)
+      || resultadosApostas.find(r => normNomeTime(normM(r.time_casa)) === ncN && normNomeTime(normM(r.time_fora)) === nfN)
+      || resultadosApostas.find(r => semSufixo(normNomeTime(normM(r.time_casa))) === semSufixo(ncN) && semSufixo(normNomeTime(normM(r.time_fora))) === semSufixo(nfN))
+;
     if (!res) { console.log(`  ⚠️ Múltipla: jogo não encontrado nos resultados: ${j.time_casa} x ${j.time_fora}`); return 'nao_encontrado'; }
     if (res.resultado_aposta === 'pendente') { console.log(`  ⏳ Múltipla: jogo pendente: ${j.time_casa} x ${j.time_fora}`); return 'pendente'; }
 
