@@ -2292,12 +2292,46 @@ async function rotina05h() {
       console.log(`✅ ${diaAlvo}: múltiplas OK — A:${multiplas.multipla_a?.odd_total} B:${multiplas.multipla_b?.odd_total}`);
     }
 
-    // 3. Verificar integridade dos dados
-    const semFixtureId = jogos.filter(j => !j.fixtureId).length;
-    const semLigaId = jogos.filter(j => !j.ligaId).length;
-    if (semFixtureId > 0) console.log(`⚠️ ${diaAlvo}: ${semFixtureId} jogos sem fixtureId`);
-    if (semLigaId > 0) console.log(`⚠️ ${diaAlvo}: ${semLigaId} jogos sem ligaId`);
-    if (semFixtureId === 0 && semLigaId === 0) console.log(`✅ ${diaAlvo}: dados de integridade OK`);
+    // 3. Verificar e corrigir fixtureId e ligaId ausentes
+    const semFixtureId = jogos.filter(j => !j.fixtureId);
+    const semLigaId = jogos.filter(j => !j.ligaId);
+
+    if (semFixtureId.length > 0) {
+      console.log(`⚠️ ${diaAlvo}: ${semFixtureId.length} jogos sem fixtureId — buscando na API...`);
+      // Buscar fixtures do dia para recuperar IDs
+      const fixtures = await buscarFixturesPorData(diaAlvo);
+      const norm = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
+      let corrigidos = 0;
+      const jogosAtualizados = jogos.map(j => {
+        if (j.fixtureId) return j;
+        // Buscar fixture pelo nome dos times
+        const f = fixtures.find(fx => {
+          const hN = norm(fx.teams?.home?.name), aN = norm(fx.teams?.away?.name);
+          const nc = norm(j.time_casa), nf = norm(j.time_fora);
+          return (hN.includes(nc.split(' ')[0]) || nc.includes(hN.split(' ')[0])) &&
+                 (aN.includes(nf.split(' ')[0]) || nf.includes(aN.split(' ')[0]));
+        });
+        if (f) {
+          corrigidos++;
+          return { ...j, fixtureId: f.fixture?.id, ligaId: f.league?.id || j.ligaId };
+        }
+        return j;
+      });
+      if (corrigidos > 0) {
+        await dbSave(diaAlvo, { jogos: jogosAtualizados });
+        // Salvar ligas novas no banco
+        for (const j of jogosAtualizados.filter(j => j.ligaId && j.liga)) {
+          await dbSaveLiga(j.liga, j.ligaId, '').catch(()=>{});
+        }
+        console.log(`✅ ${diaAlvo}: ${corrigidos} fixtureIds corrigidos`);
+      }
+    } else {
+      console.log(`✅ ${diaAlvo}: todos os jogos com fixtureId`);
+    }
+
+    if (semLigaId.length > 0) {
+      console.log(`⚠️ ${diaAlvo}: ${semLigaId.length} jogos sem ligaId`);
+    }
   }
 
   console.log('✅ Rotina 05h concluída');
