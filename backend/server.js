@@ -438,8 +438,10 @@ function registrarCusto(modelo, inputTokens, outputTokens) {
 
 // ─── Utilitários de data ─────────────────────────────────────
 function hojeStr() {
+  // Usar horário de Brasília (UTC-3)
   const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  const brasilia = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  return `${brasilia.getUTCFullYear()}-${String(brasilia.getUTCMonth()+1).padStart(2,'0')}-${String(brasilia.getUTCDate()).padStart(2,'0')}`;
 }
 
 function diaOffset(dataStr, offset) {
