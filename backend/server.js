@@ -117,7 +117,7 @@ async function buscarOddsDia(data) {
 function extrairOdds(todasOdds, timeCasa, timeFora, mercado) {
   if (!todasOdds) return null;
 
-  const normalizar = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    r = r.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const nCasa = normalizar(timeCasa), nFora = normalizar(timeFora);
   const palavraCasa = nCasa?.split(' ')[0] || '';
   const palavraFora = nFora?.split(' ')[0] || '';
@@ -203,7 +203,7 @@ const SELECOES_CAMPEAS = new Set([
 ]);
 
 function isSelecaoCampea(timeCasa, timeFora) {
-  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+    r = r.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const nc = n(timeCasa), nf = n(timeFora);
   // Verificar match exato ou parcial
   return [...SELECOES_CAMPEAS].some(s => {
@@ -232,7 +232,7 @@ const TIMES_CHAMPIONS = new Set([
 ]);
 
 function isTimesChampions(timeCasa, timeFora) {
-  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+    r = r.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const nc = n(timeCasa), nf = n(timeFora);
   return [...TIMES_CHAMPIONS].some(t => nc?.includes(t) || nf?.includes(t) || t.includes(nc?.split(' ')[0]) || t.includes(nf?.split(' ')[0]));
 }
@@ -328,7 +328,7 @@ const TIMES_EUROPA_B = new Set([
 ]);
 
 function isTimesEuropaB(timeCasa, timeFora) {
-  const n = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+    r = r.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const nc = n(timeCasa), nf = n(timeFora);
   return TIMES_EUROPA_B.has(nc) || TIMES_EUROPA_B.has(nf) ||
     [...TIMES_EUROPA_B].some(t => nc?.includes(t) || nf?.includes(t));
@@ -1408,7 +1408,7 @@ async function validarMultipla(multipla, resultadosApostas) {
   const nm = s => {
     if (!s) return '';
     let r = s.toLowerCase();
-    r = r.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    r = r.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return r.trim();
   };
   // Remove sufixos estaduais
@@ -1482,7 +1482,6 @@ async function validarMultipla(multipla, resultadosApostas) {
         }
       }
     } catch(e) { console.log(`  ⚠️ Web search falhou: ${e.message}`); }
-  }
   }
 
   // Converter nao_encontrado restantes para pendente
@@ -1608,7 +1607,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   };
 
   // Helper: palavras do time (funciona com siglas curtas como CRB, ADT, CSA)
-  const normStr = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
+    r = r.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const equiv = {
     'brazil':'brasil','brasil':'brazil','germany':'alemanha','alemanha':'germany',
     'france':'franca','franca':'france','spain':'espanha','espanha':'spain',
