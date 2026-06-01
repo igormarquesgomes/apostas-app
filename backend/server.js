@@ -1687,11 +1687,33 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
 
   // ── MERCADO RESULTADO ─────────────────────────────────────
   if (mercado === 'resultado') {
-    const nomeCasa = jogo.time_casa?.toLowerCase() || '';
-    const nomeFora = jogo.time_fora?.toLowerCase() || '';
-    const palavrasCasa = nomeCasa.split(' ').filter(p => p.length > 3);
-    const apostaMencCasa = palavrasCasa.some(p => aposta.includes(p));
-    const apostaMencFora = !apostaMencCasa && nomeFora.split(' ').filter(p => p.length > 3).some(p => aposta.includes(p));
+    // Normalizar nomes — incluir equivalências PT/EN
+    const normNome = s => {
+      const n = s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim() || '';
+      // Equivalências PT <-> EN
+      return n
+        .replace(/^brazil$/, 'brasil').replace(/^brasil$/, 'brazil')
+        .replace(/^germany$/, 'alemanha').replace(/^alemanha$/, 'germany')
+        .replace(/^france$/, 'franca').replace(/^franca$/, 'france')
+        .replace(/^spain$/, 'espanha').replace(/^espanha$/, 'spain')
+        .replace(/^england$/, 'inglaterra').replace(/^inglaterra$/, 'england')
+        .replace(/^italy$/, 'italia').replace(/^italia$/, 'italy')
+        .replace(/^argentina$/, 'argentina');
+    };
+    const nomeCasa = jogo.time_casa?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') || '';
+    const nomeFora = jogo.time_fora?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') || '';
+    const apostaNorm = aposta.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    // Palavras do time casa (original + equivalência)
+    const palavrasCasa = [...new Set([
+      ...nomeCasa.split(' ').filter(p => p.length > 3),
+      ...normNome(nomeCasa).split(' ').filter(p => p.length > 3)
+    ])];
+    const palavrasFora = [...new Set([
+      ...nomeFora.split(' ').filter(p => p.length > 3),
+      ...normNome(nomeFora).split(' ').filter(p => p.length > 3)
+    ])];
+    const apostaMencCasa = palavrasCasa.some(p => apostaNorm.includes(p));
+    const apostaMencFora = !apostaMencCasa && palavrasFora.some(p => apostaNorm.includes(p));
 
     if (aposta.includes('empate') && !aposta.includes('vence') && !aposta.includes('dupla')) return empate ? 'green' : 'red';
     if (aposta.includes('ou empat') || aposta.includes('vence ou empat') || aposta.includes('dupla chance') || aposta.includes('x2') || aposta.includes('1x') || aposta.includes('12')) {
