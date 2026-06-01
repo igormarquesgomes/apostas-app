@@ -1854,7 +1854,7 @@ async function agentValidar(data) {
           await sleep(300);
         }
         const resultado = verificarAposta(jogo, golsCasa, golsFora, stats);
-        console.log(`    ✅ ${placar} | mercado:${jogo.mercado} | aposta:${jogo.aposta} → ${resultado.toUpperCase()}`);
+        console.log(`    ✅ ${placar} | mercado:"${jogo.mercado}" | aposta:"${jogo.aposta}" | casa:"${jogo.time_casa}" | fora:"${jogo.time_fora}" → ${resultado.toUpperCase()}`);
         resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
       } else {
         console.log(`    ⏳ Resultado não encontrado`);
