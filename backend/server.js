@@ -1797,12 +1797,15 @@ async function agentValidar(data) {
 
       // Fallback: buscar pelo nome dos times
       if (golsCasa === null) {
-        if (!cacheFixtures) {
-          // Buscar todos os fixtures do dia de uma vez (1 requisição)
+        // Recarregar fixtures a cada 30 min para pegar jogos que terminaram
+        const agora = Date.now();
+        if (!cacheFixtures || !cacheFixtures._ts || (agora - cacheFixtures._ts) > 30 * 60 * 1000) {
           if (!contarRequisicao()) { resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: 'limite API', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora }); continue; }
           const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${data}&timezone=America/Sao_Paulo`, { headers: { 'x-apisports-key': APIFOOTBALL_KEY } });
           const json = await res.json();
           cacheFixtures = json.response || [];
+          cacheFixtures._ts = agora; // Timestamp para controle de recarregamento
+          console.log(`📊 Fixtures carregados: ${cacheFixtures.length} jogos | Req: ${reqHoje}/${LIMITE_SEGURO}`);
           await sleep(300);
         }
 
@@ -1830,7 +1833,7 @@ async function agentValidar(data) {
             const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
             return casaMatch && foraMatch;
           });
-          if (fixture) console.log(`    📊 Match via ligaId ${ligaIdResolvido}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name}`);
+          if (fixture) console.log(`    📊 Match via ligaId ${ligaIdResolvido}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name} | Status: ${fixture.fixture?.status?.short}`);
         }
 
         // 2. Fallback: pool geral — excluindo ligas ignoradas (sub-20, U17 etc)
@@ -1848,7 +1851,7 @@ async function agentValidar(data) {
             const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
             const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
             if (casaMatch && foraMatch) {
-              console.log(`    📊 Match pool geral: ${f.teams?.home?.name} x ${f.teams?.away?.name} | liga:${f.league?.id}`);
+              console.log(`    📊 Match pool geral: ${f.teams?.home?.name} x ${f.teams?.away?.name} | liga:${f.league?.id} | Status: ${f.fixture?.status?.short}`);
             }
             return casaMatch && foraMatch;
           });
