@@ -390,9 +390,15 @@ async function validarHoje(forcar=false){
   const btn=document.getElementById('btn-hoje');
   btn.disabled=true;btn.textContent='⏳ Validando...';
 
+  // Usar horário de Brasília (UTC-3) para determinar o dia correto
+  const agora = new Date();
+  const brasilia = new Date(agora.getTime() - 3*60*60*1000);
+  const dataBrasilia = brasilia.toISOString().substring(0,10);
+
   try{
-    // Disparar validação
-    await fetch(`${B}/validar-agora${forcar?'?forcar=true':''}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forcar})});
+    // Disparar validação com data de Brasília
+    const endpoint = forcar ? `/validar/${dataBrasilia}?forcar=true` : `/validar-agora`;
+    await fetch(`${B}${endpoint}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forcar})});
 
     // Aguardar 8 segundos e buscar resultado atualizado
     await new Promise(r=>setTimeout(r,8000));
