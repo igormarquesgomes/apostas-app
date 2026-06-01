@@ -1702,18 +1702,28 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
         .replace(/^italy$/, 'italia').replace(/^italia$/, 'italy')
         .replace(/^argentina$/, 'argentina');
     };
-    const nomeCasa = jogo.time_casa?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') || '';
-    const nomeFora = jogo.time_fora?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') || '';
-    const apostaNorm = aposta.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    // Palavras do time casa (original + equivalência)
-    const palavrasCasa = [...new Set([
-      ...nomeCasa.split(' ').filter(p => p.length > 3),
-      ...normNome(nomeCasa).split(' ').filter(p => p.length > 3)
-    ])];
-    const palavrasFora = [...new Set([
-      ...nomeFora.split(' ').filter(p => p.length > 3),
-      ...normNome(nomeFora).split(' ').filter(p => p.length > 3)
-    ])];
+    // Normalizar removendo acentos
+    const normStr = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
+    // Equivalências PT <-> EN para seleções
+    const equiv = {
+      'brazil':'brasil','brasil':'brazil',
+      'germany':'alemanha','alemanha':'germany',
+      'france':'franca','franca':'france',
+      'spain':'espanha','espanha':'spain',
+      'england':'inglaterra','inglaterra':'england',
+      'italy':'italia','italia':'italy',
+    };
+    const nomeCasa = normStr(jogo.time_casa);
+    const nomeFora = normStr(jogo.time_fora);
+    const apostaNorm = normStr(jogo.aposta);
+    // Montar lista de palavras incluindo equivalências
+    const palavrasDoTime = (nome) => {
+      const ps = nome.split(' ').filter(p => p.length > 3);
+      const extras = ps.map(p => equiv[p]).filter(Boolean);
+      return [...new Set([...ps, ...extras])];
+    };
+    const palavrasCasa = palavrasDoTime(nomeCasa);
+    const palavrasFora = palavrasDoTime(nomeFora);
     const apostaMencCasa = palavrasCasa.some(p => apostaNorm.includes(p));
     const apostaMencFora = !apostaMencCasa && palavrasFora.some(p => apostaNorm.includes(p));
 
