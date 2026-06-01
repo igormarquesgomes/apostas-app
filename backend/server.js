@@ -1677,7 +1677,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     const apostaMencFora = !apostaMencCasa && palavrasFora.some(p => apostaNorm.includes(p));
 
     if (aposta.includes('empate') && !aposta.includes('vence') && !aposta.includes('dupla')) return empate ? 'green' : 'red';
-    if (aposta.includes('ou empat') || aposta.includes('vence ou empat') || aposta.includes('dupla chance') || aposta.includes('x2') || aposta.includes('1x') || aposta.includes('12')) {
+    if (aposta.includes('ou empat') || aposta.includes('vence ou empat') || aposta.includes('dupla chance') || aposta.includes('nao perde') || aposta.includes('não perde') || aposta.includes('x2') || aposta.includes('1x') || aposta.includes('12')) {
       if (aposta.includes('x2') || apostaMencFora) return (foraVence || empate) ? 'green' : 'red';
       if (aposta.includes('1x') || apostaMencCasa) return (casaVence || empate) ? 'green' : 'red';
       if (aposta.includes('12')) return (casaVence || foraVence) ? 'green' : 'red';
