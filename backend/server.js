@@ -1428,7 +1428,7 @@ async function validarMultipla(multipla, resultadosApostas) {
     return false;
   };
 
-  const resultadosJogos = multipla.jogos.map(j => {
+  const resultadosJogos = [...multipla.jogos.map(j => {
     // Buscar por casa+fora OU fora+casa (ordem pode variar)
     const res = resultadosApostas.find(r =>
       match(r.time_casa, j.time_casa) && match(r.time_fora, j.time_fora)
@@ -1441,10 +1441,22 @@ async function validarMultipla(multipla, resultadosApostas) {
     }
     if (res.resultado_aposta === 'pendente' || !res.placar) return 'pendente';
     const [gC, gF] = res.placar.split('-').map(Number);
-    const resultado = verificarAposta({...j}, gC, gF, null);
-    console.log(`  📊 Múltipla: ${j.time_casa} x ${j.time_fora} | ${res.placar} | mercado:${j.mercado} | ${j.aposta} → ${resultado.toUpperCase()}`);
+    // Inferir mercado pela aposta quando não está definido
+    const inferirMercado = (aposta) => {
+      const a = aposta?.toLowerCase() || '';
+      if (a.includes('over') || a.includes('under') || a.includes('gols') ||
+          a.includes('marca') || a.includes('ambas') || a.includes('ambos') ||
+          a.includes('btts') || a.includes('menos de') || a.includes('mais de')) return 'gols';
+      if (a.includes('escanteio') || a.includes('canto') || a.includes('corner')) return 'escanteios';
+      if (a.includes('cartão') || a.includes('cartao') || a.includes('amarelo')) return 'cartoes';
+      return 'resultado';
+    };
+    const mercadoFinal = j.mercado || inferirMercado(j.aposta);
+    const jogoComMercado = {...j, mercado: mercadoFinal};
+    const resultado = verificarAposta(jogoComMercado, gC, gF, null);
+    console.log(`  📊 Múltipla: ${j.time_casa} x ${j.time_fora} | ${res.placar} | mercado:${j.mercado||'resultado'} | ${j.aposta} → ${resultado.toUpperCase()}`);
     return resultado;
-  });
+  })];
 
   // Buscar via web search para jogos não encontrados
   // Web search individual para cada jogo não encontrado
