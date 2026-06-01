@@ -1404,63 +1404,44 @@ Retorne SOMENTE JSON:
 async function validarMultipla(multipla, resultadosApostas) {
   if (!multipla?.jogos?.length) return null;
 
+  // Normalização limpa sem regex corrompido
+  const nm = s => {
+    if (!s) return '';
+    let r = s.toLowerCase();
+    r = r.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return r.trim();
+  };
+  // Remove sufixos estaduais
+  const ss = s => nm(s).replace(/-[a-z]{2}$/, '').trim();
+  // Palavras com 5+ letras
+  const pw = s => nm(s).split(' ').filter(p => p.length >= 5);
+  // Verifica match entre dois times
+  const match = (a, b) => {
+    const na = nm(a), nb = nm(b);
+    if (na === nb) return true;
+    if (ss(na) === ss(nb)) return true;
+    const pa = pw(a), pb = pw(b);
+    if (pa.length && pb.length) {
+      if (pa.every(p => nb.includes(p))) return true;
+      if (pb.every(p => na.includes(p))) return true;
+    }
+    return false;
+  };
+
   const resultadosJogos = multipla.jogos.map(j => {
-    // Buscar resultado do jogo nos resultados do dia — match exato ou parcial
-    const normM = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
-    // Normalizar nomes conhecidos com apelidos/abreviações
-    const normNomeTime = s => {
-      let n = normM(s);
-      n = n.replace(/^red bull bragantino/, 'rb bragantino')
-           .replace(/^rb bragantino/, 'red bull bragantino')
-           .replace(/^atletico mineiro/, 'atletico-mg')
-           .replace(/^atletico-mg/, 'atletico mineiro')
-           .replace(/^atletico goianiense/, 'atletico goianiense')
-           .replace(/^sport recife/, 'sport')
-           .replace(/^nautico recife/, 'nautico')
-           .replace(/^vasco da gama/, 'vasco')
-           .replace(/^vasco$/, 'vasco da gama');
-      return n;
-    };
-    const nc = normM(j.time_casa), nf = normM(j.time_fora);
-    const ncN = normNomeTime(nc), nfN = normNomeTime(nf);
-    // Remove sufixos estaduais (-sc, -pr, -mg, -rj etc) para comparação
-    const semSufixo = s => s.replace(/-[a-z]{2}$/,'').trim();
-    const ncS = semSufixo(nc), nfS = semSufixo(nf);
-    const res = resultadosApostas.find(r => r.time_casa === j.time_casa && r.time_fora === j.time_fora)
-      || resultadosApostas.find(r => normM(r.time_casa) === nc && normM(r.time_fora) === nf)
-      || resultadosApostas.find(r => semSufixo(normM(r.time_casa)) === ncS && semSufixo(normM(r.time_fora)) === nfS)
-      || resultadosApostas.find(r => normNomeTime(normM(r.time_casa)) === ncN && normNomeTime(normM(r.time_fora)) === nfN)
-      || resultadosApostas.find(r => semSufixo(normNomeTime(normM(r.time_casa))) === semSufixo(ncN) && semSufixo(normNomeTime(normM(r.time_fora))) === semSufixo(nfN))
-      || resultadosApostas.find(r => {
-          const palavrasNC = nc.split(' ').filter(p => p.length >= 5);
-          const palavrasNF = nf.split(' ').filter(p => p.length >= 5);
-          if (!palavrasNC.length || !palavrasNF.length) return false;
-          const rNC = normM(r.time_casa), rNF = normM(r.time_fora);
-          return palavrasNC.every(p => rNC.includes(p)) && palavrasNF.every(p => rNF.includes(p));
-        });
-    if (!res) { console.log(`  ⚠️ Múltipla: jogo não encontrado nos resultados: ${j.time_casa} x ${j.time_fora}`); return 'nao_encontrado'; }
-    if (res.resultado_aposta === 'pendente') { console.log(`  ⏳ Múltipla: jogo pendente: ${j.time_casa} x ${j.time_fora}`); return 'pendente'; }
-
-    // Verificar se a aposta específica da múltipla bateu
-    if (!res.placar) return 'pendente';
-    const partes = res.placar.split('-');
-    const golsCasa = parseInt(partes[0]) || 0;
-    const golsFora = parseInt(partes[1]) || 0;
-
-    const jogoFake = { ...j, time_casa: j.time_casa, time_fora: j.time_fora };
-    const resultado = verificarAposta(jogoFake, golsCasa, golsFora, null);
+    const res = resultadosApostas.find(r =>
+      match(r.time_casa, j.time_casa) && match(r.time_fora, j.time_fora)
+    );
+    if (!res) {
+      console.log(`  ⚠️ Não encontrado: "${j.time_casa}" x "${j.time_fora}"`);
+      return 'nao_encontrado';
+    }
+    if (res.resultado_aposta === 'pendente' || !res.placar) return 'pendente';
+    const [gC, gF] = res.placar.split('-').map(Number);
+    const resultado = verificarAposta({...j}, gC, gF, null);
+    console.log(`  📊 Múltipla: ${j.time_casa} x ${j.time_fora} | ${res.placar} | ${j.aposta} → ${resultado.toUpperCase()}`);
     return resultado;
   });
-
-  // Se já tem RED, marcar imediatamente sem esperar pendentes/não encontrados
-  if (resultadosJogos.some(r => r === 'red')) {
-    return {
-      resultado: 'red',
-      jogos_resultado: multipla.jogos.map((j, i) => ({
-        ...j, resultado: resultadosJogos[i] === 'nao_encontrado' ? 'pendente' : resultadosJogos[i]
-      }))
-    };
-  }
 
   // Buscar via web search para jogos não encontrados
   const naoEncontrados = multipla.jogos.filter((j, i) => resultadosJogos[i] === 'nao_encontrado');
@@ -1862,6 +1843,41 @@ async function agentValidar(data) {
         } catch(e) { console.log(`    ⚠️ Web search falhou: ${e.message}`); }
       }
 
+      // Se não encontrou e jogo deveria ter terminado, usar web search
+      if (golsCasa === null) {
+        const horario = jogo.horario || '00:00';
+        const [hh, mm] = horario.split(':').map(Number);
+        const minutos = hh * 60 + (mm || 0);
+        // Detectar se é rotina noturna (00h) ou rotina das 3h
+        const horaAtual = new Date().getHours();
+        const limiteMinutos = horaAtual <= 1 ? 21 * 60 + 30 : 23 * 60 + 59;
+        // Jogos antes do limite deveriam ter resultado
+        if (minutos <= limiteMinutos) {
+          try {
+            console.log(`    🔍 Web search: ${jogo.time_casa} x ${jogo.time_fora} (${horario})`);
+            const txt = await chamarIAComBusca(
+              `Qual foi o placar final do jogo ${jogo.time_casa} x ${jogo.time_fora} de ${data}? O jogo foi adiado, cancelado ou interrompido? Responda com o placar no formato X-Y ou "adiado"/"cancelado"/"interrompido".`,
+              500
+            );
+            if (txt) {
+              const tl = txt.toLowerCase();
+              if (tl.includes('adiado') || tl.includes('cancelado') || tl.includes('interrompido') || tl.includes('suspenso')) {
+                console.log(`    ⚠️ Jogo não realizado: ${txt.trim()}`);
+                resultados.push({ encontrado: false, placar: null, resultado_aposta: 'cancelado', motivo: txt.trim(), jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+                continue;
+              }
+              const m = txt.match(/(\d+)\s*[-x]\s*(\d+)/);
+              if (m) {
+                golsCasa = parseInt(m[1]);
+                golsFora = parseInt(m[2]);
+                placar = `${golsCasa}-${golsFora}`;
+                console.log(`    ✅ Placar via web search: ${placar}`);
+              }
+            }
+          } catch(e) { console.log(`    ⚠️ Web search falhou: ${e.message}`); }
+        }
+      }
+
       if (golsCasa !== null && golsFora !== null) {
         // Buscar stats detalhadas se precisar (cartões/escanteios)
         let stats = null;
@@ -2255,12 +2271,13 @@ app.post('/validar-parcial', async (req, res) => {
     const pendentes = row.resultados.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
     if (pendentes.length === 0) {
       console.log(`✅ Rotina parcial ${data}: todos já validados`);
-      return;
+    } else {
+      console.log(`🔄 Rotina parcial ${data}: ${pendentes.length} pendentes para validar`);
     }
-    console.log(`🔄 Rotina parcial ${data}: ${pendentes.length} pendentes para validar`);
   }
 
   // agentValidar já mantém confirmados e revalida apenas pendentes
+  // Após validar apostas simples, valida múltiplas também
   agentValidar(data).catch(console.error);
 });
 
