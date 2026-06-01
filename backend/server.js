@@ -1863,60 +1863,19 @@ async function agentValidar(data) {
         }
       }
 
-      // Web search como último fallback se não encontrou na API
-      if (golsCasa === null) {
-        try {
-          console.log(`    🔍 Web search: ${jogo.time_casa} x ${jogo.time_fora}`);
-          const txt = await chamarIAComBusca(
-            `Qual foi o placar final do jogo ${jogo.time_casa} x ${jogo.time_fora} de ${data}? Responda APENAS o placar no formato X-Y.`,
-            300
-          );
-          if (txt) {
-            const m = txt.match(/(\d+)\s*[-x]\s*(\d+)/);
-            if (m) {
-              golsCasa = parseInt(m[1]);
-              golsFora = parseInt(m[2]);
-              placar = `${golsCasa}-${golsFora}`;
-              console.log(`    ✅ Placar via web search: ${placar}`);
-            }
-          }
-        } catch(e) { console.log(`    ⚠️ Web search falhou: ${e.message}`); }
-      }
-
-      // Se não encontrou e jogo deveria ter terminado, usar web search
+      // Marcar para web search em lote (após o loop)
       if (golsCasa === null) {
         const horario = jogo.horario || '00:00';
         const [hh, mm] = horario.split(':').map(Number);
         const minutos = hh * 60 + (mm || 0);
-        // Detectar se é rotina noturna (00h) ou rotina das 3h
-        const horaAtual = new Date().getHours();
+        const horaAtual = new Date(new Date().getTime() - 3*60*60*1000).getUTCHours();
         const limiteMinutos = horaAtual <= 1 ? 21 * 60 + 30 : 23 * 60 + 59;
-        // Jogos antes do limite deveriam ter resultado
         if (minutos <= limiteMinutos) {
-          try {
-            console.log(`    🔍 Web search: ${jogo.time_casa} x ${jogo.time_fora} (${horario})`);
-            const txt = await chamarIAComBusca(
-              `Qual foi o placar final do jogo ${jogo.time_casa} x ${jogo.time_fora} de ${data}? O jogo foi adiado, cancelado ou interrompido? Responda com o placar no formato X-Y ou "adiado"/"cancelado"/"interrompido".`,
-              500
-            );
-            if (txt) {
-              const tl = txt.toLowerCase();
-              if (tl.includes('adiado') || tl.includes('cancelado') || tl.includes('interrompido') || tl.includes('suspenso')) {
-                console.log(`    ⚠️ Jogo não realizado: ${txt.trim()}`);
-                resultados.push({ encontrado: false, placar: null, resultado_aposta: 'cancelado', motivo: txt.trim(), jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
-                continue;
-              }
-              const m = txt.match(/(\d+)\s*[-x]\s*(\d+)/);
-              if (m) {
-                golsCasa = parseInt(m[1]);
-                golsFora = parseInt(m[2]);
-                placar = `${golsCasa}-${golsFora}`;
-                console.log(`    ✅ Placar via web search: ${placar}`);
-              }
-            }
-          } catch(e) { console.log(`    ⚠️ Web search falhou: ${e.message}`); }
+          resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente_ws', motivo: 'aguardando web search em lote', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
+          continue;
         }
       }
+
 
       if (golsCasa !== null && golsFora !== null) {
         // Buscar stats detalhadas se precisar (cartões/escanteios)
@@ -1936,6 +1895,56 @@ async function agentValidar(data) {
     } catch(err) {
       console.log(`    ❌ Erro: ${err.message}`);
       resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: err.message, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+    }
+  }
+
+  // Web search em lote para todos os pendentes_ws de uma vez
+  const pendentesWS = resultados.filter(r => r.resultado_aposta === 'pendente_ws');
+  if (pendentesWS.length > 0) {
+    try {
+      const lista = pendentesWS.map(r => `${r.time_casa} x ${r.time_fora}`).join(', ');
+      console.log(`\n🔍 Web search em lote: ${pendentesWS.length} jogos (${lista})`);
+      const txt = await chamarIAComBusca(
+        `Busque o placar final dos seguintes jogos de futebol do dia ${data}:\n${lista}\n\nPara cada jogo responda no formato:\n"Time Casa X-Y Time Fora" ou "Time Casa x Time Fora: cancelado/adiado"`,
+        800
+      );
+      if (txt) {
+        for (const pend of pendentesWS) {
+          const nc = pend.time_casa.split(' ')[0].toLowerCase();
+          const nf = pend.time_fora.split(' ')[0].toLowerCase();
+          // Verificar cancelado/adiado
+          const linhaJogo = txt.toLowerCase().split('\n').find(l => l.includes(nc) && l.includes(nf));
+          if (linhaJogo && (linhaJogo.includes('cancelado') || linhaJogo.includes('adiado') || linhaJogo.includes('suspens'))) {
+            pend.resultado_aposta = 'cancelado';
+            pend.motivo = 'Jogo cancelado/adiado (web search)';
+            console.log(`    ⚠️ Cancelado: ${pend.time_casa} x ${pend.time_fora}`);
+            continue;
+          }
+          // Extrair placar
+          const m = txt.match(new RegExp(nc + '[^\n]*?([0-9]{1,2})\\s*[-x]\\s*([0-9]{1,2})', 'i'))
+                  || txt.match(new RegExp('([0-9]{1,2})\\s*[-x]\\s*([0-9]{1,2})[^\n]*' + nf, 'i'));
+          if (m) {
+            const gC = parseInt(m[1]), gF = parseInt(m[2]);
+            const jogoOriginal = jogos.find(j => j.time_casa === pend.time_casa && j.time_fora === pend.time_fora);
+            if (jogoOriginal) {
+              const res = verificarAposta(jogoOriginal, gC, gF, null);
+              pend.placar = `${gC}-${gF}`;
+              pend.resultado_aposta = res;
+              pend.motivo = `${pend.time_casa} ${gC} x ${gF} ${pend.time_fora} (web search)`;
+              pend.encontrado = true;
+              console.log(`    ✅ ${pend.time_casa} x ${pend.time_fora} → ${gC}-${gF} → ${res.toUpperCase()}`);
+            }
+          } else {
+            pend.resultado_aposta = 'pendente';
+            pend.motivo = 'resultado não encontrado';
+          }
+        }
+      } else {
+        pendentesWS.forEach(p => { p.resultado_aposta = 'pendente'; p.motivo = 'web search sem resposta'; });
+      }
+    } catch(e) {
+      console.log(`⚠️ Web search em lote falhou: ${e.message}`);
+      pendentesWS.forEach(p => { p.resultado_aposta = 'pendente'; p.motivo = 'web search falhou'; });
     }
   }
 
