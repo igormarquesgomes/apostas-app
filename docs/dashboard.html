@@ -241,6 +241,7 @@ function processar(dias,h){
   let oG=0,oR=0,sG=0,sR=0,mG=0,mR=0;
   // Múltiplas
   let mAG=0,mAR=0,mBG=0,mBR=0,mAP=0,mBP=0;
+  dadosMultiplasDias=[];
   const diasP=[];
 
   for(const dia of dias){
@@ -262,13 +263,15 @@ function processar(dias,h){
     if(dia.data>=sw){sG+=dG;sR+=dR;}
     if(dia.data>=sm){mG+=dG;mR+=dR;}
 
-    // Contar múltiplas
+    // Contar múltiplas — só conta no mês atual para os totais
     const rM=dia.resultados_multiplas;
     const rA = rM?.multipla_a?.resultado || (dia.multiplas?.multipla_a ? 'pendente' : null);
     const rB = rM?.multipla_b?.resultado || (dia.multiplas?.multipla_b ? 'pendente' : null);
-    if(rA==='green') mAG++; else if(rA==='red') mAR++; else if(rA) mAP++;
-    if(rB==='green') mBG++; else if(rB==='red') mBR++; else if(rB) mBP++;
-    // Guardar para histórico mensal
+    if(dia.data>=sm){
+      if(rA==='green') mAG++; else if(rA==='red') mAR++; else if(rA) mAP++;
+      if(rB==='green') mBG++; else if(rB==='red') mBR++; else if(rB) mBP++;
+    }
+    // Guardar TODOS os dias para histórico (separado por mês no render)
     if(rA || rB) dadosMultiplasDias.push({ data: dia.data, rA, rB });
 
     diasP.push({data:dia.data,apostas:apR,green:dG,red:dR,pendente:dP,total:ap.length,assert:da,multiplas:dia.multiplas,resultados_multiplas:rM});
@@ -281,7 +284,6 @@ function processar(dias,h){
 
   dadosGlobais=diasP;
   window._diasCache=diasP;
-  dadosMultiplasDias=[];
   renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR,multiplas);renderDiario(diasP);
 }
 
