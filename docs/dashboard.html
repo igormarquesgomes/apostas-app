@@ -264,12 +264,12 @@ function processar(dias,h){
 
     // Contar múltiplas
     const rM=dia.resultados_multiplas;
-    if(rM?.multipla_a?.resultado==='green') mAG++;
-    else if(rM?.multipla_a?.resultado==='red') mAR++;
-    else if(dia.multiplas?.multipla_a) mAP++;
-    if(rM?.multipla_b?.resultado==='green') mBG++;
-    else if(rM?.multipla_b?.resultado==='red') mBR++;
-    else if(dia.multiplas?.multipla_b) mBP++;
+    const rA = rM?.multipla_a?.resultado || (dia.multiplas?.multipla_a ? 'pendente' : null);
+    const rB = rM?.multipla_b?.resultado || (dia.multiplas?.multipla_b ? 'pendente' : null);
+    if(rA==='green') mAG++; else if(rA==='red') mAR++; else if(rA) mAP++;
+    if(rB==='green') mBG++; else if(rB==='red') mBR++; else if(rB) mBP++;
+    // Guardar para histórico mensal
+    if(rA || rB) dadosMultiplasDias.push({ data: dia.data, rA, rB });
 
     diasP.push({data:dia.data,apostas:apR,green:dG,red:dR,pendente:dP,total:ap.length,assert:da,multiplas:dia.multiplas,resultados_multiplas:rM});
   }
@@ -281,6 +281,7 @@ function processar(dias,h){
 
   dadosGlobais=diasP;
   window._diasCache=diasP;
+  dadosMultiplasDias=[];
   renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR,multiplas);renderDiario(diasP);
 }
 
@@ -318,6 +319,9 @@ function renderHealth(ag,ligas,tG,tR){
       </div>`).join('')||'<div class="empty" style="padding:.5rem 0">Aguardando dados...</div>'}`;
 }
 
+// Dados globais de múltiplas por dia para o histórico mensal
+let dadosMultiplasDias = [];
+
 function renderStats(ag,t,g,r,multiplas){
   const mA=multiplas?.a, mB=multiplas?.b;
   const pctA=mA?.total>0?Math.round(mA.green/mA.total*100):null;
@@ -330,13 +334,65 @@ function renderStats(ag,t,g,r,multiplas){
     <div class="stat-card"><div class="stat-lbl">Red</div><div class="stat-val" style="color:var(--red)">${r}</div></div>
     <div class="stat-card" style="border-top:1px solid var(--border);padding-top:8px;grid-column:1/-1">
       <div class="stat-lbl" style="margin-bottom:8px">🎯 Múltiplas do mês</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
         <div><div class="stat-lbl">Múltipla A</div><div class="stat-val" style="font-size:18px;color:${corP(pctA??0)}">${pctA!==null?pctA+'%':'--'}</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${mA?.green||0}G · ${mA?.red||0}R</div></div>
         <div><div class="stat-lbl">Múltipla B</div><div class="stat-val" style="font-size:18px;color:${corP(pctB??0)}">${pctB!==null?pctB+'%':'--'}</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${mB?.green||0}G · ${mB?.red||0}R</div></div>
-        <div><div class="stat-lbl">Meta A (10 greens)</div><div class="stat-val" style="font-size:18px;color:${metaA>=10?'var(--green)':'var(--amber)'}">  ${metaA}/10</div></div>
-        <div><div class="stat-lbl">Meta B (15 greens)</div><div class="stat-val" style="font-size:18px;color:${metaB>=15?'var(--green)':'var(--amber)'}">  ${metaB}/15</div></div>
+        <div><div class="stat-lbl">Meta A (10 greens)</div><div class="stat-val" style="font-size:18px;color:${metaA>=10?'var(--green)':'var(--amber)'}">${metaA}/10</div></div>
+        <div><div class="stat-lbl">Meta B (15 greens)</div><div class="stat-val" style="font-size:18px;color:${metaB>=15?'var(--green)':'var(--amber)'}">${metaB}/15</div></div>
       </div>
+      <div id="mult-historico"></div>
     </div>`;
+  renderHistoricoMultiplas();
+}
+
+function renderHistoricoMultiplas(){
+  const el = document.getElementById('mult-historico');
+  if(!el || !dadosMultiplasDias.length) return;
+
+  // Agrupar por mês
+  const meses = {};
+  for(const d of dadosMultiplasDias){
+    const mes = d.data.substring(0,7); // YYYY-MM
+    if(!meses[mes]) meses[mes] = [];
+    meses[mes].push(d);
+  }
+
+  const fmtMes = m => {
+    const [y,mo] = m.split('-');
+    const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return `${nomes[parseInt(mo)-1]} ${y}`;
+  };
+
+  el.innerHTML = Object.entries(meses).sort((a,b)=>b[0].localeCompare(a[0])).map(([mes, dias]) => {
+    const aGs = dias.filter(d=>d.rA==='green').length;
+    const aRs = dias.filter(d=>d.rA==='red').length;
+    const bGs = dias.filter(d=>d.rB==='green').length;
+    const bRs = dias.filter(d=>d.rB==='red').length;
+    const id = 'mult-mes-'+mes.replace('-','');
+
+    const diasHtml = dias.sort((a,b)=>a.data.localeCompare(b.data)).map(d => {
+      const badgeA = d.rA==='green'?'<span style="color:var(--green);font-size:10px">✓A</span>':d.rA==='red'?'<span style="color:var(--red);font-size:10px">✗A</span>':'<span style="color:var(--text3);font-size:10px">?A</span>';
+      const badgeB = d.rB==='green'?'<span style="color:var(--green);font-size:10px">✓B</span>':d.rB==='red'?'<span style="color:var(--red);font-size:10px">✗B</span>':'<span style="color:var(--text3);font-size:10px">?B</span>';
+      const dia = d.data.substring(8,10);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-radius:4px;background:var(--card2);margin-bottom:2px">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text2)">Dia ${dia}</span>
+        <div style="display:flex;gap:8px">${badgeA} ${badgeB}</div>
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:8px">
+      <div onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'"
+           style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--card2);margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600">${fmtMes(mes)}</span>
+        <div style="display:flex;gap:12px;font-family:var(--mono);font-size:10px">
+          <span>A: <span style="color:var(--green)">${aGs}G</span> <span style="color:var(--red)">${aRs}R</span></span>
+          <span>B: <span style="color:var(--green)">${bGs}G</span> <span style="color:var(--red)">${bRs}R</span></span>
+          <span style="color:var(--text3)">▼</span>
+        </div>
+      </div>
+      <div id="${id}" style="display:none;padding:0 4px">${diasHtml}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderDiario(dias){
