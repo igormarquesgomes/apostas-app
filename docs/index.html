@@ -337,11 +337,42 @@ async function carregarMultiplas(data,label){
     const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
     const j=await r.json();
     if(!j.multiplas){
+      // Verificar se já tem apostas do dia
+      try {
+        const ra = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+        const ja = await ra.json();
+        if(!ja.apostas?.jogos?.length){
+          document.getElementById('tw-mult').innerHTML=`
+            <div style="text-align:center;padding:2rem;">
+              <div style="font-size:24px;margin-bottom:12px">⚠️</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--text2);margin-bottom:8px">Sem apostas analisadas para ${fmtDL(data)}</div>
+              <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:16px">Analise os jogos do dia primeiro para gerar as múltiplas</div>
+              <button onclick="mudarTab('apostas')" style="background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.3);color:var(--green);font-family:var(--mono);font-size:12px;padding:12px 24px;border-radius:8px;cursor:pointer;">
+                📋 Ir para Apostas do dia
+              </button>
+            </div>`;
+          return;
+        }
+      } catch(e){}
       document.getElementById('tw-mult').innerHTML=`
         <div style="text-align:center;padding:2rem;">
           <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:16px">Múltiplas de ${fmtDL(data)} não foram geradas</div>
           <button onclick="gerarMultiplasManual('${data}')" style="background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.3);color:var(--green);font-family:var(--mono);font-size:12px;padding:12px 24px;border-radius:8px;cursor:pointer;">
             🎯 Gerar múltiplas agora
+          </button>
+        </div>`;
+      return;
+    }
+    // Verificar se as múltiplas têm dados válidos (odds não nulas)
+    const mA = j.multiplas?.multipla_a, mB = j.multiplas?.multipla_b;
+    const validas = mA?.odd_total > 0 && mB?.odd_total > 0 && mA?.jogos?.length > 0;
+    if (!validas) {
+      document.getElementById('tw-mult').innerHTML=`
+        <div style="text-align:center;padding:2rem;">
+          <div style="font-size:24px;margin-bottom:12px">⚠️</div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text2);margin-bottom:8px">Múltiplas de ${fmtDL(data)} inválidas (odds zeradas)</div>
+          <button onclick="gerarMultiplasManual('${data}')" style="background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.3);color:var(--green);font-family:var(--mono);font-size:12px;padding:12px 24px;border-radius:8px;cursor:pointer;">
+            🔄 Regerar múltiplas
           </button>
         </div>`;
       return;
