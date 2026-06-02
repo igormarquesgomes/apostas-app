@@ -1659,10 +1659,13 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
       return ambos ? 'green' : 'red';
     }
     // Time marca primeiro / anytime
-    if (aposta.includes('marca')) {
-      // Reusar a mesma lógica de palavrasDoTime do mercado resultado
-      if (palavrasCasa.some(p => aposta.includes(p))) return golsCasa > 0 ? 'green' : 'red';
-      if (palavrasFora.some(p => aposta.includes(p))) return golsFora > 0 ? 'green' : 'red';
+    if (aposta.includes('marca') || aposta.includes('to score') || aposta.includes('anytime')) {
+      // Mandante/visitante genérico
+      if (aposta.includes('visitante') || aposta.includes('away team') || aposta.includes('away to score')) return golsFora > 0 ? 'green' : 'red';
+      if (aposta.includes('mandante') || aposta.includes('home team') || aposta.includes('home to score')) return golsCasa > 0 ? 'green' : 'red';
+      // Por nome do time
+      if (palavrasCasa.some(p => apostaNorm.includes(p))) return golsCasa > 0 ? 'green' : 'red';
+      if (palavrasFora.some(p => apostaNorm.includes(p))) return golsFora > 0 ? 'green' : 'red';
     }
   }
 
