@@ -1821,40 +1821,60 @@ async function agentValidar(data) {
           }
         }
 
-        // 2. Tentar pelo ligaId — mais preciso que pool geral
-        let fixture = null;
+        const matchTime = (f, nc, nf) => {
+          const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
+          const casaMatch = hN?.includes(nc?.split(' ')[0]) || nc?.includes(hN?.split(' ')[0]);
+          const foraMatch = aN?.includes(nf?.split(' ')[0]) || nf?.includes(aN?.split(' ')[0]);
+          return casaMatch && foraMatch;
+        };
+
+        // 2. Tentar pelo ligaId — busca em todos os status (inclusive em andamento)
+        let fixture = null, jogoEncontradoNaAPI = false;
         if (ligaIdResolvido) {
           const fixturasLiga = cacheFixtures.filter(f => f.league?.id === ligaIdResolvido);
-          fixture = fixturasLiga.find(f => {
-            const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
-            const status = f.fixture?.status?.short;
-            if (!['FT','AET','PEN'].includes(status)) return false;
-            const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
-            const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
-            return casaMatch && foraMatch;
-          });
-          if (fixture) console.log(`    📊 Match via ligaId ${ligaIdResolvido}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name} | Status: ${fixture.fixture?.status?.short}`);
+          // Primeiro tenta FT
+          fixture = fixturasLiga.find(f => ['FT','AET','PEN'].includes(f.fixture?.status?.short) && matchTime(f, nCasa, nFora));
+          // Se não encontrou FT, verifica se está em andamento
+          if (!fixture) {
+            const emAndamento = fixturasLiga.find(f => matchTime(f, nCasa, nFora));
+            if (emAndamento) {
+              jogoEncontradoNaAPI = true;
+              console.log(`    ⏳ Jogo em andamento/não iniciado via ligaId: ${emAndamento.teams?.home?.name} x ${emAndamento.teams?.away?.name} | ${emAndamento.fixture?.status?.short}`);
+            }
+          } else {
+            console.log(`    📊 Match via ligaId ${ligaIdResolvido}: ${fixture.teams?.home?.name} x ${fixture.teams?.away?.name} | ${fixture.fixture?.status?.short}`);
+          }
         }
 
-        // 2. Fallback: pool geral — excluindo ligas ignoradas (sub-20, U17 etc)
-        if (!fixture) {
+        // 3. Pool geral — excluindo sub-categorias
+        if (!fixture && !jogoEncontradoNaAPI) {
+          // Primeiro tenta FT
           fixture = cacheFixtures.find(f => {
-            const hN = normalizar(f.teams?.home?.name), aN = normalizar(f.teams?.away?.name);
-            const status = f.fixture?.status?.short;
-            if (!['FT','AET','PEN'].includes(status)) return false;
-            // Ignorar ligas de sub-categorias no fallback
+            if (!['FT','AET','PEN'].includes(f.fixture?.status?.short)) return false;
             if (LIGAS_IGNORAR.has(f.league?.id)) return false;
-            // Ignorar times com U17, U20, Sub etc no nome
             const nomeH = f.teams?.home?.name?.toLowerCase() || '';
             const nomeA = f.teams?.away?.name?.toLowerCase() || '';
             if (nomeH.match(/u\d{2}|sub-?\d{2}|junior|juvenil/) || nomeA.match(/u\d{2}|sub-?\d{2}|junior|juvenil/)) return false;
-            const casaMatch = hN?.includes(nCasa?.split(' ')[0]) || nCasa?.includes(hN?.split(' ')[0]);
-            const foraMatch = aN?.includes(nFora?.split(' ')[0]) || nFora?.includes(aN?.split(' ')[0]);
-            if (casaMatch && foraMatch) {
-              console.log(`    📊 Match pool geral: ${f.teams?.home?.name} x ${f.teams?.away?.name} | liga:${f.league?.id} | Status: ${f.fixture?.status?.short}`);
+            if (matchTime(f, nCasa, nFora)) {
+              console.log(`    📊 Match pool geral: ${f.teams?.home?.name} x ${f.teams?.away?.name} | liga:${f.league?.id} | ${f.fixture?.status?.short}`);
+              return true;
             }
-            return casaMatch && foraMatch;
+            return false;
           });
+          // Se não encontrou FT, verifica em andamento
+          if (!fixture) {
+            const emAndamento = cacheFixtures.find(f => {
+              if (LIGAS_IGNORAR.has(f.league?.id)) return false;
+              const nomeH = f.teams?.home?.name?.toLowerCase() || '';
+              const nomeA = f.teams?.away?.name?.toLowerCase() || '';
+              if (nomeH.match(/u\d{2}|sub-?\d{2}|junior|juvenil/) || nomeA.match(/u\d{2}|sub-?\d{2}|junior|juvenil/)) return false;
+              return matchTime(f, nCasa, nFora);
+            });
+            if (emAndamento) {
+              jogoEncontradoNaAPI = true;
+              console.log(`    ⏳ Jogo em andamento/não iniciado pool geral: ${emAndamento.teams?.home?.name} x ${emAndamento.teams?.away?.name} | ${emAndamento.fixture?.status?.short}`);
+            }
+          }
         }
 
         if (fixture) {
@@ -1866,14 +1886,18 @@ async function agentValidar(data) {
         }
       }
 
-      // Marcar para web search em lote (após o loop)
+      // Web search: só se não encontrou na API E jogo deveria ter terminado
+      // Se a API encontrou o jogo (mesmo em andamento), não usa web search
       if (golsCasa === null) {
         const horario = jogo.horario || '00:00';
         const [hh, mm] = horario.split(':').map(Number);
         const minutos = hh * 60 + (mm || 0);
         const horaAtual = new Date(new Date().getTime() - 3*60*60*1000).getUTCHours();
+        const ehRotina03h = horaAtual >= 2 && horaAtual <= 4;
         const limiteMinutos = horaAtual <= 1 ? 21 * 60 + 30 : 23 * 60 + 59;
-        if (minutos <= limiteMinutos) {
+
+        // Web search só na rotina 03h E quando API não encontrou o jogo
+        if (ehRotina03h && !jogoEncontradoNaAPI && minutos <= limiteMinutos) {
           resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente_ws', motivo: 'aguardando web search em lote', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
           continue;
         }
