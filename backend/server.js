@@ -1363,9 +1363,11 @@ async function gerarMultiplas(data, jogosDodia) {
     return null;
   }
 
-  const lista = jogosElegiveis.map((j,i) =>
-    `${i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario} | pri:${j.pri}`
-  ).join('\n');
+  const lista = jogosElegiveis.map((j,i) => {
+    const casa = j.time_casa || j.timeCasa || '?';
+    const fora = j.time_fora || j.timeFora || '?';
+    return `${i+1}. ${j.liga} | ${casa} x ${fora} | ${j.horario} | pri:${j.pri}`;
+  }).join('\n');
 
   const prompt = `Você é especialista em apostas múltiplas. Analise os jogos elegíveis abaixo e monte 2 sugestões de múltiplas para a Estrela Bet.
 
