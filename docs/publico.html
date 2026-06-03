@@ -5,120 +5,97 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>OddLab</title>
 <style>
-  :root {
-    --green: #1D9E75; --green-light: #EAF3DE; --green-dark: #27500A;
-    --red-light: #FCEBEB; --red-dark: #791F1F;
-    --blue-light: #E6F1FB; --blue-dark: #0C447C;
-    --amber: #BA7517;
-    --bg: #ffffff; --bg2: #f5f5f3; --bg3: #eeede9;
-    --text: #1a1a1a; --text2: #666; --text3: #999;
-    --border: rgba(0,0,0,0.1);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1a1a1a; --bg2: #242424; --bg3: #2e2e2e;
-      --text: #f0f0f0; --text2: #aaa; --text3: #666;
-      --border: rgba(255,255,255,0.1);
-      --green-light: #0a2e1e; --green-dark: #9FE1CB;
-      --red-light: #2e0a0a; --red-dark: #F09595;
-      --blue-light: #0a1e2e; --blue-dark: #85B7EB;
-    }
-  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); min-height: 100vh; display: flex; justify-content: center; }
-  .app { background: var(--bg); width: 100%; max-width: 430px; min-height: 100vh; display: flex; flex-direction: column; }
-
-  /* Welcome */
-  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 24px; }
-  .logo-big { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; color: var(--text); }
-  .logo-big span { color: var(--green); }
-  .welcome-sub { font-size: 13px; color: var(--text2); text-align: center; line-height: 1.7; }
-  .welcome-input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; background: var(--bg2); color: var(--text); outline: none; }
-  .welcome-input:focus { border-color: var(--green); }
-  .btn-entrar { width: 100%; padding: 12px; background: var(--green); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #000; min-height: 100vh; display: flex; justify-content: center; }
+  .app { background: #000; width: 100%; max-width: 430px; min-height: 100vh; display: flex; flex-direction: column; }
+  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 28px; }
+  .logo-big { font-size: 30px; font-weight: 700; letter-spacing: -0.8px; color: #fff; }
+  .logo-big span { color: #C0C0C0; font-weight: 300; }
+  .welcome-sub { font-size: 13px; color: #444; text-align: center; line-height: 1.7; }
+  .welcome-input { width: 100%; padding: 13px 16px; border: 1px solid #1F1F1F; border-radius: 12px; font-size: 15px; background: #0a0a0a; color: #fff; outline: none; font-family: 'Inter', sans-serif; }
+  .welcome-input:focus { border-color: #C0C0C0; }
+  .welcome-input::placeholder { color: #333; }
+  .btn-entrar { width: 100%; padding: 13px; background: #fff; color: #000; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
   .btn-entrar:active { opacity: 0.85; }
-
-  /* Header */
-  .header { padding: 16px 16px 14px; border-bottom: 1px solid var(--border); }
-  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-  .logo-sm { font-size: 13px; font-weight: 600; color: var(--text3); }
-  .logo-sm span { color: var(--green); }
-  .greeting { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
-  .greeting-nome { color: var(--green); }
-  .dateline { font-size: 12px; color: var(--text2); margin-top: 2px; }
-
-  /* Day selector */
-  .day-sel { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
-  .day-btn { flex: 1; padding: 7px 4px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text2); background: transparent; cursor: pointer; text-align: center; }
-  .day-btn.active { background: var(--green); color: #fff; border-color: var(--green); font-weight: 500; }
-
-  /* Tabs */
-  .tabs { display: flex; border-bottom: 1px solid var(--border); }
-  .tab { flex: 1; padding: 10px; text-align: center; font-size: 13px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; }
-  .tab.active { color: var(--text); border-bottom-color: var(--green); font-weight: 500; }
-
-  /* Subtabs */
-  .subtabs { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
-  .subtab { font-size: 11px; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); color: var(--text2); cursor: pointer; background: transparent; }
-  .subtab.active { background: var(--green); color: #fff; border-color: var(--green); }
-
-  /* Content */
+  .header { padding: 24px 20px 20px; border-bottom: 1px solid #111; }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .logo-sm { display: flex; align-items: center; gap: 8px; }
+  .logo-sm-name { font-size: 16px; font-weight: 700; letter-spacing: -0.4px; color: #fff; }
+  .logo-sm-name span { color: #C0C0C0; font-weight: 300; }
+  .live-dot { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #444; }
+  .live-dot-circle { width: 5px; height: 5px; border-radius: 50%; background: #fff; opacity: 0.3; }
+  .pre-label { font-size: 11px; color: #333; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
+  .greeting { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; color: #fff; line-height: 1.1; }
+  .greeting-nome { color: #C0C0C0; font-weight: 300; }
+  .dateline { font-size: 13px; font-weight: 300; color: #3a3a3a; margin-top: 8px; }
+  .rule { height: 1px; background: #111; margin: 16px 0; position: relative; }
+  .rule::after { content: ''; position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: 40px; height: 1px; background: #C0C0C0; opacity: 0.2; }
+  .day-sel { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #111; }
+  .day-btn { flex: 1; padding: 7px 4px; border: 1px solid #1a1a1a; border-radius: 8px; font-size: 12px; color: #444; background: transparent; cursor: pointer; text-align: center; font-family: 'Inter', sans-serif; }
+  .day-btn.active { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+  .tabs { display: flex; border-bottom: 1px solid #111; }
+  .tab { flex: 1; padding: 11px; text-align: center; font-size: 13px; color: #444; cursor: pointer; border-bottom: 1.5px solid transparent; }
+  .tab.active { color: #fff; border-bottom-color: #fff; font-weight: 500; }
+  .subtabs { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #111; }
+  .subtab { font-size: 11px; padding: 4px 14px; border-radius: 20px; border: 1px solid #1a1a1a; color: #444; cursor: pointer; background: transparent; font-family: 'Inter', sans-serif; }
+  .subtab.active { background: #fff; color: #000; border-color: #fff; font-weight: 500; }
   .content { flex: 1; overflow-y: auto; }
-  .section { padding: 12px 14px; }
-  .section-title { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
-
-  /* Jogo card */
-  .card { background: var(--bg2); border-radius: 10px; padding: 11px 12px; margin-bottom: 8px; border: 1px solid var(--border); }
-  .jogo-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-  .jogo-nome { font-size: 12px; font-weight: 600; color: var(--text); }
-  .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
-  .b-green { background: var(--green-light); color: var(--green-dark); }
-  .b-red { background: var(--red-light); color: var(--red-dark); }
-  .b-pending { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
-  .b-amanha { background: var(--blue-light); color: var(--blue-dark); }
-  .jogo-aposta { font-size: 11px; color: var(--text2); }
-  .jogo-meta { font-size: 10px; color: var(--text3); margin-top: 3px; }
-
-  /* Multipla card */
-  .mult-card { background: var(--bg2); border-radius: 10px; padding: 11px 12px; margin-bottom: 8px; border: 1px solid var(--border); }
-  .mult-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .mult-title { font-size: 12px; font-weight: 600; color: var(--text); }
-  .mult-odd { font-size: 15px; font-weight: 600; }
-  .mult-odd.green { color: var(--green); }
-  .mult-odd.red { color: var(--red-dark); }
-  .mult-odd.pending { color: var(--text2); }
-  .mult-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; margin-left: 6px; }
-  .mult-jogo { font-size: 11px; color: var(--text2); padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+  .section { padding: 14px 16px; }
+  .section-title { font-size: 9px; font-weight: 600; color: #2a2a2a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #1a1a1a; border-left-width: 2px; }
+  .card.gc { border-left-color: #2D6A4F; }
+  .card.rc { border-left-color: #7B2D2D; }
+  .card.pc { border-left-color: #1a1a1a; }
+  .card.ac { border-left-color: #1F1F1F; }
+  .jogo-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 8px; }
+  .jogo-nome { font-size: 12px; font-weight: 600; color: #fff; flex: 1; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; letter-spacing: .2px; }
+  .b-green { color: #4ADE80; background: rgba(74,222,128,0.08); }
+  .b-red { color: #F87171; background: rgba(248,113,113,0.08); }
+  .b-pending { color: #333; background: transparent; }
+  .b-amanha { color: #555; background: transparent; border: 1px solid #1F1F1F; }
+  .jogo-aposta { font-size: 11px; color: #333; }
+  .jogo-meta { font-size: 10px; color: #222; margin-top: 3px; }
+  .mult-card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #1a1a1a; }
+  .mult-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .mult-title { font-size: 12px; font-weight: 600; color: #fff; }
+  .mult-odd { font-size: 15px; font-weight: 700; }
+  .mult-odd.green { color: #4ADE80; opacity: 0.8; }
+  .mult-odd.red { color: #F87171; opacity: 0.6; }
+  .mult-odd.pending { color: #444; }
+  .mult-jogo { font-size: 11px; color: #333; padding: 5px 0; border-bottom: 1px solid #111; display: flex; justify-content: space-between; gap: 8px; }
   .mult-jogo:last-child { border-bottom: none; padding-bottom: 0; }
   .mj-nome { flex: 1; }
-  .mj-badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; }
-
-  /* Stats */
-  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-  .stat { background: var(--bg2); border-radius: 10px; padding: 12px; text-align: center; }
-  .stat-val { font-size: 22px; font-weight: 600; color: var(--text); }
-  .stat-lbl { font-size: 10px; color: var(--text2); margin-top: 3px; }
-
-  /* Relatório */
-  .rel-card { background: var(--bg2); border-radius: 10px; padding: 12px; border: 1px solid var(--border); margin-bottom: 10px; }
-  .rel-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
-  .rel-item { font-size: 11px; color: var(--text2); padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+  .mj-badge { font-size: 9px; padding: 1px 5px; border-radius: 6px; }
+  .mj-badge.g { color: #4ADE80; background: rgba(74,222,128,0.08); }
+  .mj-badge.r { color: #F87171; background: rgba(248,113,113,0.08); }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat { background: #0a0a0a; border-radius: 12px; padding: 12px 8px; text-align: center; border: 1px solid #1a1a1a; }
+  .stat.hl { border-color: #333; }
+  .stat-val { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .stat-lbl { font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: .8px; margin-top: 4px; }
+  .bar-wrap { margin-bottom: 16px; }
+  .bar-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .bar-title { font-size: 9px; font-weight: 600; color: #2a2a2a; text-transform: uppercase; letter-spacing: 1px; }
+  .bar-pct { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+  .bar-pct span { font-size: 12px; font-weight: 300; color: #C0C0C0; }
+  .bar-bg { height: 3px; background: #111; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 3px; background: #C0C0C0; border-radius: 4px; }
+  .bar-sub { display: flex; justify-content: space-between; margin-top: 6px; }
+  .rel-card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; border: 1px solid #1a1a1a; margin-bottom: 10px; }
+  .rel-title { font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 10px; }
+  .rel-item { font-size: 11px; color: #333; padding: 6px 0; border-bottom: 1px solid #111; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
   .rel-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
-  .dot-green { background: var(--green); }
-  .dot-amber { background: var(--amber); }
-
-  /* Nav */
-  .nav { display: flex; border-top: 1px solid var(--border); padding: 8px 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); background: var(--bg); }
-  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--text2); cursor: pointer; padding: 4px 0; }
-  .nav-item.active { color: var(--green); }
-  .nav-icon { font-size: 22px; }
-
-  /* Empty */
-  .empty { text-align: center; padding: 40px 20px; color: var(--text2); font-size: 13px; }
-
-  /* Loading */
-  .loading { text-align: center; padding: 30px; color: var(--text3); font-size: 12px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .dot-green { background: #2D6A4F; }
+  .dot-amber { background: #7B2D2D; }
+  .nav { display: flex; border-top: 1px solid #111; padding: 10px 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #000; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #333; cursor: pointer; padding: 4px 0; }
+  .nav-item.active { color: #fff; }
+  .nav-icon { font-size: 20px; }
+  .empty { text-align: center; padding: 40px 20px; color: #2a2a2a; font-size: 13px; }
+  .loading { text-align: center; padding: 30px; color: #222; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -127,7 +104,16 @@
   <!-- Tela de boas-vindas -->
   <div id="v-welcome" style="display:flex;flex-direction:column;flex:1;">
     <div class="welcome">
-      <div class="logo-big">Odd<span>Lab</span></div>
+      <div>
+        <svg width="48" height="48" viewBox="0 0 44 44" fill="none" style="display:block;margin:0 auto 12px">
+          <circle cx="22" cy="22" r="20.5" stroke="#fff" stroke-width="0.8"/>
+          <circle cx="22" cy="22" r="20.5" stroke="#C0C0C0" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.3"/>
+          <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="34" cy="17.5" r="2.2" fill="#fff"/>
+          <circle cx="34" cy="17.5" r="4" stroke="#fff" stroke-width="0.5" opacity="0.2"/>
+        </svg>
+        <div class="logo-big">Odd<span>Lab</span></div>
+      </div>
       <div class="welcome-sub">análise de apostas esportivas<br>para te ajudar a apostar melhor</div>
       <div style="width:100%;display:flex;flex-direction:column;gap:12px;">
         <input class="welcome-input" type="text" id="inp-nome" placeholder="qual é o seu nome?" maxlength="30" />
@@ -140,10 +126,20 @@
   <div id="v-app" style="display:none;flex-direction:column;flex:1;">
     <div class="header">
       <div class="header-top">
-        <div class="logo-sm">Odd<span>Lab</span></div>
-        <div class="dateline" id="dateline"></div>
+        <div class="logo-sm">
+          <svg width="26" height="26" viewBox="0 0 44 44" fill="none">
+            <circle cx="22" cy="22" r="20.5" stroke="#fff" stroke-width="0.8"/>
+            <circle cx="22" cy="22" r="20.5" stroke="#C0C0C0" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.3"/>
+            <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="34" cy="17.5" r="2.2" fill="#fff"/>
+          </svg>
+          <div class="logo-sm-name">Odd<span>Lab</span></div>
+        </div>
+        <div class="live-dot"><div class="live-dot-circle"></div>ao vivo</div>
       </div>
-      <div class="greeting" id="greeting">olá! 👋</div>
+      <div class="pre-label">bem-vindo de volta</div>
+      <div class="greeting" id="greeting">olá!</div>
+      <div class="dateline" id="dateline"></div>
     </div>
 
     <div class="tabs">
@@ -258,7 +254,7 @@ function iniciarApp(nome) {
   document.getElementById('v-welcome').style.display = 'none';
   document.getElementById('v-app').style.display = 'flex';
 
-  document.getElementById('greeting').innerHTML = `olá, <span class="greeting-nome">${nome}</span> 👋`;
+  document.getElementById('greeting').innerHTML = `olá, <span class="greeting-nome">${nome}</span>`;
   const hoje = new Date();
   const br = new Date(hoje.getTime() - 3 * 60 * 60 * 1000);
   const d = String(br.getDate()).padStart(2,'0');
@@ -305,14 +301,15 @@ function renderDia(dia, data) {
       const res = resultados.find(r => r.jogo_id === j.id);
       const rv = res?.resultado_aposta || 'pendente';
       const placar = res?.placar ? ` · ${res.placar}` : '';
-      let badgeHtml = '';
-      if (rv === 'green') badgeHtml = `<span class="badge b-green">✓ green${placar}</span>`;
-      else if (rv === 'red') badgeHtml = `<span class="badge b-red">✗ red${placar}</span>`;
-      else if (dia === 'amanha') badgeHtml = `<span class="badge b-amanha">${fmtData(dataStr)}</span>`;
-      else badgeHtml = `<span class="badge b-pending">⏳ pendente</span>`;
-      return `<div class="card">
+      let badgeHtml = '', cardCls = 'pc';
+      if (rv === 'green') { badgeHtml = `<span class="badge b-green">✓ green${placar}</span>`; cardCls = 'gc'; }
+      else if (rv === 'red') { badgeHtml = `<span class="badge b-red">✗ red${placar}</span>`; cardCls = 'rc'; }
+      else if (dia === 'amanha') { badgeHtml = `<span class="badge b-amanha">${fmtData(dataStr)}</span>`; cardCls = 'ac'; }
+      else badgeHtml = `<span class="badge b-pending">⏳</span>`;
+      const oddStr = j.odd && j.odd > 0 ? ` · odd ${j.odd}` : '';
+      return `<div class="card ${cardCls}">
         <div class="jogo-top"><div class="jogo-nome">${j.time_casa} x ${j.time_fora}</div>${badgeHtml}</div>
-        <div class="jogo-aposta">${j.aposta} · odd ${j.odd||'?'}</div>
+        <div class="jogo-aposta">${j.aposta}${oddStr}</div>
         <div class="jogo-meta">${j.liga} · ${j.horario}</div>
       </div>`;
     }).join('');
@@ -376,17 +373,36 @@ async function carregarRelatorio() {
     const positivos = linhas.filter(l => !l.toLowerCase().includes('melhor') && !l.toLowerCase().includes('atenção') && !l.toLowerCase().includes('red') && l.length > 20).slice(0,4);
     const melhorar = linhas.filter(l => l.toLowerCase().includes('melhor') || l.toLowerCase().includes('atenção') || l.toLowerCase().includes('pivotar')).slice(0,2);
 
+    const pct = assert !== null ? assert : 0;
+    const barW = Math.min(pct, 100);
     document.getElementById('stats-rel').innerHTML = `
       <div class="stat-grid">
-        <div class="stat">
-          <div class="stat-val" style="color:${assert>=60?'var(--green)':'var(--amber)'}">${assert !== null ? assert+'%' : '--'}</div>
-          <div class="stat-lbl">assertividade semana</div>
+        <div class="stat hl">
+          <div class="stat-val" style="color:#fff;font-size:24px">${assert !== null ? assert+'%' : '--'}</div>
+          <div class="stat-lbl" style="color:#C0C0C0">semana</div>
         </div>
         <div class="stat">
-          <div class="stat-val">${tG}<span style="font-size:13px;color:var(--text2)">G</span> ${tR}<span style="font-size:13px;color:var(--text2)">R</span></div>
-          <div class="stat-lbl">resultados semana</div>
+          <div class="stat-val" style="color:#4ADE80;opacity:0.8">${tG}</div>
+          <div class="stat-lbl" style="color:#4ADE80;opacity:0.4">greens</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" style="color:#F87171;opacity:0.5">${tR}</div>
+          <div class="stat-lbl" style="color:#F87171;opacity:0.3">reds</div>
         </div>
       </div>
+      <div class="bar-wrap">
+        <div class="bar-header">
+          <div class="bar-title">assertividade semanal</div>
+          <div class="bar-pct">${assert !== null ? assert : '--'}<span>%</span></div>
+        </div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${barW}%"></div></div>
+        <div class="bar-sub">
+          <span style="color:#4ADE80;opacity:0.6">${tG} greens</span>
+          <span style="color:#F87171;opacity:0.4">${tR} reds</span>
+          <span style="color:#2a2a2a">meta 70%</span>
+        </div>
+      </div>
+      <div class="rule"></div>
       ${positivos.length > 0 ? `
       <div class="rel-card">
         <div class="rel-title">destaques da semana</div>
