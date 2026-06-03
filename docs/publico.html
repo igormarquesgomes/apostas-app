@@ -7,95 +7,105 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body { font-family: 'Inter', -apple-system, sans-serif; background: #000; min-height: 100vh; display: flex; justify-content: center; }
-  .app { background: #000; width: 100%; max-width: 430px; min-height: 100vh; display: flex; flex-direction: column; }
-  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 28px; }
-  .logo-big { font-size: 30px; font-weight: 700; letter-spacing: -0.8px; color: #fff; }
-  .logo-big span { color: #C0C0C0; font-weight: 300; }
-  .welcome-sub { font-size: 13px; color: #444; text-align: center; line-height: 1.7; }
-  .welcome-input { width: 100%; padding: 13px 16px; border: 1px solid #1F1F1F; border-radius: 12px; font-size: 15px; background: #0a0a0a; color: #fff; outline: none; font-family: 'Inter', sans-serif; }
-  .welcome-input:focus { border-color: #C0C0C0; }
-  .welcome-input::placeholder { color: #333; }
-  .btn-entrar { width: 100%; padding: 13px; background: #fff; color: #000; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
-  .btn-entrar:active { opacity: 0.85; }
-  .header { padding: 24px 20px 20px; border-bottom: 1px solid #111; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #F0EDEA; min-height: 100vh; display: flex; justify-content: center; }
+  .app { background: #FAF7F2; width: 100%; max-width: 430px; min-height: 100vh; display: flex; flex-direction: column; }
+
+  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 28px; background: #FAF7F2; }
+  .logo-big { font-size: 30px; font-weight: 700; letter-spacing: -0.8px; color: #1E293B; text-align: center; }
+  .logo-big span { color: #0F766E; font-weight: 300; }
+  .welcome-sub { font-size: 13px; color: #94A3B8; text-align: center; line-height: 1.7; }
+  .welcome-input { width: 100%; padding: 13px 16px; border: 1px solid #D1D5DB; border-radius: 12px; font-size: 15px; background: #fff; color: #1E293B; outline: none; font-family: 'Inter', sans-serif; }
+  .welcome-input:focus { border-color: #0F766E; }
+  .welcome-input::placeholder { color: #CBD5E1; }
+  .btn-entrar { width: 100%; padding: 13px; background: #0F766E; color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
+  .btn-entrar:active { opacity: 0.9; }
+
+  .header { padding: 24px 20px 20px; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
   .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
   .logo-sm { display: flex; align-items: center; gap: 8px; }
-  .logo-sm-name { font-size: 16px; font-weight: 700; letter-spacing: -0.4px; color: #fff; }
-  .logo-sm-name span { color: #C0C0C0; font-weight: 300; }
-  .live-dot { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #444; }
-  .live-dot-circle { width: 5px; height: 5px; border-radius: 50%; background: #fff; opacity: 0.3; }
-  .pre-label { font-size: 11px; color: #333; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
-  .greeting { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; color: #fff; line-height: 1.1; }
-  .greeting-nome { color: #C0C0C0; font-weight: 300; }
-  .dateline { font-size: 13px; font-weight: 300; color: #3a3a3a; margin-top: 8px; }
-  .rule { height: 1px; background: #111; margin: 16px 0; position: relative; }
-  .rule::after { content: ''; position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: 40px; height: 1px; background: #C0C0C0; opacity: 0.2; }
-  .day-sel { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #111; }
-  .day-btn { flex: 1; padding: 7px 4px; border: 1px solid #1a1a1a; border-radius: 8px; font-size: 12px; color: #444; background: transparent; cursor: pointer; text-align: center; font-family: 'Inter', sans-serif; }
-  .day-btn.active { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
-  .tabs { display: flex; border-bottom: 1px solid #111; }
-  .tab { flex: 1; padding: 11px; text-align: center; font-size: 13px; color: #666; cursor: pointer; border-bottom: 1.5px solid transparent; }
-  .tab.active { color: #fff; border-bottom-color: #fff; font-weight: 500; }
-  .subtabs { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #111; }
-  .subtab { font-size: 11px; padding: 4px 14px; border-radius: 20px; border: 1px solid #1a1a1a; color: #444; cursor: pointer; background: transparent; font-family: 'Inter', sans-serif; }
-  .subtab.active { background: #fff; color: #000; border-color: #fff; font-weight: 500; }
-  .content { flex: 1; overflow-y: auto; }
+  .logo-sm-name { font-size: 16px; font-weight: 700; letter-spacing: -0.4px; color: #1E293B; }
+  .logo-sm-name span { color: #0F766E; font-weight: 300; }
+  .live-dot { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #94A3B8; }
+  .live-dot-circle { width: 5px; height: 5px; border-radius: 50%; background: #0F766E; opacity: 0.6; }
+  .pre-label { font-size: 11px; color: #94A3B8; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
+  .greeting { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; color: #1E293B; line-height: 1.1; }
+  .greeting-nome { color: #0F766E; font-weight: 300; }
+  .dateline { font-size: 13px; font-weight: 300; color: #94A3B8; margin-top: 8px; }
+  .rule { height: 1px; background: #E2E8F0; margin: 16px 0; }
+
+  .day-sel { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
+  .day-btn { flex: 1; padding: 7px 4px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 12px; color: #94A3B8; background: transparent; cursor: pointer; text-align: center; font-family: 'Inter', sans-serif; }
+  .day-btn.active { background: #0F766E; color: #fff; border-color: #0F766E; font-weight: 600; }
+
+  .tabs { display: flex; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
+  .tab { flex: 1; padding: 11px; text-align: center; font-size: 13px; color: #94A3B8; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: #0F766E; border-bottom-color: #0F766E; font-weight: 600; }
+
+  .subtabs { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
+  .subtab { font-size: 11px; padding: 4px 14px; border-radius: 20px; border: 1px solid #D1D5DB; color: #94A3B8; cursor: pointer; background: transparent; font-family: 'Inter', sans-serif; }
+  .subtab.active { background: #0F766E; color: #fff; border-color: #0F766E; font-weight: 500; }
+
+  .content { flex: 1; overflow-y: auto; background: #FAF7F2; }
   .section { padding: 14px 16px; }
-  .section-title { font-size: 9px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-  .card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #1a1a1a; border-left-width: 2px; }
-  .card.gc { border-left-color: #2D6A4F; }
-  .card.rc { border-left-color: #7B2D2D; }
-  .card.pc { border-left-color: #1a1a1a; }
-  .card.ac { border-left-color: #1F1F1F; }
+  .section-title { font-size: 9px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+  .card { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #E2E8F0; border-left-width: 3px; }
+  .card.gc { border-left-color: #0F766E; }
+  .card.rc { border-left-color: #E11D48; }
+  .card.pc { border-left-color: #E2E8F0; }
+  .card.ac { border-left-color: #CBD5E1; }
   .jogo-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 8px; }
-  .jogo-nome { font-size: 12px; font-weight: 600; color: #fff; flex: 1; }
-  .badge { font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; letter-spacing: .2px; }
-  .b-green { color: #4ADE80; background: rgba(74,222,128,0.08); }
-  .b-red { color: #F87171; background: rgba(248,113,113,0.08); }
-  .b-pending { color: #333; background: transparent; }
-  .b-amanha { color: #555; background: transparent; border: 1px solid #1F1F1F; }
-  .jogo-aposta { font-size: 11px; color: #888; }
-  .jogo-meta { font-size: 10px; color: #555; margin-top: 3px; }
-  .mult-card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #1a1a1a; }
+  .jogo-nome { font-size: 12px; font-weight: 600; color: #1E293B; flex: 1; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+  .b-green { color: #0F766E; background: #CCFBF1; }
+  .b-red { color: #BE123C; background: #FFE4E6; opacity: 0.85; }
+  .b-pending { color: #94A3B8; background: #F1F5F9; }
+  .b-amanha { color: #94A3B8; background: #F8FAFC; border: 1px solid #E2E8F0; }
+  .jogo-aposta { font-size: 11px; color: #64748B; }
+  .jogo-meta { font-size: 10px; color: #94A3B8; margin-top: 3px; }
+
+  .mult-card { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #E2E8F0; }
   .mult-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .mult-title { font-size: 12px; font-weight: 600; color: #fff; }
+  .mult-title { font-size: 12px; font-weight: 600; color: #1E293B; }
   .mult-odd { font-size: 15px; font-weight: 700; }
-  .mult-odd.green { color: #4ADE80; opacity: 0.8; }
-  .mult-odd.red { color: #F87171; opacity: 0.6; }
-  .mult-odd.pending { color: #444; }
-  .mult-jogo { font-size: 11px; color: #888; padding: 5px 0; border-bottom: 1px solid #111; display: flex; justify-content: space-between; gap: 8px; }
+  .mult-odd.green { color: #0F766E; }
+  .mult-odd.red { color: #BE123C; opacity: 0.8; }
+  .mult-odd.pending { color: #94A3B8; }
+  .mult-jogo { font-size: 11px; color: #64748B; padding: 5px 0; border-bottom: 1px solid #F1F5F9; display: flex; justify-content: space-between; gap: 8px; }
   .mult-jogo:last-child { border-bottom: none; padding-bottom: 0; }
   .mj-nome { flex: 1; }
-  .mj-badge { font-size: 9px; padding: 1px 5px; border-radius: 6px; }
-  .mj-badge.g { color: #4ADE80; background: rgba(74,222,128,0.08); }
-  .mj-badge.r { color: #F87171; background: rgba(248,113,113,0.08); }
+  .mj-badge { font-size: 9px; padding: 1px 5px; border-radius: 5px; }
+  .mj-badge.g { color: #0F766E; background: #CCFBF1; }
+  .mj-badge.r { color: #BE123C; background: #FFE4E6; }
+
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
-  .stat { background: #0a0a0a; border-radius: 12px; padding: 12px 8px; text-align: center; border: 1px solid #1a1a1a; }
-  .stat.hl { border-color: #333; }
+  .stat { background: #fff; border-radius: 12px; padding: 12px 8px; text-align: center; border: 1px solid #E2E8F0; }
+  .stat.hl { border-color: #99F6E4; background: #F0FDFA; }
   .stat-val { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
   .stat-lbl { font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: .8px; margin-top: 4px; }
   .bar-wrap { margin-bottom: 16px; }
   .bar-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-  .bar-title { font-size: 9px; font-weight: 600; color: #2a2a2a; text-transform: uppercase; letter-spacing: 1px; }
-  .bar-pct { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
-  .bar-pct span { font-size: 12px; font-weight: 300; color: #C0C0C0; }
-  .bar-bg { height: 3px; background: #111; border-radius: 4px; overflow: hidden; }
-  .bar-fill { height: 3px; background: #C0C0C0; border-radius: 4px; }
+  .bar-title { font-size: 9px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; }
+  .bar-pct { font-size: 18px; font-weight: 800; color: #0F766E; letter-spacing: -0.5px; }
+  .bar-pct span { font-size: 12px; font-weight: 300; color: #94A3B8; }
+  .bar-bg { height: 4px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 4px; background: #0F766E; border-radius: 4px; }
   .bar-sub { display: flex; justify-content: space-between; margin-top: 6px; }
-  .rel-card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; border: 1px solid #1a1a1a; margin-bottom: 10px; }
-  .rel-title { font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 10px; }
-  .rel-item { font-size: 11px; color: #888; padding: 6px 0; border-bottom: 1px solid #111; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+
+  .rel-card { background: #fff; border-radius: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; margin-bottom: 10px; }
+  .rel-title { font-size: 11px; font-weight: 600; color: #1E293B; margin-bottom: 10px; }
+  .rel-item { font-size: 11px; color: #64748B; padding: 6px 0; border-bottom: 1px solid #F1F5F9; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
   .rel-item:last-child { border-bottom: none; padding-bottom: 0; }
   .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-  .dot-green { background: #2D6A4F; }
-  .dot-amber { background: #7B2D2D; }
-  .nav { display: flex; border-top: 1px solid #111; padding: 10px 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #000; }
-  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #666; cursor: pointer; padding: 4px 0; }
-  .nav-item.active { color: #fff; }
+  .dot-green { background: #0F766E; }
+  .dot-amber { background: #E11D48; opacity: 0.6; }
+
+  .nav { display: flex; border-top: 1px solid #E2E8F0; padding: 10px 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #FAF7F2; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #94A3B8; cursor: pointer; padding: 4px 0; }
+  .nav-item.active { color: #0F766E; }
   .nav-icon { font-size: 20px; }
-  .empty { text-align: center; padding: 40px 20px; color: #2a2a2a; font-size: 13px; }
-  .loading { text-align: center; padding: 30px; color: #222; font-size: 12px; }
+  .empty { text-align: center; padding: 40px 20px; color: #94A3B8; font-size: 13px; }
+  .loading { text-align: center; padding: 30px; color: #CBD5E1; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -106,11 +116,11 @@
     <div class="welcome">
       <div>
         <svg width="48" height="48" viewBox="0 0 44 44" fill="none" style="display:block;margin:0 auto 12px">
-          <circle cx="22" cy="22" r="20.5" stroke="#fff" stroke-width="0.8"/>
-          <circle cx="22" cy="22" r="20.5" stroke="#C0C0C0" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.3"/>
-          <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <circle cx="34" cy="17.5" r="2.2" fill="#fff"/>
-          <circle cx="34" cy="17.5" r="4" stroke="#fff" stroke-width="0.5" opacity="0.2"/>
+          <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="1.2"/>
+          <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.2"/>
+          <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#0F766E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="34" cy="17.5" r="2.2" fill="#0F766E"/>
+          <circle cx="34" cy="17.5" r="4" stroke="#0F766E" stroke-width="0.5" opacity="0.2"/>
         </svg>
         <div class="logo-big">Odd<span>Lab</span></div>
       </div>
@@ -128,10 +138,10 @@
       <div class="header-top">
         <div class="logo-sm">
           <svg width="26" height="26" viewBox="0 0 44 44" fill="none">
-            <circle cx="22" cy="22" r="20.5" stroke="#fff" stroke-width="0.8"/>
-            <circle cx="22" cy="22" r="20.5" stroke="#C0C0C0" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.3"/>
-            <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <circle cx="34" cy="17.5" r="2.2" fill="#fff"/>
+            <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="1.2"/>
+            <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.2"/>
+            <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#0F766E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="34" cy="17.5" r="2.2" fill="#0F766E"/>
           </svg>
           <div class="logo-sm-name">Odd<span>Lab</span></div>
         </div>
@@ -378,16 +388,16 @@ async function carregarRelatorio() {
     document.getElementById('stats-rel').innerHTML = `
       <div class="stat-grid">
         <div class="stat hl">
-          <div class="stat-val" style="color:#fff;font-size:24px">${assert !== null ? assert+'%' : '--'}</div>
-          <div class="stat-lbl" style="color:#C0C0C0">semana</div>
+          <div class="stat-val" style="color:#0F766E;font-size:24px">${assert !== null ? assert+'%' : '--'}</div>
+          <div class="stat-lbl" style="color:#2DD4BF">semana</div>
         </div>
         <div class="stat">
-          <div class="stat-val" style="color:#4ADE80;opacity:0.8">${tG}</div>
-          <div class="stat-lbl" style="color:#4ADE80;opacity:0.4">greens</div>
+          <div class="stat-val" style="color:#0F766E">${tG}</div>
+          <div class="stat-lbl" style="color:#2DD4BF">greens</div>
         </div>
         <div class="stat">
-          <div class="stat-val" style="color:#F87171;opacity:0.5">${tR}</div>
-          <div class="stat-lbl" style="color:#F87171;opacity:0.3">reds</div>
+          <div class="stat-val" style="color:#BE123C;opacity:0.6">${tR}</div>
+          <div class="stat-lbl" style="color:#FDA4AF;opacity:0.6">reds</div>
         </div>
       </div>
       <div class="bar-wrap">
@@ -397,9 +407,9 @@ async function carregarRelatorio() {
         </div>
         <div class="bar-bg"><div class="bar-fill" style="width:${barW}%"></div></div>
         <div class="bar-sub">
-          <span style="color:#4ADE80;opacity:0.6">${tG} greens</span>
-          <span style="color:#F87171;opacity:0.4">${tR} reds</span>
-          <span style="color:#2a2a2a">meta 70%</span>
+          <span style="color:#0F766E;font-weight:500">${tG} greens</span>
+          <span style="color:#BE123C;opacity:0.6">${tR} reds</span>
+          <span style="color:#94A3B8">meta 70%</span>
         </div>
       </div>
       <div class="rule"></div>
