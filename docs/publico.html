@@ -316,11 +316,24 @@ function renderDia(dia, data) {
       else if (rv === 'red') { badgeHtml = `<span class="badge b-red">✗ red${placar}</span>`; cardCls = 'rc'; }
       else if (dia === 'amanha') { badgeHtml = `<span class="badge b-amanha">${fmtData(dataStr)}</span>`; cardCls = 'ac'; }
       else badgeHtml = `<span class="badge b-pending">⏳</span>`;
-      const oddStr = j.odd && j.odd > 0 ? ` · odd ${j.odd}` : '';
+      const odd = j.odd_mercado || j.odd_sugerida || j.odd;
+      const oddStr = odd && odd > 0 ? `odd ${parseFloat(odd).toFixed(2)}` : '';
+      const conf = j.confianca || '';
+      const confHtml = conf === 'alta'
+        ? `<span style="font-size:9px;font-weight:600;color:#0F766E;background:#CCFBF1;padding:1px 6px;border-radius:4px">alta</span>`
+        : conf === 'media' || conf === 'média'
+        ? `<span style="font-size:9px;font-weight:600;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:4px">média</span>`
+        : conf === 'baixa'
+        ? `<span style="font-size:9px;font-weight:600;color:#9F1239;background:#FFE4E6;padding:1px 6px;border-radius:4px">baixa</span>`
+        : '';
       return `<div class="card ${cardCls}">
         <div class="jogo-top"><div class="jogo-nome">${j.time_casa} x ${j.time_fora}</div>${badgeHtml}</div>
-        <div class="jogo-aposta">${j.aposta}${oddStr}</div>
-        <div class="jogo-meta">${j.liga} · ${j.horario}</div>
+        <div class="jogo-aposta" style="margin-bottom:5px">${j.aposta}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${oddStr ? `<span style="font-size:10px;font-weight:600;color:#0F766E;background:#F0FDFA;padding:1px 7px;border-radius:5px;border:1px solid #99F6E4">${oddStr}</span>` : ''}
+          ${confHtml}
+          <span style="font-size:10px;color:#94A3B8">${j.liga} · ${j.horario}</span>
+        </div>
       </div>`;
     }).join('');
   }
