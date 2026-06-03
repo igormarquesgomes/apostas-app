@@ -35,14 +35,14 @@
   .day-btn { flex: 1; padding: 7px 4px; border: 1px solid #1a1a1a; border-radius: 8px; font-size: 12px; color: #444; background: transparent; cursor: pointer; text-align: center; font-family: 'Inter', sans-serif; }
   .day-btn.active { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
   .tabs { display: flex; border-bottom: 1px solid #111; }
-  .tab { flex: 1; padding: 11px; text-align: center; font-size: 13px; color: #444; cursor: pointer; border-bottom: 1.5px solid transparent; }
+  .tab { flex: 1; padding: 11px; text-align: center; font-size: 13px; color: #666; cursor: pointer; border-bottom: 1.5px solid transparent; }
   .tab.active { color: #fff; border-bottom-color: #fff; font-weight: 500; }
   .subtabs { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #111; }
   .subtab { font-size: 11px; padding: 4px 14px; border-radius: 20px; border: 1px solid #1a1a1a; color: #444; cursor: pointer; background: transparent; font-family: 'Inter', sans-serif; }
   .subtab.active { background: #fff; color: #000; border-color: #fff; font-weight: 500; }
   .content { flex: 1; overflow-y: auto; }
   .section { padding: 14px 16px; }
-  .section-title { font-size: 9px; font-weight: 600; color: #2a2a2a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .section-title { font-size: 9px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
   .card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #1a1a1a; border-left-width: 2px; }
   .card.gc { border-left-color: #2D6A4F; }
   .card.rc { border-left-color: #7B2D2D; }
@@ -55,8 +55,8 @@
   .b-red { color: #F87171; background: rgba(248,113,113,0.08); }
   .b-pending { color: #333; background: transparent; }
   .b-amanha { color: #555; background: transparent; border: 1px solid #1F1F1F; }
-  .jogo-aposta { font-size: 11px; color: #333; }
-  .jogo-meta { font-size: 10px; color: #222; margin-top: 3px; }
+  .jogo-aposta { font-size: 11px; color: #888; }
+  .jogo-meta { font-size: 10px; color: #555; margin-top: 3px; }
   .mult-card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #1a1a1a; }
   .mult-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .mult-title { font-size: 12px; font-weight: 600; color: #fff; }
@@ -64,7 +64,7 @@
   .mult-odd.green { color: #4ADE80; opacity: 0.8; }
   .mult-odd.red { color: #F87171; opacity: 0.6; }
   .mult-odd.pending { color: #444; }
-  .mult-jogo { font-size: 11px; color: #333; padding: 5px 0; border-bottom: 1px solid #111; display: flex; justify-content: space-between; gap: 8px; }
+  .mult-jogo { font-size: 11px; color: #888; padding: 5px 0; border-bottom: 1px solid #111; display: flex; justify-content: space-between; gap: 8px; }
   .mult-jogo:last-child { border-bottom: none; padding-bottom: 0; }
   .mj-nome { flex: 1; }
   .mj-badge { font-size: 9px; padding: 1px 5px; border-radius: 6px; }
@@ -85,13 +85,13 @@
   .bar-sub { display: flex; justify-content: space-between; margin-top: 6px; }
   .rel-card { background: #0a0a0a; border-radius: 12px; padding: 12px 14px; border: 1px solid #1a1a1a; margin-bottom: 10px; }
   .rel-title { font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 10px; }
-  .rel-item { font-size: 11px; color: #333; padding: 6px 0; border-bottom: 1px solid #111; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+  .rel-item { font-size: 11px; color: #888; padding: 6px 0; border-bottom: 1px solid #111; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
   .rel-item:last-child { border-bottom: none; padding-bottom: 0; }
   .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
   .dot-green { background: #2D6A4F; }
   .dot-amber { background: #7B2D2D; }
   .nav { display: flex; border-top: 1px solid #111; padding: 10px 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #000; }
-  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #333; cursor: pointer; padding: 4px 0; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #666; cursor: pointer; padding: 4px 0; }
   .nav-item.active { color: #fff; }
   .nav-icon { font-size: 20px; }
   .empty { text-align: center; padding: 40px 20px; color: #2a2a2a; font-size: 13px; }
