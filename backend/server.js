@@ -2503,7 +2503,8 @@ async function rotinaMultiplas() {
     const multiplas = row?.multiplas;
     const mA = multiplas?.multipla_a, mB = multiplas?.multipla_b;
     // Verificar se odds são válidas E se os jogos são reais (não indefinidos/nulos)
-    const jogoValido = j => j?.time_casa && j?.time_fora && j?.aposta && j?.odd > 0;
+    const jogoValido = j => j?.time_casa && j?.time_fora && j?.aposta && j?.odd > 0 &&
+      j.time_casa !== 'undefined' && j.time_fora !== 'undefined';
     const mAValida = mA?.odd_total > 0 && mA?.jogos?.length > 0 && mA.jogos.every(jogoValido);
     const mBValida = mB?.odd_total > 0 && mB?.jogos?.length > 0 && mB.jogos.every(jogoValido);
     const validas = mAValida && mBValida;
