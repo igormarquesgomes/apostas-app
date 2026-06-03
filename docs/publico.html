@@ -315,7 +315,9 @@ function renderDia(dia, data) {
   if (!jogos.length) {
     document.getElementById('lista-jogos').innerHTML = `<div class="empty">sem apostas para ${labels[dia].split('—')[0].trim()}</div>`;
   } else {
-    document.getElementById('lista-jogos').innerHTML = jogos.map(j => {
+    // Ordenar por horário — só no público
+    const jogosOrdenados = [...jogos].sort((a, b) => (a.horario || '00:00').localeCompare(b.horario || '00:00'));
+    document.getElementById('lista-jogos').innerHTML = jogosOrdenados.map(j => {
       const res = resultados.find(r => r.jogo_id === j.id);
       const rv = res?.resultado_aposta || 'pendente';
       const placar = res?.placar ? ` · ${res.placar}` : '';
