@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>OddLab</title>
+<style>
+  :root {
+    --green: #1D9E75; --green-light: #EAF3DE; --green-dark: #27500A;
+    --red-light: #FCEBEB; --red-dark: #791F1F;
+    --blue-light: #E6F1FB; --blue-dark: #0C447C;
+    --amber: #BA7517;
+    --bg: #ffffff; --bg2: #f5f5f3; --bg3: #eeede9;
+    --text: #1a1a1a; --text2: #666; --text3: #999;
+    --border: rgba(0,0,0,0.1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --bg2: #242424; --bg3: #2e2e2e;
+      --text: #f0f0f0; --text2: #aaa; --text3: #666;
+      --border: rgba(255,255,255,0.1);
+      --green-light: #0a2e1e; --green-dark: #9FE1CB;
+      --red-light: #2e0a0a; --red-dark: #F09595;
+      --blue-light: #0a1e2e; --blue-dark: #85B7EB;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); min-height: 100vh; display: flex; justify-content: center; }
+  .app { background: var(--bg); width: 100%; max-width: 430px; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* Welcome */
+  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 24px; }
+  .logo-big { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; color: var(--text); }
+  .logo-big span { color: var(--green); }
+  .welcome-sub { font-size: 13px; color: var(--text2); text-align: center; line-height: 1.7; }
+  .welcome-input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; background: var(--bg2); color: var(--text); outline: none; }
+  .welcome-input:focus { border-color: var(--green); }
+  .btn-entrar { width: 100%; padding: 12px; background: var(--green); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; }
+  .btn-entrar:active { opacity: 0.85; }
+
+  /* Header */
+  .header { padding: 16px 16px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+  .greeting { font-size: 18px; font-weight: 600; color: var(--text); }
+  .dateline { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .logo-sm { font-size: 13px; font-weight: 600; color: var(--text3); }
+  .logo-sm span { color: var(--green); }
+
+  /* Day selector */
+  .day-sel { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .day-btn { flex: 1; padding: 7px 4px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text2); background: transparent; cursor: pointer; text-align: center; }
+  .day-btn.active { background: var(--green); color: #fff; border-color: var(--green); font-weight: 500; }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab { flex: 1; padding: 10px; text-align: center; font-size: 13px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--text); border-bottom-color: var(--green); font-weight: 500; }
+
+  /* Subtabs */
+  .subtabs { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .subtab { font-size: 11px; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); color: var(--text2); cursor: pointer; background: transparent; }
+  .subtab.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+  /* Content */
+  .content { flex: 1; overflow-y: auto; }
+  .section { padding: 12px 14px; }
+  .section-title { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+
+  /* Jogo card */
+  .card { background: var(--bg2); border-radius: 10px; padding: 11px 12px; margin-bottom: 8px; border: 1px solid var(--border); }
+  .jogo-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .jogo-nome { font-size: 12px; font-weight: 600; color: var(--text); }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+  .b-green { background: var(--green-light); color: var(--green-dark); }
+  .b-red { background: var(--red-light); color: var(--red-dark); }
+  .b-pending { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+  .b-amanha { background: var(--blue-light); color: var(--blue-dark); }
+  .jogo-aposta { font-size: 11px; color: var(--text2); }
+  .jogo-meta { font-size: 10px; color: var(--text3); margin-top: 3px; }
+
+  /* Multipla card */
+  .mult-card { background: var(--bg2); border-radius: 10px; padding: 11px 12px; margin-bottom: 8px; border: 1px solid var(--border); }
+  .mult-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .mult-title { font-size: 12px; font-weight: 600; color: var(--text); }
+  .mult-odd { font-size: 15px; font-weight: 600; }
+  .mult-odd.green { color: var(--green); }
+  .mult-odd.red { color: var(--red-dark); }
+  .mult-odd.pending { color: var(--text2); }
+  .mult-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; margin-left: 6px; }
+  .mult-jogo { font-size: 11px; color: var(--text2); padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+  .mult-jogo:last-child { border-bottom: none; padding-bottom: 0; }
+  .mj-nome { flex: 1; }
+  .mj-badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; }
+
+  /* Stats */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .stat { background: var(--bg2); border-radius: 10px; padding: 12px; text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 600; color: var(--text); }
+  .stat-lbl { font-size: 10px; color: var(--text2); margin-top: 3px; }
+
+  /* Relatório */
+  .rel-card { background: var(--bg2); border-radius: 10px; padding: 12px; border: 1px solid var(--border); margin-bottom: 10px; }
+  .rel-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+  .rel-item { font-size: 11px; color: var(--text2); padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+  .rel-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+  .dot-green { background: var(--green); }
+  .dot-amber { background: var(--amber); }
+
+  /* Nav */
+  .nav { display: flex; border-top: 1px solid var(--border); padding: 8px 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); background: var(--bg); }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--text2); cursor: pointer; padding: 4px 0; }
+  .nav-item.active { color: var(--green); }
+  .nav-icon { font-size: 22px; }
+
+  /* Empty */
+  .empty { text-align: center; padding: 40px 20px; color: var(--text2); font-size: 13px; }
+
+  /* Loading */
+  .loading { text-align: center; padding: 30px; color: var(--text3); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Tela de boas-vindas -->
+  <div id="v-welcome" style="display:flex;flex-direction:column;flex:1;">
+    <div class="welcome">
+      <div class="logo-big">Odd<span>Lab</span></div>
+      <div class="welcome-sub">análise de apostas esportivas<br>para te ajudar a apostar melhor</div>
+      <div style="width:100%;display:flex;flex-direction:column;gap:12px;">
+        <input class="welcome-input" type="text" id="inp-nome" placeholder="qual é o seu nome?" maxlength="30" />
+        <button class="btn-entrar" onclick="entrar()">entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App principal -->
+  <div id="v-app" style="display:none;flex-direction:column;flex:1;">
+    <div class="header">
+      <div>
+        <div class="greeting" id="greeting">olá!</div>
+        <div class="dateline" id="dateline"></div>
+      </div>
+      <div class="logo-sm">Odd<span>Lab</span></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('apostas')">apostas</div>
+      <div class="tab" onclick="switchTab('relatorio')">relatório</div>
+    </div>
+
+    <!-- Aba apostas -->
+    <div id="tab-apostas" class="content">
+      <div class="day-sel">
+        <button class="day-btn" onclick="switchDay('ontem')">ontem</button>
+        <button class="day-btn active" onclick="switchDay('hoje')">hoje</button>
+        <button class="day-btn" onclick="switchDay('amanha')">amanhã</button>
+      </div>
+      <div class="subtabs">
+        <button class="subtab active" onclick="switchSub('simples')">simples</button>
+        <button class="subtab" onclick="switchSub('multiplas')">múltiplas</button>
+      </div>
+
+      <div id="sub-simples">
+        <div class="section">
+          <div class="section-title" id="day-label">hoje</div>
+          <div id="lista-jogos"><div class="loading">carregando...</div></div>
+        </div>
+      </div>
+
+      <div id="sub-multiplas" style="display:none">
+        <div class="section">
+          <div class="section-title" id="mult-label">múltiplas de hoje</div>
+          <div id="lista-multiplas"><div class="loading">carregando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aba relatório -->
+    <div id="tab-relatorio" class="content" style="display:none">
+      <div class="section">
+        <div id="stats-rel"><div class="loading">carregando...</div></div>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-item active" onclick="switchTab('apostas')" id="nav-apostas">
+        <span class="nav-icon">⚽</span>apostas
+      </div>
+      <div class="nav-item" onclick="switchTab('relatorio')" id="nav-relatorio">
+        <span class="nav-icon">📊</span>relatório
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const B = 'https://apostas-app.onrender.com';
+const DIAS_PT = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+const MESES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+let diaAtivo = 'hoje';
+let subAtivo = 'simples';
+let cacheData = {};
+
+function hojeStr() {
+  const d = new Date();
+  const br = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  return br.toISOString().substring(0, 10);
+}
+function offsetStr(dias) {
+  const d = new Date();
+  const br = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  br.setDate(br.getDate() + dias);
+  return br.toISOString().substring(0, 10);
+}
+function fmtData(str) {
+  const [y,m,d] = str.split('-');
+  return `${d}/${m}`;
+}
+
+// Device ID persistente
+function getDeviceId() {
+  let id = localStorage.getItem('oddlab_device');
+  if (!id) { id = 'dev_' + Math.random().toString(36).substr(2, 12) + Date.now(); localStorage.setItem('oddlab_device', id); }
+  return id;
+}
+
+async function entrar() {
+  const nome = document.getElementById('inp-nome').value.trim();
+  if (!nome) { document.getElementById('inp-nome').focus(); return; }
+  const deviceId = getDeviceId();
+  try {
+    await fetch(`${B}/oddlab/registrar`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome, device_id: deviceId })
+    });
+  } catch(e) {}
+  localStorage.setItem('oddlab_nome', nome);
+  iniciarApp(nome);
+}
+
+async function verificarUsuario() {
+  const deviceId = getDeviceId();
+  const nomeSalvo = localStorage.getItem('oddlab_nome');
+  if (nomeSalvo) { iniciarApp(nomeSalvo); return; }
+  try {
+    const r = await fetch(`${B}/oddlab/usuario/${deviceId}`);
+    const d = await r.json();
+    if (d.ok && d.nome) { localStorage.setItem('oddlab_nome', d.nome); iniciarApp(d.nome); }
+  } catch(e) {}
+}
+
+function iniciarApp(nome) {
+  document.getElementById('v-welcome').style.display = 'none';
+  document.getElementById('v-app').style.display = 'flex';
+
+  document.getElementById('greeting').textContent = `olá, ${nome}`;
+  const hoje = new Date();
+  const br = new Date(hoje.getTime() - 3 * 60 * 60 * 1000);
+  const d = String(br.getDate()).padStart(2,'0');
+  const m = String(br.getMonth()+1).padStart(2,'0');
+  document.getElementById('dateline').textContent = `${d}/${m} · ${DIAS_PT[br.getDay()]}`;
+
+  carregarDia('hoje');
+  carregarRelatorio();
+}
+
+async function carregarDia(dia) {
+  const dataStr = dia === 'hoje' ? hojeStr() : dia === 'ontem' ? offsetStr(-1) : offsetStr(1);
+  if (cacheData[dia]) { renderDia(dia, cacheData[dia]); return; }
+  try {
+    const r = await fetch(`${B}/apostas-resultado/${dataStr}`);
+    const d = await r.json();
+    cacheData[dia] = d;
+    renderDia(dia, d);
+  } catch(e) {
+    document.getElementById('lista-jogos').innerHTML = '<div class="empty">erro ao carregar</div>';
+  }
+}
+
+function renderDia(dia, data) {
+  const jogos = data.apostas?.jogos || [];
+  const resultados = data.resultados?.apostas || [];
+  const dataStr = dia === 'hoje' ? hojeStr() : dia === 'ontem' ? offsetStr(-1) : offsetStr(1);
+
+  const labels = { ontem: `ontem — ${fmtData(offsetStr(-1))}`, hoje: `hoje — ${fmtData(hojeStr())}`, amanha: `amanhã — ${fmtData(offsetStr(1))}` };
+  const mlabels = { ontem: `múltiplas de ontem`, hoje: `múltiplas de hoje`, amanha: `múltiplas de amanhã` };
+  document.getElementById('day-label').textContent = labels[dia];
+  document.getElementById('mult-label').textContent = mlabels[dia];
+
+  if (!jogos.length) {
+    document.getElementById('lista-jogos').innerHTML = `<div class="empty">sem apostas para ${labels[dia].split('—')[0].trim()}</div>`;
+  } else {
+    document.getElementById('lista-jogos').innerHTML = jogos.map(j => {
+      const res = resultados.find(r => r.jogo_id === j.id);
+      const rv = res?.resultado_aposta || 'pendente';
+      const placar = res?.placar ? ` · ${res.placar}` : '';
+      let badgeHtml = '';
+      if (rv === 'green') badgeHtml = `<span class="badge b-green">✓ green${placar}</span>`;
+      else if (rv === 'red') badgeHtml = `<span class="badge b-red">✗ red${placar}</span>`;
+      else if (dia === 'amanha') badgeHtml = `<span class="badge b-amanha">${fmtData(dataStr)}</span>`;
+      else badgeHtml = `<span class="badge b-pending">⏳ pendente</span>`;
+      return `<div class="card">
+        <div class="jogo-top"><div class="jogo-nome">${j.time_casa} x ${j.time_fora}</div>${badgeHtml}</div>
+        <div class="jogo-aposta">${j.aposta} · odd ${j.odd||'?'}</div>
+        <div class="jogo-meta">${j.liga} · ${j.horario}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Múltiplas
+  const mult = data.multiplas;
+  const resM = data.resultados_multiplas;
+  if (!mult?.multipla_a) {
+    document.getElementById('lista-multiplas').innerHTML = '<div class="empty">sem múltiplas para este dia</div>';
+  } else {
+    const renderMult = (m, res, label) => {
+      if (!m) return '';
+      const rv = res?.resultado || 'pendente';
+      const oddCls = rv === 'green' ? 'green' : rv === 'red' ? 'red' : 'pending';
+      const icon = rv === 'green' ? ' ✓' : rv === 'red' ? ' ✗' : ' ⏳';
+      const jogosHtml = (m.jogos || []).map(j => {
+        const jr = res?.jogos_resultado?.find(x => x.time_casa === j.time_casa);
+        const jrv = jr?.resultado || 'pendente';
+        const jbadge = jrv === 'green' ? `<span class="mj-badge b-green">✓</span>` : jrv === 'red' ? `<span class="mj-badge b-red">✗</span>` : '';
+        return `<div class="mult-jogo"><span class="mj-nome">${j.time_casa} x ${j.time_fora} · ${j.aposta}</span>${jbadge}</div>`;
+      }).join('');
+      return `<div class="mult-card">
+        <div class="mult-header">
+          <div class="mult-title">${label}</div>
+          <div class="mult-odd ${oddCls}">@${m.odd_total}${icon}</div>
+        </div>
+        ${jogosHtml}
+      </div>`;
+    };
+    document.getElementById('lista-multiplas').innerHTML =
+      renderMult(mult.multipla_a, resM?.multipla_a, 'múltipla A') +
+      renderMult(mult.multipla_b, resM?.multipla_b, 'múltipla B');
+  }
+}
+
+async function carregarRelatorio() {
+  try {
+    // Buscar últimos 7 dias para calcular assertividade
+    const promises = [-6,-5,-4,-3,-2,-1,0].map(i => fetch(`${B}/apostas-resultado/${offsetStr(i)}`).then(r=>r.json()).catch(()=>null));
+    const dias = await Promise.all(promises);
+    let tG=0, tR=0, relTexto = '';
+
+    for (const dia of dias.filter(Boolean)) {
+      const res = dia.resultados?.apostas || [];
+      tG += res.filter(r=>r.resultado_aposta==='green').length;
+      tR += res.filter(r=>r.resultado_aposta==='red').length;
+    }
+
+    const assert = tG+tR > 0 ? Math.round(tG/(tG+tR)*100) : null;
+
+    // Buscar relatório semanal do banco
+    try {
+      const rRel = await fetch(`${B}/calibracao?tipo=semanal&limit=1`);
+      const dRel = await rRel.json();
+      if (dRel?.[0]?.relatorio) relTexto = dRel[0].relatorio;
+    } catch(e) {}
+
+    // Processar relatório — separar positivos e pontos a melhorar
+    const linhas = relTexto ? relTexto.split('\n').filter(l => l.trim()) : [];
+    const positivos = linhas.filter(l => !l.toLowerCase().includes('melhor') && !l.toLowerCase().includes('atenção') && !l.toLowerCase().includes('red') && l.length > 20).slice(0,4);
+    const melhorar = linhas.filter(l => l.toLowerCase().includes('melhor') || l.toLowerCase().includes('atenção') || l.toLowerCase().includes('pivotar')).slice(0,2);
+
+    document.getElementById('stats-rel').innerHTML = `
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-val" style="color:${assert>=60?'var(--green)':'var(--amber)'}">${assert !== null ? assert+'%' : '--'}</div>
+          <div class="stat-lbl">assertividade semana</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">${tG}<span style="font-size:13px;color:var(--text2)">G</span> ${tR}<span style="font-size:13px;color:var(--text2)">R</span></div>
+          <div class="stat-lbl">resultados semana</div>
+        </div>
+      </div>
+      ${positivos.length > 0 ? `
+      <div class="rel-card">
+        <div class="rel-title">destaques da semana</div>
+        ${positivos.map(l=>`<div class="rel-item"><div class="dot dot-green"></div><div>${l.replace(/^[-•*]\s*/,'')}</div></div>`).join('')}
+      </div>` : ''}
+      ${melhorar.length > 0 ? `
+      <div class="rel-card">
+        <div class="rel-title">pontos a melhorar</div>
+        ${melhorar.map(l=>`<div class="rel-item"><div class="dot dot-amber"></div><div>${l.replace(/^[-•*]\s*/,'')}</div></div>`).join('')}
+      </div>` : ''}
+      ${!positivos.length && !melhorar.length ? '<div class="empty">relatório semanal ainda não disponível</div>' : ''}
+    `;
+  } catch(e) {
+    document.getElementById('stats-rel').innerHTML = '<div class="empty">erro ao carregar relatório</div>';
+  }
+}
+
+function switchDay(dia) {
+  diaAtivo = dia;
+  document.querySelectorAll('.day-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['ontem','hoje','amanha'][i] === dia);
+  });
+  carregarDia(dia);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0&&tab==='apostas')||(i===1&&tab==='relatorio'));
+  });
+  document.getElementById('tab-apostas').style.display = tab==='apostas' ? 'block' : 'none';
+  document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? 'block' : 'none';
+  document.getElementById('nav-apostas').classList.toggle('active', tab==='apostas');
+  document.getElementById('nav-relatorio').classList.toggle('active', tab==='relatorio');
+}
+
+function switchSub(sub) {
+  subAtivo = sub;
+  document.querySelectorAll('.subtab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0&&sub==='simples')||(i===1&&sub==='multiplas'));
+  });
+  document.getElementById('sub-simples').style.display = sub==='simples' ? 'block' : 'none';
+  document.getElementById('sub-multiplas').style.display = sub==='multiplas' ? 'block' : 'none';
+}
+
+// Iniciar
+verificarUsuario();
+</script>
+</body>
+</html>
