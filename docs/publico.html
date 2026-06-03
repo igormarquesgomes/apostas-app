@@ -386,15 +386,34 @@ async function carregarRelatorio() {
 
     // Buscar relatório semanal do banco
     try {
-      const rRel = await fetch(`${B}/calibracao?tipo=semanal&limit=1`);
+      const rRel = await fetch(`${B}/calibracao`);
       const dRel = await rRel.json();
-      if (dRel?.[0]?.relatorio) relTexto = dRel[0].relatorio;
+      // Preferir semanal, fallback para diário
+      const rel = dRel?.semanal || dRel?.diario;
+      if (rel?.relatorio) relTexto = rel.relatorio;
     } catch(e) {}
 
-    // Processar relatório — separar positivos e pontos a melhorar
-    const linhas = relTexto ? relTexto.split('\n').filter(l => l.trim()) : [];
-    const positivos = linhas.filter(l => !l.toLowerCase().includes('melhor') && !l.toLowerCase().includes('atenção') && !l.toLowerCase().includes('red') && l.length > 20).slice(0,4);
-    const melhorar = linhas.filter(l => l.toLowerCase().includes('melhor') || l.toLowerCase().includes('atenção') || l.toLowerCase().includes('pivotar')).slice(0,2);
+    // Processar relatório — extrair destaques positivos e pontos a melhorar
+    const linhas = relTexto ? relTexto.split('\n').filter(l => l.trim().length > 15) : [];
+    // Positivos: linhas que falam de acerto, padrão, mercado bom
+    const positivos = linhas.filter(l => {
+      const ll = l.toLowerCase();
+      return (ll.includes('acert') || ll.includes('green') || ll.includes('identif') ||
+              ll.includes('padrão') || ll.includes('padrao') || ll.includes('mercado') ||
+              ll.includes('assertiv') || ll.includes('destaque') || ll.includes('perform'))
+             && !ll.includes('melhor') && !ll.includes('atenção') && !ll.includes('erro');
+    }).slice(0, 4);
+    // Pontos a melhorar
+    const melhorar = linhas.filter(l => {
+      const ll = l.toLowerCase();
+      return ll.includes('melhor') || ll.includes('atenção') || ll.includes('atencao') ||
+             ll.includes('pivotar') || ll.includes('red flag') || ll.includes('cuidado') ||
+             ll.includes('evitar') || ll.includes('revisar');
+    }).slice(0, 3);
+    // Se não classificou nada, pega as primeiras linhas como destaques
+    if (!positivos.length && linhas.length > 0) {
+      positivos.push(...linhas.slice(0, 4));
+    }
 
     const pct = assert !== null ? assert : 0;
     const barW = Math.min(pct, 100);
