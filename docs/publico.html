@@ -361,7 +361,8 @@ function renderDia(dia, data) {
         const jr = res?.jogos_resultado?.find(x => x.time_casa === j.time_casa);
         const jrv = jr?.resultado || 'pendente';
         const jbadge = jrv === 'green' ? `<span class="mj-badge b-green">✓</span>` : jrv === 'red' ? `<span class="mj-badge b-red">✗</span>` : '';
-        return `<div class="mult-jogo"><span class="mj-nome">${j.time_casa} x ${j.time_fora} · ${j.aposta}</span>${jbadge}</div>`;
+        const oddJ = j.odd && j.odd > 0 ? `<span style="font-size:9px;font-weight:600;color:#0F766E;background:#F0FDFA;padding:1px 5px;border-radius:4px;border:1px solid #99F6E4;margin-left:4px">${parseFloat(j.odd).toFixed(2)}</span>` : '';
+        return `<div class="mult-jogo"><span class="mj-nome">${j.time_casa} x ${j.time_fora} · ${j.aposta}${oddJ}</span>${jbadge}</div>`;
       }).join('');
       return `<div class="mult-card">
         <div class="mult-header">
