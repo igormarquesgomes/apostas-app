@@ -2055,43 +2055,71 @@ async function agentDiario(data) {
   const resultados = row.resultados?.apostas || [];
   const g = resultados.filter(r=>r.resultado_aposta==='green').length;
   const r = resultados.filter(r=>r.resultado_aposta==='red').length;
+  const p = resultados.filter(r=>r.resultado_aposta==='pendente').length;
   const total = g + r;
   const assert = total > 0 ? ((g/total)*100).toFixed(2) : 0;
 
-  // Montar detalhes com alternativas para jogos RED
-  const detalhes = resultados.map(r => {
-    const a = apostas.find(x=>x.id===r.jogo_id);
-    let linha = `- ${r.time_casa} x ${r.time_fora}: ${a?.aposta||r.aposta} → ${r.resultado_aposta?.toUpperCase()} (${r.placar||'-'}) | ${r.motivo}`;
+  // Só incluir jogos validados no relatório — pendentes não têm resultado para analisar
+  const resultadosValidados = resultados.filter(r => ['green','red','cancelado'].includes(r.resultado_aposta));
 
-    // Para jogos RED, calcular mercados alternativos que teriam dado green
-    if (r.resultado_aposta === 'red' && r.placar) {
+  // Calcular mercados alternativos para TODOS os jogos (não só RED)
+  // Isso gera padrões por liga
+  const padroesPorLiga = {};
+  const detalhes = resultadosValidados.map(r => {
+    const a = apostas.find(x=>x.id===r.jogo_id);
+    let linha = `- ${r.time_casa} x ${r.time_fora} [${a?.liga||'?'}]: ${a?.aposta||r.aposta} → ${r.resultado_aposta?.toUpperCase()} (${r.placar||'-'})`;
+
+    if (r.placar) {
       const alts = calcularAlternativas(a || r, r.placar, null);
-      // Remover a aposta que já foi feita das alternativas
       const apostaFeita = (a?.aposta || r.aposta || '').toLowerCase();
       const altsFiltradas = alts.filter(alt => !apostaFeita.includes(alt.split(' ')[0].toLowerCase()));
-      if (altsFiltradas.length > 0) {
-        linha += `\n  💡 Alternativas que dariam GREEN: ${altsFiltradas.slice(0,3).join(' | ')}`;
+
+      // Acumular padrões por liga
+      const liga = a?.liga || 'Outras';
+      if (!padroesPorLiga[liga]) padroesPorLiga[liga] = { mercados: {}, total: 0 };
+      padroesPorLiga[liga].total++;
+      alts.forEach(alt => {
+        const mercado = alt.split(' ').slice(0,3).join(' ');
+        padroesPorLiga[liga].mercados[mercado] = (padroesPorLiga[liga].mercados[mercado] || 0) + 1;
+      });
+
+      if (r.resultado_aposta === 'red' && altsFiltradas.length > 0) {
+        linha += `\n  💡 Teria dado GREEN: ${altsFiltradas.slice(0,3).join(' | ')}`;
       }
     }
     return linha;
   }).join('\n');
 
+  // Padrões identificados por liga (mercados que mais dariam green)
+  const padroesTexto = Object.entries(padroesPorLiga)
+    .filter(([,v]) => v.total >= 1)
+    .map(([liga, v]) => {
+      const top = Object.entries(v.mercados)
+        .sort((a,b) => b[1]-a[1])
+        .slice(0,3)
+        .map(([m,n]) => `${m} (${n}/${v.total} jogos)`);
+      return `  ${liga}: ${top.join(' | ')}`;
+    }).join('\n');
+
   // Identificar jogos com confiança baixa (potenciais red flags)
   const baixaConfianca = apostas.filter(a => a.confianca === 'baixa').map(a => `${a.time_casa} x ${a.time_fora}`);
 
-  const promptDiario = `Analise as apostas do dia ${data}. Assertividade: ${assert}% (${g} green, ${r} red).
+  const promptDiario = `Analise as apostas do dia ${data}. Assertividade: ${assert}% (${g} green, ${r} red${p>0?`, ${p} ainda pendentes`:''}). Analise apenas os jogos já validados.
 
-RESULTADOS:
+RESULTADOS (com mercados alternativos que teriam dado GREEN):
 ${detalhes}
 
-${baixaConfianca.length > 0 ? `JOGOS COM BAIXA CONFIANÇA (red flags): ${baixaConfianca.join(', ')}` : ''}
+${padroesTexto ? `PADRÕES IDENTIFICADOS POR LIGA (mercados que mais dariam GREEN hoje):\n${padroesTexto}` : ''}
+
+${baixaConfianca.length > 0 ? `JOGOS COM BAIXA CONFIANÇA: ${baixaConfianca.join(', ')}` : ''}
 
 INSTRUÇÕES:
-1. Identifique padrões de erro nos jogos RED
-2. Para os jogos RED que tiveram alternativas disponíveis, analise quais mercados (escanteios, cartões, resultado) seriam mais seguros
-3. Sugira: em jogos com dificuldade de aposta segura, quais mercados têm mais histórico de acerto?
-4. Registre padrões de "red flag" — situações em que é melhor ir para mercados alternativos
-Máx 400 palavras.`;
+1. Para cada liga com jogos RED, identifique qual mercado teria sido mais seguro
+2. Destaque padrões recorrentes: ex. "Liga X tem historicamente Under 2.5 em 3/3 jogos hoje"
+3. Para apostas de confiança baixa, sugira o mercado alternativo mais seguro baseado nos padrões
+4. Identifique red flags: ligas ou tipos de jogo onde é melhor pivotar para mercados alternativos
+5. Seja específico com números — ex. "Over 2.5 gols daria GREEN em 5 dos 7 jogos hoje"
+Máx 500 palavras.`;
 
   // Incluir resultado das múltiplas no relatório
   const rowM = await dbGetComMultiplas(data);
@@ -2472,12 +2500,20 @@ async function rotinaMultiplas() {
 
     const multiplas = row?.multiplas;
     const mA = multiplas?.multipla_a, mB = multiplas?.multipla_b;
-    const validas = mA?.odd_total > 0 && mB?.odd_total > 0 && mA?.jogos?.length > 0;
+    // Verificar se odds são válidas E se os jogos são reais (não indefinidos/nulos)
+    const jogoValido = j => j?.time_casa && j?.time_fora && j?.aposta && j?.odd > 0;
+    const mAValida = mA?.odd_total > 0 && mA?.jogos?.length > 0 && mA.jogos.every(jogoValido);
+    const mBValida = mB?.odd_total > 0 && mB?.jogos?.length > 0 && mB.jogos.every(jogoValido);
+    const validas = mAValida && mBValida;
 
     if (validas) {
       console.log(`✅ ${diaAlvo}: múltiplas OK — A:${mA.odd_total} B:${mB.odd_total}`);
       continue;
     }
+
+    // Log detalhado do problema
+    if (!mAValida) console.log(`⚠️ ${diaAlvo}: Múltipla A inválida — odd:${mA?.odd_total||0} jogos:${mA?.jogos?.length||0}`);
+    if (!mBValida) console.log(`⚠️ ${diaAlvo}: Múltipla B inválida — odd:${mB?.odd_total||0} jogos:${mB?.jogos?.length||0}`);
 
     console.log(`🔄 ${diaAlvo}: ${!multiplas ? 'sem múltiplas' : 'múltiplas inválidas'} — gerando...`);
     try {
