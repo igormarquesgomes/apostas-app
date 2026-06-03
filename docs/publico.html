@@ -39,11 +39,13 @@
   .btn-entrar:active { opacity: 0.85; }
 
   /* Header */
-  .header { padding: 16px 16px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
-  .greeting { font-size: 18px; font-weight: 600; color: var(--text); }
-  .dateline { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .header { padding: 16px 16px 14px; border-bottom: 1px solid var(--border); }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .logo-sm { font-size: 13px; font-weight: 600; color: var(--text3); }
   .logo-sm span { color: var(--green); }
+  .greeting { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+  .greeting-nome { color: var(--green); }
+  .dateline { font-size: 12px; color: var(--text2); margin-top: 2px; }
 
   /* Day selector */
   .day-sel { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
@@ -137,11 +139,11 @@
   <!-- App principal -->
   <div id="v-app" style="display:none;flex-direction:column;flex:1;">
     <div class="header">
-      <div>
-        <div class="greeting" id="greeting">olá!</div>
+      <div class="header-top">
+        <div class="logo-sm">Odd<span>Lab</span></div>
         <div class="dateline" id="dateline"></div>
       </div>
-      <div class="logo-sm">Odd<span>Lab</span></div>
+      <div class="greeting" id="greeting">olá! 👋</div>
     </div>
 
     <div class="tabs">
@@ -256,7 +258,7 @@ function iniciarApp(nome) {
   document.getElementById('v-welcome').style.display = 'none';
   document.getElementById('v-app').style.display = 'flex';
 
-  document.getElementById('greeting').textContent = `olá, ${nome}`;
+  document.getElementById('greeting').innerHTML = `olá, <span class="greeting-nome">${nome}</span> 👋`;
   const hoje = new Date();
   const br = new Date(hoje.getTime() - 3 * 60 * 60 * 1000);
   const d = String(br.getDate()).padStart(2,'0');
@@ -271,10 +273,16 @@ async function carregarDia(dia) {
   const dataStr = dia === 'hoje' ? hojeStr() : dia === 'ontem' ? offsetStr(-1) : offsetStr(1);
   if (cacheData[dia]) { renderDia(dia, cacheData[dia]); return; }
   try {
-    const r = await fetch(`${B}/apostas-resultado/${dataStr}`);
-    const d = await r.json();
-    cacheData[dia] = d;
-    renderDia(dia, d);
+    const [rAp, rMult] = await Promise.all([
+      fetch(`${B}/apostas-resultado/${dataStr}`).then(r=>r.json()),
+      fetch(`${B}/multiplas/${dataStr}`).then(r=>r.json()).catch(()=>null)
+    ]);
+    if (rMult) {
+      rAp.multiplas = rMult.multiplas;
+      rAp.resultados_multiplas = rMult.resultados_multiplas;
+    }
+    cacheData[dia] = rAp;
+    renderDia(dia, rAp);
   } catch(e) {
     document.getElementById('lista-jogos').innerHTML = '<div class="empty">erro ao carregar</div>';
   }
