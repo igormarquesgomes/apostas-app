@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>OddLab</title>
 <meta name="application-name" content="OddLab">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -339,7 +342,14 @@ function renderDia(dia, data) {
       return `<div class="card ${cardCls}">
         <div class="jogo-top"><div class="jogo-nome">${j.time_casa} x ${j.time_fora}</div>${badgeHtml}</div>
         <div class="jogo-aposta" style="margin-bottom:5px">${j.aposta}</div>
-        ${j.justificativa ? `<div style="font-size:10px;color:#64748B;line-height:1.5;margin-bottom:5px;padding:6px 8px;background:#F8FAFC;border-radius:6px;border-left:2px solid #CBD5E1">${j.justificativa}</div>` : ''}
+        ${j.justificativa ? `
+        <div style="margin-bottom:5px">
+          <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.arr').textContent=this.nextElementSibling.style.display==='none'?'▸':'▾'"
+            style="font-size:10px;color:#0F766E;background:none;border:none;cursor:pointer;padding:0;font-family:Inter,sans-serif;display:flex;align-items:center;gap:4px">
+            <span class="arr">▸</span> por que essa aposta?
+          </button>
+          <div style="display:none;font-size:10px;color:#64748B;line-height:1.5;margin-top:5px;padding:6px 8px;background:#F0FDFA;border-radius:6px;border-left:2px solid #99F6E4">${j.justificativa}</div>
+        </div>` : ''}
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           ${oddStr ? `<span style="font-size:10px;font-weight:600;color:#0F766E;background:#F0FDFA;padding:1px 7px;border-radius:5px;border:1px solid #99F6E4">${oddStr}</span>` : ''}
           ${confHtml}
