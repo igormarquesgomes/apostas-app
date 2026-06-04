@@ -85,9 +85,18 @@ async function testarSoEstrela() {
   log('─────────────────────────────────────────────', 'dim');
 
   try {
-    // Endpoint correto conforme documentação
-    const url = `https://api.oddspapi.io/v4/odds?apiKey=${KEY}&bookmakers=estrelabet&sportId=10`;
-    log(`\n📡 GET /v4/odds?bookmakers=estrelabet&sportId=10`, 'info');
+    // Passo 1: buscar fixtures primeiro
+    log(`\n📡 STEP 1 — Buscando fixtures hoje/amanhã...`, 'info');
+    const urlFix = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${hoje()}&to=${amanha()}&apiKey=${KEY}`;
+    const dataFix = await get(urlFix);
+    const allFix = dataFix.fixtures || dataFix.data || (Array.isArray(dataFix)?dataFix:[]);
+    const comOdds = allFix.filter(f => f.hasOdds===true||f.has_odds===true);
+    log(`  Total fixtures: ${allFix.length} | com hasOdds=true: ${comOdds.length}`, comOdds.length>0?'ok':'warn');
+    if (comOdds.length === 0) { log('⚠️ Nenhum fixture com hasOdds=true', 'warn'); document.getElementById('btn-run').disabled=false; return; }
+    // Passo 2: buscar odds da Estrela Bet para o primeiro fixture
+    const fid = comOdds[0].fixtureId || comOdds[0].id;
+    log(`\n📡 STEP 2 — Buscando odds Estrela Bet para fixtureId: ${fid}`, 'info');
+    const url = `https://api.oddspapi.io/v4/odds?apiKey=${KEY}&bookmakers=estrelabet&fixtureId=${fid}`;
     const data = await get(url);
 
     log(`\n📦 Estrutura da resposta:`, 'info');
