@@ -1617,7 +1617,18 @@ async function buscarStatsFixture(fixtureId) {
 function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   const total = golsCasa + golsFora;
   const aposta = jogo.aposta?.toLowerCase() || '';
-  const mercado = jogo.mercado?.toLowerCase() || '';
+  // Inferir mercado pela aposta — evita erro quando mercado salvo está errado
+  const inferirMercadoVerif = (m, a) => {
+    const al = (a||'').toLowerCase();
+    if (al.includes('marca') || al.includes('to score') || al.includes('anytime') ||
+        al.includes('over') || al.includes('under') || al.includes('ambas') ||
+        al.includes('ambos') || al.includes('btts') || al.includes('menos de') ||
+        al.includes('mais de')) return 'gols';
+    if (al.includes('escanteio') || al.includes('corner')) return 'escanteios';
+    if (al.includes('cartao') || al.includes('cartao') || al.includes('amarelo')) return 'cartoes';
+    return m || 'resultado';
+  };
+  const mercado = inferirMercadoVerif(jogo.mercado?.toLowerCase(), jogo.aposta);
   const casaVence = golsCasa > golsFora;
   const foraVence = golsFora > golsCasa;
   const empate = golsCasa === golsFora;
