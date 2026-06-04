@@ -250,7 +250,7 @@ function processar(dias,h){
     const apR=ap.map(a=>{
       const r=res.find(x=>x.jogo_id===a.id);
       const rv=r?.resultado_aposta||'pendente';
-      if(rv==='green'){dG++;tG++;}else if(rv==='red'){dR++;tR++;}else dP++;
+      if(rv==='green'){dG++;tG++;}else if(rv==='red'){dR++;tR++;}else if(rv==='cancelado'){/* reembolso — não conta */}else dP++;
       const lg=a.liga||'Outras';
       if(!ligasMap[lg])ligasMap[lg]={green:0,red:0,total:0};
       if(rv==='green')ligasMap[lg].green++;else if(rv==='red')ligasMap[lg].red++;
