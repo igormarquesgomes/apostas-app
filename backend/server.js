@@ -1452,6 +1452,7 @@ async function validarMultipla(multipla, resultadosApostas) {
       console.log(`  ⚠️ Não encontrado: "${j.time_casa}" x "${j.time_fora}"`);
       return 'nao_encontrado';
     }
+    if (res.resultado_aposta === 'cancelado') return 'cancelado';
     if (res.resultado_aposta === 'pendente' || !res.placar) return 'pendente';
     const [gC, gF] = res.placar.split('-').map(Number);
     // Inferir mercado pela aposta quando não está definido
@@ -1510,11 +1511,14 @@ async function validarMultipla(multipla, resultadosApostas) {
 
   // Converter nao_encontrado restantes para pendente
   const resultadosFinais = resultadosJogos.map(r => r === 'nao_encontrado' ? 'pendente' : r);
-  const todosGreen = resultadosFinais.every(r => r === 'green');
-  const algumRed = resultadosFinais.some(r => r === 'red');
+  // Cancelados não contam — filtrar para o cálculo
+  const paraCalculo = resultadosFinais.filter(r => r !== 'cancelado');
+  const todosGreen = paraCalculo.length > 0 && paraCalculo.every(r => r === 'green');
+  const algumRed = paraCalculo.some(r => r === 'red');
+  const temPendente = paraCalculo.some(r => r === 'pendente');
 
   return {
-    resultado: algumRed ? 'red' : todosGreen ? 'green' : 'pendente',
+    resultado: algumRed ? 'red' : todosGreen ? 'green' : temPendente ? 'pendente' : paraCalculo.length === 0 ? 'cancelado' : 'pendente',
     jogos_resultado: multipla.jogos.map((j, i) => ({
       ...j,
       resultado: resultadosFinais[i]
