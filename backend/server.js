@@ -1661,10 +1661,10 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
       return ambos ? 'green' : 'red';
     }
     // Time marca primeiro / anytime
-    if (aposta.includes('marca') || aposta.includes('to score') || aposta.includes('anytime')) {
+    if (apostaNorm.includes('marca') || apostaNorm.includes('to score') || apostaNorm.includes('anytime')) {
       // Mandante/visitante genérico
-      if (aposta.includes('visitante') || aposta.includes('away team') || aposta.includes('away to score')) return golsFora > 0 ? 'green' : 'red';
-      if (aposta.includes('mandante') || aposta.includes('home team') || aposta.includes('home to score')) return golsCasa > 0 ? 'green' : 'red';
+      if (apostaNorm.includes('visitante') || apostaNorm.includes('away team') || apostaNorm.includes('away to score')) return golsFora > 0 ? 'green' : 'red';
+      if (apostaNorm.includes('mandante') || apostaNorm.includes('home team') || apostaNorm.includes('home to score')) return golsCasa > 0 ? 'green' : 'red';
       // Por nome do time
       if (palavrasCasa.some(p => apostaNorm.includes(p))) return golsCasa > 0 ? 'green' : 'red';
       if (palavrasFora.some(p => apostaNorm.includes(p))) return golsFora > 0 ? 'green' : 'red';
@@ -1793,10 +1793,31 @@ async function agentValidar(data) {
     let placar = null, golsCasa = null, golsFora = null, fixtureIdUsado = jogo.fixtureId || null;
 
     try {
+      let jogoEncontradoNaAPI = false; // Declarar no escopo externo
+
       // Tentar pelo fixtureId salvo
       if (jogo.fixtureId) {
         const res = await buscarResultadoFixture(jogo.fixtureId);
-        if (res) { placar = res.placar; golsCasa = res.golsCasa; golsFora = res.golsFora; }
+        if (res) {
+          placar = res.placar; golsCasa = res.golsCasa; golsFora = res.golsFora;
+        } else {
+          // fixtureId existe mas jogo não terminou — API encontrou o jogo
+          jogoEncontradoNaAPI = true;
+          // Verificar se foi adiado/suspenso
+          try {
+            const resRaw = await fetch(`https://v3.football.api-sports.io/fixtures?id=${jogo.fixtureId}`,
+              { headers: { 'x-apisports-key': APIFOOTBALL_KEY } });
+            const rawJson = await resRaw.json();
+            const f = rawJson.response?.[0];
+            const statusShort = f?.fixture?.status?.short;
+            const statusLong = f?.fixture?.status?.long || '';
+            if (['PST','CANC','ABD','AWD','WO'].includes(statusShort)) {
+              console.log(`    ⚠️ Jogo adiado/cancelado: ${statusShort} — ${statusLong}`);
+              resultados.push({ encontrado: false, placar: null, resultado_aposta: 'cancelado', motivo: `Jogo ${statusShort}: ${statusLong}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+              continue;
+            }
+          } catch(e) {}
+        }
         await sleep(300);
       }
 
@@ -1834,7 +1855,7 @@ async function agentValidar(data) {
         };
 
         // 2. Tentar pelo ligaId — busca em todos os status (inclusive em andamento)
-        let fixture = null, jogoEncontradoNaAPI = false;
+        let fixture = null;
         if (ligaIdResolvido) {
           const fixturasLiga = cacheFixtures.filter(f => f.league?.id === ligaIdResolvido);
           // Primeiro tenta FT
