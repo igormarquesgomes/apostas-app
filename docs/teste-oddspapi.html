@@ -13,9 +13,10 @@
   label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 4px; }
   input { width: 100%; padding: 10px 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace; margin-bottom: 12px; outline: none; }
   input:focus { border-color: #444; }
-  .btns { display: flex; gap: 8px; }
-  button { flex: 1; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { flex: 1; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; min-width: 120px; }
   button.sec { background: #1a1a1a; color: #888; border: 1px solid #222; }
+  button.green { background: #0F766E; color: #fff; }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
   .log { background: #000; border: 1px solid #1a1a1a; border-radius: 12px; padding: 14px; font-family: monospace; font-size: 12px; line-height: 1.8; min-height: 200px; max-height: 700px; overflow-y: auto; white-space: pre-wrap; }
   .ok { color: #4ADE80; }
@@ -30,302 +31,216 @@
 <body>
 
 <h1>Teste OddsPapi × Estrela Bet</h1>
-<div class="sub">Endpoint correto: /v4/odds?bookmakers=estrelabet&sportId=10</div>
+<div class="sub">Diagnóstico em 3 modos — use de cima para baixo</div>
 
 <div class="form">
   <label>OddsPapi API Key</label>
-  <input type="text" id="oddspapi-key" placeholder="cole sua chave aqui" />
-  <label>API-Football Key (opcional — para cruzamento Série B)</label>
-  <input type="text" id="apifootball-key" placeholder="cole sua chave aqui" />
+  <input type="text" id="key" placeholder="cole sua chave aqui" />
   <div class="btns">
-    <button id="btn-run" onclick="rodar()">▶ Rodar Diagnóstico</button>
-    <button class="sec" onclick="testarSoEstrela()">🎯 Só Estrela Bet</button>
+    <button onclick="verFixtures()">1️⃣ Ver todos fixtures</button>
+    <button class="sec" onclick="verOddsFixture()">2️⃣ Odds de um fixture</button>
+    <button class="green" onclick="testarEstrelaBet()">3️⃣ Buscar Estrela Bet</button>
+  </div>
+  <div style="margin-top:10px">
+    <label>fixtureId (para o teste 2)</label>
+    <input type="text" id="fixture-id" placeholder="ex: id1004237171889424" style="margin-bottom:0" />
   </div>
 </div>
 
 <div class="log" id="log">aguardando...</div>
-<button class="save-btn" onclick="salvar()">💾 Salvar resultado como JSON</button>
+<button class="save-btn" onclick="salvar()">💾 Salvar JSON</button>
 
 <script>
 let resultado = {};
-let logEl;
-
 function log(msg, cls='') {
-  logEl = logEl || document.getElementById('log');
+  const el = document.getElementById('log');
   const span = document.createElement('span');
   span.className = cls;
   span.textContent = msg + '\n';
-  if (logEl.textContent === 'aguardando...') logEl.textContent = '';
-  logEl.appendChild(span);
-  logEl.scrollTop = logEl.scrollHeight;
+  if (el.textContent === 'aguardando...') el.textContent = '';
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
 }
-
-async function get(url, headers={}) {
-  const r = await fetch(url, { headers });
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text().then(t=>t.substring(0,200))}`);
-  return r.json();
-}
-
-function norm(s) {
-  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+function clear() { document.getElementById('log').textContent = ''; resultado = {}; }
+async function get(url) {
+  const r = await fetch(url);
+  const txt = await r.text();
+  try { return JSON.parse(txt); }
+  catch(e) { throw new Error(`HTTP ${r.status}: ${txt.substring(0,300)}`); }
 }
 function hoje() { return new Date().toISOString().substring(0,10); }
 function amanha() { const d=new Date(); d.setDate(d.getDate()+1); return d.toISOString().substring(0,10); }
+function disableAll(v) { document.querySelectorAll('button').forEach(b=>b.disabled=v); }
 
-// ─── Teste focado só na Estrela Bet ──────────────────────────
-async function testarSoEstrela() {
-  const KEY = document.getElementById('oddspapi-key').value.trim();
-  if (!KEY) { alert('Cole a OddsPapi Key primeiro!'); return; }
-
-  document.getElementById('log').textContent = '';
-  document.getElementById('btn-run').disabled = true;
-  resultado = { gerado_em: new Date().toISOString(), modo: 'estrela_bet_only' };
-
-  log('🎯 TESTE FOCADO — Estrela Bet odds (sportId=10)', 'sec2');
-  log('─────────────────────────────────────────────', 'dim');
-
+// ── TESTE 1: Ver estrutura completa dos fixtures ──────────────
+async function verFixtures() {
+  const KEY = document.getElementById('key').value.trim();
+  if (!KEY) return alert('Cole a chave!');
+  clear(); disableAll(true);
+  log('1️⃣ LISTANDO TODOS OS FIXTURES HOJE/AMANHÃ', 'sec2');
+  log('─────────────────────────────────────────', 'dim');
   try {
-    // Passo 1: buscar fixtures primeiro
-    log(`\n📡 STEP 1 — Buscando fixtures hoje/amanhã...`, 'info');
-    const urlFix = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${hoje()}&to=${amanha()}&apiKey=${KEY}`;
-    const dataFix = await get(urlFix);
-    const allFix = dataFix.fixtures || dataFix.data || (Array.isArray(dataFix)?dataFix:[]);
-    const comOdds = allFix.filter(f => f.hasOdds===true||f.has_odds===true);
-    log(`  Total fixtures: ${allFix.length} | com hasOdds=true: ${comOdds.length}`, comOdds.length>0?'ok':'warn');
-    if (comOdds.length === 0) { log('⚠️ Nenhum fixture com hasOdds=true', 'warn'); document.getElementById('btn-run').disabled=false; return; }
-    // Passo 2: buscar odds da Estrela Bet para o primeiro fixture
-    const fid = comOdds[0].fixtureId || comOdds[0].id;
-    log(`\n📡 STEP 2 — Buscando odds Estrela Bet para fixtureId: ${fid}`, 'info');
-    const url = `https://api.oddspapi.io/v4/odds?apiKey=${KEY}&bookmakers=estrelabet&fixtureId=${fid}`;
+    const url = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${hoje()}&to=${amanha()}&apiKey=${KEY}`;
+    log(`GET: ${url.replace(KEY,'***')}`, 'dim');
     const data = await get(url);
 
-    log(`\n📦 Estrutura da resposta:`, 'info');
-    log(`  Chaves no root: ${Object.keys(data).join(', ')}`, '');
+    log(`\nEstrutura root: ${Object.keys(data).join(', ')}`, 'info');
+    const all = data.fixtures || data.data || (Array.isArray(data)?data:[]);
+    log(`Total: ${all.length}`, '');
 
-    const fixtures = data.data || data.fixtures || data.odds || (Array.isArray(data)?data:[]);
-    log(`  Total fixtures: ${fixtures.length}`, fixtures.length>0?'ok':'err');
+    if (all.length > 0) {
+      log(`\nPrimeiro fixture completo:`, 'info');
+      log(JSON.stringify(all[0], null, 2), 'dim');
 
-    if (fixtures.length === 0) {
-      log('\n⚠️  Nenhum fixture retornado.', 'warn');
-      log('  Verifique se sua chave tem acesso à Estrela Bet.', 'warn');
-      log('\n  Resposta raw:', 'dim');
-      log('  ' + JSON.stringify(data).substring(0, 500), 'dim');
-      resultado.raw = data;
-    } else {
-      // Analisar primeiro fixture
-      const primeiro = fixtures[0];
-      log(`\n  Primeiro fixture — estrutura:`, 'info');
-      log('  ' + JSON.stringify(primeiro).substring(0, 400), 'dim');
+      const comOdds = all.filter(f=>f.hasOdds===true||f.has_odds===true);
+      log(`\nCom hasOdds=true: ${comOdds.length}`, comOdds.length>0?'ok':'warn');
 
-      // Tentar extrair nomes
-      const home = primeiro.participants?.home?.name ||
-                   primeiro.homeTeam?.name ||
-                   primeiro.home_team ||
-                   primeiro.home || '?';
-      const away = primeiro.participants?.away?.name ||
-                   primeiro.awayTeam?.name ||
-                   primeiro.away_team ||
-                   primeiro.away || '?';
-      const date = (primeiro.startTime || primeiro.date || primeiro.commence_time || '?').substring(0,10);
-
-      log(`\n  Exemplo: ${home} x ${away} | ${date}`, 'ok');
-
-      // Verificar odds da Estrela Bet
-      const eb = primeiro.bookmakerOdds?.estrelabet ||
-                 primeiro.odds?.estrelabet ||
-                 primeiro.estrelabet;
-
-      if (eb) {
-        log(`\n  ✅ bookmakerOdds.estrelabet encontrado!`, 'ok');
-        log(`  Estrutura odds: ${JSON.stringify(eb).substring(0,300)}`, 'dim');
-
-        const markets = eb.markets || eb;
-        if (typeof markets === 'object') {
-          log(`\n  Mercados disponíveis:`, 'info');
-          Object.entries(markets).forEach(([mid, sels]) => {
-            const nome = sels.name || mid;
-            log(`    [${mid}] ${nome}`, 'info');
-            const outcomes = sels.outcomes || sels.selections || (Array.isArray(sels)?sels:[]);
-            outcomes.slice(0,4).forEach(s => {
-              const odd = parseFloat(s.odds||s.price||s.value||0);
-              log(`      → ${s.name||s.label||'?'}: ${odd}`, odd>=1.25?'ok':'dim');
-            });
-          });
-        }
-      } else {
-        log(`\n  ⚠️  bookmakerOdds.estrelabet não encontrado neste fixture`, 'warn');
-        log(`  Bookmakers disponíveis: ${Object.keys(primeiro.bookmakerOdds||{}).join(', ')||'nenhum'}`, 'warn');
+      if (comOdds.length > 0) {
+        log(`\nFixtures COM odds — IDs:`, 'ok');
+        comOdds.slice(0,10).forEach(f => {
+          const id = f.fixtureId||f.id;
+          const t = (f.startTime||f.date||'?').substring(0,16);
+          log(`  ${id} | ${t} | tournamentId:${f.tournamentId||'?'}`, 'ok');
+        });
+        log(`\n💡 Cole um desses IDs no campo acima e use o teste 2!`, 'warn');
       }
-
-      // Listar todos os jogos
-      log(`\n  Todos os ${fixtures.length} fixtures:`, 'info');
-      fixtures.forEach((f, i) => {
-        const h = f.participants?.home?.name || f.homeTeam?.name || f.home || '?';
-        const a = f.participants?.away?.name || f.awayTeam?.name || f.away || '?';
-        const d = (f.startTime||f.date||'?').substring(0,10);
-        const hasEB = !!(f.bookmakerOdds?.estrelabet || f.odds?.estrelabet);
-        log(`  ${i+1}. ${h} x ${a} | ${d} | EB: ${hasEB?'✅':'❌'}`, hasEB?'ok':'dim');
-      });
-
-      resultado.fixtures = fixtures;
-      resultado.total = fixtures.length;
-      resultado.com_estrelabet = fixtures.filter(f=>!!(f.bookmakerOdds?.estrelabet||f.odds?.estrelabet)).length;
     }
-
-  } catch(e) {
-    log(`\n❌ Erro: ${e.message}`, 'err');
-    resultado.erro = e.message;
-  }
-
-  log('\n✅ Concluído. Salve o JSON para análise detalhada.', 'ok');
-  document.getElementById('btn-run').disabled = false;
+    resultado = { fixtures: all, com_odds: all.filter(f=>f.hasOdds===true||f.has_odds===true) };
+  } catch(e) { log(`❌ ${e.message}`, 'err'); }
+  disableAll(false);
 }
 
-// ─── Diagnóstico completo ─────────────────────────────────────
-async function rodar() {
-  const KEY = document.getElementById('oddspapi-key').value.trim();
-  const AF_KEY = document.getElementById('apifootball-key').value.trim();
-  if (!KEY) { alert('Cole a OddsPapi Key primeiro!'); return; }
+// ── TESTE 2: Odds de um fixture específico ────────────────────
+async function verOddsFixture() {
+  const KEY = document.getElementById('key').value.trim();
+  const FID = document.getElementById('fixture-id').value.trim();
+  if (!KEY) return alert('Cole a chave!');
+  if (!FID) return alert('Cole o fixtureId!');
+  clear(); disableAll(true);
+  log('2️⃣ ODDS DO FIXTURE: ' + FID, 'sec2');
+  log('─────────────────────────────────────────', 'dim');
+  try {
+    const url = `https://api.oddspapi.io/v4/odds?fixtureId=${FID}&apiKey=${KEY}`;
+    log(`GET: ${url.replace(KEY,'***')}`, 'dim');
+    const data = await get(url);
 
-  document.getElementById('btn-run').disabled = true;
-  document.getElementById('log').textContent = '';
-  resultado = { gerado_em: new Date().toISOString(), passo1:{}, passo2:{cruzamentos:[]}, passo3:[], resumo:{} };
+    log(`\nEstrutura root: ${Object.keys(data).join(', ')}`, 'info');
+    log(`\nResposta completa:`, 'info');
+    log(JSON.stringify(data, null, 2).substring(0, 3000), 'dim');
 
-  log('========================================', 'sec2');
-  log('DIAGNÓSTICO COMPLETO — OddsPapi × Estrela Bet', 'sec2');
-  log('========================================', 'sec2');
+    // Tentar achar bookmakers
+    const bookmakers = data.bookmakerOdds || data.odds || data.bookmakers;
+    if (bookmakers) {
+      log(`\nBookmakers disponíveis: ${Object.keys(bookmakers).join(', ')}`, 'ok');
+      const eb = bookmakers.estrelabet || bookmakers['Estrela Bet'];
+      if (eb) {
+        log(`\n✅ ESTRELA BET ENCONTRADA!`, 'ok');
+        log(JSON.stringify(eb, null, 2).substring(0, 2000), 'ok');
+      } else {
+        log(`\n❌ Estrela Bet não disponível para este fixture`, 'err');
+      }
+    }
+    resultado = data;
+  } catch(e) { log(`❌ ${e.message}`, 'err'); }
+  disableAll(false);
+}
 
-  // ── PASSO 1 — Odds diretas Estrela Bet ───────────────────────
-  log('\n📡 PASSO 1 — Buscando odds Estrela Bet (sportId=10)...', 'info');
-  let fixtures = [];
+// ── TESTE 3: Varrer fixtures até achar Estrela Bet ────────────
+async function testarEstrelaBet() {
+  const KEY = document.getElementById('key').value.trim();
+  if (!KEY) return alert('Cole a chave!');
+  clear(); disableAll(true);
+  log('3️⃣ VARREDURA — Buscando Estrela Bet nos fixtures', 'sec2');
+  log('─────────────────────────────────────────────────', 'dim');
+
+  let encontrado = false;
+  resultado = { gerado_em: new Date().toISOString(), testados: [], estrelabet: [] };
 
   try {
-    const url = `https://api.oddspapi.io/v4/odds?apiKey=${KEY}&bookmakers=estrelabet&sportId=10`;
-    const data = await get(url);
-    fixtures = data.data || data.fixtures || (Array.isArray(data)?data:[]);
+    // Buscar fixtures
+    const urlFix = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${hoje()}&to=${amanha()}&apiKey=${KEY}`;
+    const dataFix = await get(urlFix);
+    const all = dataFix.fixtures || dataFix.data || (Array.isArray(dataFix)?dataFix:[]);
+    const comOdds = all.filter(f=>f.hasOdds===true||f.has_odds===true);
 
-    log(`  Total fixtures com odds: ${fixtures.length}`, fixtures.length>0?'ok':'warn');
+    log(`\nFixtures com hasOdds=true: ${comOdds.length}`, comOdds.length>0?'ok':'warn');
 
-    const comEB = fixtures.filter(f=>!!(f.bookmakerOdds?.estrelabet||f.odds?.estrelabet));
-    log(`  Com Estrela Bet: ${comEB.length}`, comEB.length>0?'ok':'err');
-
-    resultado.passo1 = { total: fixtures.length, com_estrelabet: comEB.length };
-
-    // Mostrar amostra
-    log('\n  Amostra:', 'dim');
-    fixtures.slice(0,5).forEach(f => {
-      const h = f.participants?.home?.name || f.homeTeam?.name || f.home || '?';
-      const a = f.participants?.away?.name || f.awayTeam?.name || f.away || '?';
-      const d = (f.startTime||f.date||'?').substring(0,10);
-      const hasEB = !!(f.bookmakerOdds?.estrelabet||f.odds?.estrelabet);
-      log(`    ${h} x ${a} | ${d} | EB:${hasEB?'✅':'❌'}`, hasEB?'ok':'dim');
-    });
-  } catch(e) {
-    log(`  ❌ Erro: ${e.message}`, 'err');
-    resultado.passo1.erro = e.message;
-  }
-
-  // ── PASSO 2 — Cruzar com Série B ─────────────────────────────
-  log('\n📡 PASSO 2 — Cruzamento com Série B (API-Football)...', 'info');
-
-  if (!AF_KEY) {
-    log('  ⚠️  API-Football Key não informada — pulando', 'warn');
-  } else {
-    try {
-      const url = `https://v3.football.api-sports.io/fixtures?league=72&season=2026&next=10`;
-      const data = await get(url, { 'x-apisports-key': AF_KEY });
-      const jogos = data.response || [];
-      log(`  Próximos jogos Série B: ${jogos.length}`, '');
-
-      for (const f of jogos.slice(0,5)) {
-        const home = f.teams?.home?.name||'';
-        const away = f.teams?.away?.name||'';
-        const date = (f.fixture?.date||'').substring(0,10);
-
-        const match = fixtures.find(x => {
-          const xh = norm(x.participants?.home?.name||x.homeTeam?.name||x.home||'');
-          const xa = norm(x.participants?.away?.name||x.awayTeam?.name||x.away||'');
-          const xd = (x.startTime||x.date||'').substring(0,10);
-          const nh = norm(home), na = norm(away);
-          return xd===date &&
-            (xh.includes(nh.split(' ')[0])||nh.includes(xh.split(' ')[0])) &&
-            (xa.includes(na.split(' ')[0])||na.includes(xa.split(' ')[0]));
-        });
-
-        if (match) {
-          log(`  ✅ ${home} x ${away} → ENCONTRADO (${date})`, 'ok');
-          resultado.passo2.cruzamentos.push({status:'ENCONTRADO',home,away,date,fixture:match});
-        } else {
-          log(`  ❌ ${home} x ${away} → NÃO ENCONTRADO (${date})`, 'err');
-          resultado.passo2.cruzamentos.push({status:'NÃO ENCONTRADO',home,away,date});
-        }
-      }
-    } catch(e) {
-      log(`  ❌ Erro: ${e.message}`, 'err');
+    if (comOdds.length === 0) {
+      log('⚠️  Expandindo para 7 dias...', 'warn');
+      // Tentar range maior
+      const d7 = new Date(); d7.setDate(d7.getDate()+7);
+      const to7 = d7.toISOString().substring(0,10);
+      const url7 = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${hoje()}&to=${to7}&apiKey=${KEY}`;
+      const data7 = await get(url7);
+      const all7 = data7.fixtures || data7.data || (Array.isArray(data7)?data7:[]);
+      const com7 = all7.filter(f=>f.hasOdds===true||f.has_odds===true);
+      log(`  Fixtures próximos 7 dias com odds: ${com7.length}`, com7.length>0?'ok':'err');
+      comOdds.push(...com7);
     }
+
+    // Testar até 5 fixtures
+    const testar = comOdds.slice(0,5);
+    log(`\nTestando odds em ${testar.length} fixtures...`, 'info');
+
+    for (const f of testar) {
+      const fid = f.fixtureId || f.id;
+      const t = (f.startTime||f.date||'?').substring(0,16);
+      log(`\n  → fixtureId: ${fid} | ${t}`, '');
+
+      try {
+        await new Promise(r=>setTimeout(r,500));
+        const urlOdds = `https://api.oddspapi.io/v4/odds?fixtureId=${fid}&apiKey=${KEY}`;
+        const dataOdds = await get(urlOdds);
+
+        resultado.testados.push({fixtureId: fid, raw: dataOdds});
+
+        // Detectar bookmakers
+        const bks = dataOdds.bookmakerOdds || dataOdds.odds || dataOdds.bookmakers || {};
+        const bkList = Object.keys(bks);
+        log(`    Bookmakers: ${bkList.join(', ')||'nenhum'}`, bkList.length>0?'info':'dim');
+
+        const eb = bks.estrelabet || bks['Estrela Bet'] || bks['estrelaBet'];
+        if (eb) {
+          log(`    ✅ ESTRELA BET ENCONTRADA!`, 'ok');
+          encontrado = true;
+          // Listar mercados
+          const markets = eb.markets || eb;
+          if (typeof markets === 'object') {
+            Object.entries(markets).forEach(([mid, m]) => {
+              log(`      [${mid}] ${m.name||mid}`, 'info');
+              const outs = m.outcomes||m.selections||(Array.isArray(m)?m:[]);
+              outs.slice(0,4).forEach(s => {
+                const odd = parseFloat(s.odds||s.price||s.value||0);
+                log(`        → ${s.name||'?'}: ${odd}`, odd>=1.25?'ok':'dim');
+              });
+            });
+          } else {
+            log('    ' + JSON.stringify(eb).substring(0,300), 'ok');
+          }
+          resultado.estrelabet.push({fixtureId: fid, data: eb});
+        } else {
+          log(`    ❌ Estrela Bet não disponível`, 'dim');
+        }
+      } catch(e) {
+        log(`    ❌ Erro: ${e.message}`, 'err');
+      }
+    }
+  } catch(e) {
+    log(`❌ Erro geral: ${e.message}`, 'err');
   }
 
-  // ── PASSO 3 — Detalhes mercados Estrela Bet ───────────────────
-  log('\n📡 PASSO 3 — Detalhes dos mercados Estrela Bet...', 'info');
-
-  const comEB = fixtures.filter(f=>!!(f.bookmakerOdds?.estrelabet||f.odds?.estrelabet)).slice(0,3);
-
-  if (comEB.length === 0) {
-    log('  ⚠️  Nenhum fixture com Estrela Bet encontrado', 'warn');
-  }
-
-  for (const f of comEB) {
-    const h = f.participants?.home?.name||f.home||'?';
-    const a = f.participants?.away?.name||f.away||'?';
-    log(`\n  ${h} x ${a}`, 'sec2');
-
-    const eb = f.bookmakerOdds?.estrelabet || f.odds?.estrelabet;
-    const markets = eb.markets || eb;
-    let apostas = [];
-
-    Object.entries(markets).forEach(([mid, m]) => {
-      const nome = m.name || mid;
-      log(`    [${mid}] ${nome}`, 'info');
-      const outs = m.outcomes||m.selections||(Array.isArray(m)?m:[]);
-      outs.forEach(s => {
-        const odd = parseFloat(s.odds||s.price||s.value||0);
-        log(`      → ${s.name||'?'}: ${odd}`, odd>=1.25?'ok':'dim');
-        apostas.push({marketId:mid,marketName:nome,nome:s.name,odd});
-      });
-    });
-
-    const acima = apostas.filter(a=>a.odd>=1.25).length;
-    log(`\n    Total apostas: ${apostas.length} | odd>=1.25: ${acima}`, 'ok');
-    resultado.passo3.push({fixture:`${h} x ${a}`,apostas,acima_125:acima});
-  }
-
-  // ── RESUMO ────────────────────────────────────────────────────
-  const enc = resultado.passo2.cruzamentos.filter(c=>c.status==='ENCONTRADO').length;
-  resultado.resumo = {
-    total_fixtures: resultado.passo1.total||0,
-    com_estrelabet: resultado.passo1.com_estrelabet||0,
-    serie_b_encontrados: enc,
-    fixtures_analisados: resultado.passo3.length,
-  };
-
-  log('\n========================================', 'sec2');
-  log('RESUMO', 'sec2');
-  log('========================================', 'sec2');
-  log(`Total fixtures odds: ${resultado.resumo.total_fixtures}`, '');
-  log(`Com Estrela Bet: ${resultado.resumo.com_estrelabet}`, resultado.resumo.com_estrelabet>0?'ok':'err');
-  log(`Série B cruzados: ${enc}`, enc>0?'ok':'warn');
-  log('========================================', 'sec2');
-  log('\n✅ Salve o JSON para análise completa.', 'ok');
-
-  document.getElementById('btn-run').disabled = false;
+  log(`\n${'='.repeat(40)}`, 'sec2');
+  log(encontrado ? '✅ Estrela Bet encontrada em pelo menos 1 fixture!' : '❌ Estrela Bet não encontrada em nenhum fixture testado', encontrado?'ok':'err');
+  log(`Fixtures testados: ${resultado.testados.length}`, '');
+  log(`Com Estrela Bet: ${resultado.estrelabet.length}`, '');
+  log(`${'='.repeat(40)}`, 'sec2');
+  disableAll(false);
 }
 
 function salvar() {
   const blob = new Blob([JSON.stringify(resultado,null,2)],{type:'application/json'});
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'teste-oddspapi-resultado.json';
-  a.click();
+  a.href = URL.createObjectURL(blob); a.download = 'teste-oddspapi-resultado.json'; a.click();
 }
 </script>
 </body>
