@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="version" content="202606040943">
+<meta name="version" content="202606040949">
 <title>OddLab</title>
 <meta name="application-name" content="OddLab">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -376,7 +376,7 @@ function renderDia(dia, data) {
       const jogosHtml = (m.jogos || []).map(j => {
         const jr = res?.jogos_resultado?.find(x => x.time_casa === j.time_casa);
         const jrv = jr?.resultado || 'pendente';
-        const jbadge = jrv === 'green' ? `<span class="mj-badge b-green">✓</span>` : jrv === 'red' ? `<span class="mj-badge b-red">✗</span>` : '';
+        const jbadge = jrv === 'green' ? `<span class="mj-badge b-green">✓</span>` : jrv === 'red' ? `<span class="mj-badge b-red">✗</span>` : jrv === 'cancelado' ? `<span class="mj-badge" style="color:#92400E;background:#FEF3C7">↩</span>` : '';
         const oddJ = j.odd && j.odd > 0 ? `<span style="font-size:9px;font-weight:600;color:#0F766E;background:#F0FDFA;padding:1px 5px;border-radius:4px;border:1px solid #99F6E4;margin-left:4px">${parseFloat(j.odd).toFixed(2)}</span>` : '';
         return `<div class="mult-jogo"><span class="mj-nome">${j.time_casa} x ${j.time_fora} · ${j.aposta}${oddJ}</span>${jbadge}</div>`;
       }).join('');
@@ -403,7 +403,8 @@ async function carregarRelatorio() {
     const diaSem = br_d.getDay(); // 0=dom,1=seg,...,6=sab
     const diasDesdeSegunda = diaSem === 0 ? 6 : diaSem - 1;
     const offsets = Array.from({length: diasDesdeSegunda + 1}, (_,i) => -diasDesdeSegunda + i);
-    const promises = offsets.map(i => fetch(`${B}/apostas-resultado/${offsetStr(i)}`).then(r=>r.json()).catch(()=>null));
+    const tsRel = Date.now();
+    const promises = offsets.map(i => fetch(`${B}/apostas-resultado/${offsetStr(i)}?t=${tsRel}`).then(r=>r.json()).catch(()=>null));
     const dias = await Promise.all(promises);
     let tG=0, tR=0, relTexto = '';
 
@@ -417,7 +418,7 @@ async function carregarRelatorio() {
 
     // Buscar relatório semanal do banco — sem cache
     try {
-      const rRel = await fetch(`${B}/calibracao?t=${Date.now()}`);
+      const rRel = await fetch(`${B}/calibracao?t=${Date.now()}`, {cache:'no-store'});
       const dRel = await rRel.json();
       // Preferir semanal, fallback para diário
       const rel = dRel?.semanal || dRel?.diario;
@@ -520,11 +521,25 @@ function switchSub(sub) {
   document.getElementById('sub-multiplas').style.display = sub==='multiplas' ? 'block' : 'none';
 }
 
-// Registrar Service Worker para controle de cache
+// Registrar Service Worker e forçar atualização automática
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('oddlab-sw.js').then(reg => {
-    reg.update(); // Forçar verificação de atualização
+    // Verificar atualização a cada abertura
+    reg.update();
+    // Quando SW atualizar, recarregar página automaticamente
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated') {
+          window.location.reload();
+        }
+      });
+    });
   }).catch(()=>{});
+  // Se SW já está esperando (nova versão disponível), ativar imediatamente
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
 }
 
 // Verificar se precisa recarregar (cache bust diário)
