@@ -520,6 +520,13 @@ function switchSub(sub) {
   document.getElementById('sub-multiplas').style.display = sub==='multiplas' ? 'block' : 'none';
 }
 
+// Registrar Service Worker para controle de cache
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('oddlab-sw.js').then(reg => {
+    reg.update(); // Forçar verificação de atualização
+  }).catch(()=>{});
+}
+
 // Verificar se precisa recarregar (cache bust diário)
 const hoje_v = new Date().toISOString().substring(0,10);
 const cacheData_v = localStorage.getItem('oddlab_cache_date');
