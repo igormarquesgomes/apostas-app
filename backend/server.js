@@ -1798,7 +1798,8 @@ async function agentValidar(data) {
       continue;
     }
     // Se já tem resultado confirmado (green/red), manter e pular
-    if (resExistente && resExistente.resultado_aposta !== 'pendente') {
+    // cancelado pode ser revalidado — jogo suspenso pode retomar
+    if (resExistente && resExistente.resultado_aposta !== 'pendente' && resExistente.resultado_aposta !== 'cancelado') {
       console.log(`  ✅ Mantendo: ${jogo.time_casa} x ${jogo.time_fora} → ${resExistente.resultado_aposta.toUpperCase()}`);
       resultados.push(resExistente);
       continue;
@@ -1826,7 +1827,7 @@ async function agentValidar(data) {
             const f = rawJson.response?.[0];
             const statusShort = f?.fixture?.status?.short;
             const statusLong = f?.fixture?.status?.long || '';
-            if (['PST','CANC','ABD','AWD','WO'].includes(statusShort)) {
+            if (['PST','CANC','ABD','AWD','WO','SUSP','INT'].includes(statusShort)) {
               console.log(`    ⚠️ Jogo adiado/cancelado: ${statusShort} — ${statusLong}`);
               resultados.push({ encontrado: false, placar: null, resultado_aposta: 'cancelado', motivo: `Jogo ${statusShort}: ${statusLong}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
               continue;
