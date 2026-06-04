@@ -2458,16 +2458,22 @@ app.post('/oddlab/registrar', async (req, res) => {
 
 app.get('/oddlab/usuario/:device_id', async (req, res) => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/oddlab_usuarios?device_id=eq.${req.params.device_id}&select=nome,acessos,primeiro_acesso`,
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/oddlab_usuarios?device_id=eq.${req.params.device_id}&select=nome,acessos,primeiro_acesso,ultimo_acesso`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
     const rows = await r.json();
     if (rows?.length > 0) {
       // Atualizar último acesso e contador
-      await fetch(`${SUPABASE_URL}/rest/v1/oddlab_usuarios?device_id=eq.${req.params.device_id}`, {
+      const patch = await fetch(`${SUPABASE_URL}/rest/v1/oddlab_usuarios?device_id=eq.${req.params.device_id}`, {
         method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
         body: JSON.stringify({ ultimo_acesso: new Date().toISOString(), acessos: rows[0].acessos + 1 })
       });
+      if (!patch.ok) console.error(`❌ OddLab PATCH erro: ${patch.status}`);
       res.json({ ok: true, ...rows[0] });
     } else {
       res.json({ ok: false });
