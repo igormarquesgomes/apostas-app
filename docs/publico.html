@@ -327,6 +327,7 @@ function renderDia(dia, data) {
       let badgeHtml = '', cardCls = 'pc';
       if (rv === 'green') { badgeHtml = `<span class="badge b-green">✓ green${placar}</span>`; cardCls = 'gc'; }
       else if (rv === 'red') { badgeHtml = `<span class="badge b-red">✗ red${placar}</span>`; cardCls = 'rc'; }
+      else if (rv === 'cancelado') { badgeHtml = `<span class="badge" style="color:#92400E;background:#FEF3C7">↩ reembolso</span>`; cardCls = 'pc'; }
       else if (dia === 'amanha') { badgeHtml = `<span class="badge b-amanha">${fmtData(dataStr)}</span>`; cardCls = 'ac'; }
       else badgeHtml = `<span class="badge b-pending">⏳</span>`;
       const odd = j.odd_mercado || j.odd_sugerida || j.odd;
