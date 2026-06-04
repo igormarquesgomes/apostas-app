@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teste OddsPapi</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 20px; }
+  h1 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: #555; margin-bottom: 20px; }
+  .form { background: #111; border: 1px solid #222; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 4px; }
+  input { width: 100%; padding: 10px 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace; margin-bottom: 12px; outline: none; }
+  input:focus { border-color: #444; }
+  button { width: 100%; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .log { background: #000; border: 1px solid #1a1a1a; border-radius: 12px; padding: 14px; font-family: monospace; font-size: 12px; line-height: 1.8; min-height: 200px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; }
+  .ok { color: #4ADE80; }
+  .err { color: #F87171; }
+  .warn { color: #FBBF24; }
+  .info { color: #60A5FA; }
+  .dim { color: #444; }
+  .section { color: #C0C0C0; font-weight: bold; }
+  .save-btn { margin-top: 10px; width: 100%; padding: 10px; background: #111; border: 1px solid #222; border-radius: 8px; color: #888; font-size: 12px; cursor: pointer; }
+  .save-btn:hover { border-color: #444; color: #ccc; }
+</style>
+</head>
+<body>
+
+<h1>Teste OddsPapi × Estrela Bet</h1>
+<div class="sub">Diagnóstico isolado — não altera nenhum arquivo do projeto</div>
+
+<div class="form">
+  <label>OddsPapi API Key</label>
+  <input type="text" id="oddspapi-key" placeholder="cole sua chave aqui" />
+  <label>API-Football Key</label>
+  <input type="text" id="apifootball-key" placeholder="cole sua chave aqui" />
+  <button id="btn-run" onclick="rodar()">▶ Rodar Diagnóstico</button>
+</div>
+
+<div class="log" id="log">aguardando...</div>
+<button class="save-btn" onclick="salvar()">💾 Salvar resultado como JSON</button>
+
+<script>
+const B = 'https://apostas-app.onrender.com';
+let resultado = {};
+let logEl;
+
+function log(msg, cls='') {
+  logEl = logEl || document.getElementById('log');
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = msg + '\n';
+  if (logEl.textContent === 'aguardando...') logEl.textContent = '';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function get(url, headers={}) {
+  const r = await fetch(url, { headers });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+function norm(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+function hoje() { return new Date().toISOString().substring(0,10); }
+function amanha() { const d=new Date(); d.setDate(d.getDate()+1); return d.toISOString().substring(0,10); }
+
+async function rodar() {
+  const ODDS_KEY = document.getElementById('oddspapi-key').value.trim();
+  const AF_KEY = document.getElementById('apifootball-key').value.trim();
+
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('log').textContent = '';
+  resultado = { gerado_em: new Date().toISOString(), passo1:{}, passo2:{cruzamentos:[]}, passo3:[], resumo:{} };
+
+  log('========================================', 'section');
+  log('TESTE — OddsPapi × Estrela Bet', 'section');
+  log('========================================', 'section');
+
+  // ── PASSO 1 ──────────────────────────────────────────────────
+  log('\n📡 PASSO 1 — Fixtures hoje e amanhã...', 'info');
+  let fixturesOdds = [];
+
+  if (!ODDS_KEY) {
+    log('  ⚠️  OddsPapi Key não informada — pulando passo 1 e 3', 'warn');
+  } else {
+    try {
+      const url = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${hoje()}&to=${amanha()}&apiKey=${ODDS_KEY}`;
+      const data = await get(url);
+      const all = data.fixtures || data.data || (Array.isArray(data)?data:[]);
+      fixturesOdds = all.filter(f => f.hasOdds===true||f.has_odds===true);
+
+      log(`  Total fixtures: ${all.length}`, '');
+      log(`  Com hasOdds=true: ${fixturesOdds.length}`, 'ok');
+      resultado.passo1 = { total: all.length, com_odds: fixturesOdds.length };
+
+      log('\n  Amostra:', 'dim');
+      all.slice(0,5).forEach(f => {
+        const h = f.homeTeam?.name||f.home||'?';
+        const a = f.awayTeam?.name||f.away||'?';
+        const d = (f.date||f.startDate||'?').substring(0,10);
+        const o = f.hasOdds||f.has_odds;
+        log(`    ${h} x ${a} | ${d} | hasOdds:${o}`, o?'ok':'dim');
+      });
+    } catch(e) {
+      log(`  ❌ Erro: ${e.message}`, 'err');
+      resultado.passo1.erro = e.message;
+    }
+  }
+
+  // ── PASSO 2 ──────────────────────────────────────────────────
+  log('\n📡 PASSO 2 — Cruzamento com API-Football (Série A)...', 'info');
+  let jogosAF = [];
+
+  if (!AF_KEY) {
+    log('  ⚠️  API-Football Key não informada — pulando passo 2', 'warn');
+  } else {
+    try {
+      const url = `https://v3.football.api-sports.io/fixtures?league=71&season=2026&next=5`;
+      const data = await get(url, { 'x-apisports-key': AF_KEY });
+      jogosAF = data.response || [];
+      log(`  Próximos jogos Série A: ${jogosAF.length}`, '');
+
+      for (const f of jogosAF) {
+        const home = f.teams?.home?.name||'';
+        const away = f.teams?.away?.name||'';
+        const date = (f.fixture?.date||'').substring(0,10);
+        log(`  → ${home} x ${away} (${date})`, '');
+
+        const match = fixturesOdds.find(x => {
+          const xh = norm(x.homeTeam?.name||x.home||'');
+          const xa = norm(x.awayTeam?.name||x.away||'');
+          const xd = (x.date||x.startDate||'').substring(0,10);
+          const nh = norm(home), na = norm(away);
+          return xd===date &&
+            (xh.includes(nh.split(' ')[0])||nh.includes(xh.split(' ')[0])) &&
+            (xa.includes(na.split(' ')[0])||na.includes(xa.split(' ')[0]));
+        });
+
+        if (match) {
+          const fid = match.id||match.fixtureId;
+          log(`    ✅ [ENCONTRADO] → OddsPapi id: ${fid}`, 'ok');
+          resultado.passo2.cruzamentos.push({status:'ENCONTRADO',home,away,date,oddspapi_id:fid});
+        } else {
+          log(`    ❌ [NÃO ENCONTRADO]`, 'err');
+          resultado.passo2.cruzamentos.push({status:'NÃO ENCONTRADO',home,away,date});
+        }
+      }
+    } catch(e) {
+      log(`  ❌ Erro: ${e.message}`, 'err');
+    }
+  }
+
+  // ── PASSO 3 ──────────────────────────────────────────────────
+  log('\n📡 PASSO 3 — Odds da Estrela Bet...', 'info');
+
+  if (!ODDS_KEY) {
+    log('  ⚠️  OddsPapi Key não informada — pulando', 'warn');
+  } else {
+    const ids = [
+      ...resultado.passo2.cruzamentos.filter(c=>c.oddspapi_id).map(c=>({id:c.oddspapi_id,label:`${c.home} x ${c.away}`})),
+      ...fixturesOdds.slice(0,3).map(f=>({id:f.id||f.fixtureId,label:`${f.homeTeam?.name||f.home} x ${f.awayTeam?.name||f.away}`}))
+    ].filter((v,i,arr)=>arr.findIndex(x=>x.id===v.id)===i).slice(0,5);
+
+    for (const {id, label} of ids) {
+      log(`\n  Fixture: ${label} (${id})`, 'section');
+      try {
+        const url = `https://api.oddspapi.io/v4/odds?fixtureId=${id}&bookmakers=estrelabet&apiKey=${ODDS_KEY}`;
+        const data = await get(url);
+
+        const odds = data.odds||data.bookmakerOdds||data;
+        const eb = odds?.estrelabet || odds?.['Estrela Bet'] ||
+          (Array.isArray(odds)?odds.find(b=>norm(b.bookmaker||b.name||'')==='estrelabet'):null);
+
+        if (eb) {
+          log(`  ✅ Estrela Bet disponível!`, 'ok');
+          const mercados = eb.markets||eb.odds||eb;
+          let apostas = [];
+
+          if (Array.isArray(mercados)) {
+            mercados.forEach(m => {
+              const mid = m.marketId||m.id;
+              const mname = m.marketName||m.name||'?';
+              log(`    [${mid}] ${mname}`, 'info');
+              (m.selections||m.outcomes||m.odds||[]).forEach(s => {
+                const odd = parseFloat(s.odds||s.price||s.value||0);
+                log(`      → ${s.name||s.selection||'?'}: ${odd}`, odd>=1.25?'ok':'dim');
+                apostas.push({marketId:mid,marketName:mname,nome:s.name||s.selection,odd});
+              });
+            });
+          }
+
+          const acima = apostas.filter(a=>a.odd>=1.25).length;
+          const mids = [...new Set(apostas.map(a=>a.marketId))];
+          log(`\n  Total apostas: ${apostas.length} | odd>=1.25: ${acima}`, 'ok');
+          log(`  Market IDs: [${mids.join(', ')}]`, 'info');
+          resultado.passo3.push({fixture:label,id,estrelabet_disponivel:true,total_apostas:apostas.length,apostas_acima_125:acima,market_ids:mids,apostas,raw:data});
+        } else {
+          const bks = Object.keys(odds||{}).join(', ')||'nenhum';
+          log(`  ❌ Estrela Bet não disponível`, 'err');
+          log(`  Bookmakers encontrados: ${bks}`, 'warn');
+          resultado.passo3.push({fixture:label,id,estrelabet_disponivel:false,bookmakers:bks,raw:data});
+        }
+      } catch(e) {
+        log(`  ❌ Erro: ${e.message}`, 'err');
+        resultado.passo3.push({fixture:label,id,erro:e.message});
+      }
+      await new Promise(r=>setTimeout(r,600));
+    }
+  }
+
+  // ── RESUMO ────────────────────────────────────────────────────
+  const enc = resultado.passo2.cruzamentos.filter(c=>c.status==='ENCONTRADO').length;
+  const comEB = resultado.passo3.filter(r=>r.estrelabet_disponivel).length;
+
+  resultado.resumo = {
+    fixtures_hoje_amanha: resultado.passo1.total||0,
+    fixtures_com_odds: resultado.passo1.com_odds||0,
+    jogos_serie_a_testados: jogosAF.length,
+    cruzamentos_encontrados: enc,
+    cruzamentos_nao_encontrados: resultado.passo2.cruzamentos.length-enc,
+    fixtures_testados_estrelabet: resultado.passo3.length,
+    fixtures_com_estrelabet: comEB,
+  };
+
+  log('\n========================================', 'section');
+  log('RESUMO FINAL', 'section');
+  log('========================================', 'section');
+  log(`Fixtures hoje/amanhã: ${resultado.resumo.fixtures_hoje_amanha}`, '');
+  log(`Com hasOdds=true: ${resultado.resumo.fixtures_com_odds}`, 'ok');
+  log(`Série A testados: ${resultado.resumo.jogos_serie_a_testados}`, '');
+  log(`  Encontrados na OddsPapi: ${resultado.resumo.cruzamentos_encontrados}`, enc>0?'ok':'err');
+  log(`  Não encontrados: ${resultado.resumo.cruzamentos_nao_encontrados}`, '');
+  log(`Testados c/ Estrela Bet: ${resultado.resumo.fixtures_testados_estrelabet}`, '');
+  log(`  Estrela Bet disponível: ${resultado.resumo.fixtures_com_estrelabet}`, comEB>0?'ok':'err');
+  log('========================================', 'section');
+  log('\n✅ Pronto! Clique em "Salvar resultado" para exportar o JSON.', 'ok');
+
+  document.getElementById('btn-run').disabled = false;
+}
+
+function salvar() {
+  const blob = new Blob([JSON.stringify(resultado, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'teste-oddspapi-resultado.json';
+  a.click();
+}
+</script>
+</body>
+</html>
