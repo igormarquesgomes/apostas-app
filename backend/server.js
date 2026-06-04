@@ -2090,7 +2090,8 @@ async function agentDiario(data) {
   const g = resultados.filter(r=>r.resultado_aposta==='green').length;
   const r = resultados.filter(r=>r.resultado_aposta==='red').length;
   const p = resultados.filter(r=>r.resultado_aposta==='pendente').length;
-  const total = g + r;
+  const c = resultados.filter(r=>r.resultado_aposta==='cancelado').length;
+  const total = g + r; // cancelados não entram no cálculo
   const assert = total > 0 ? ((g/total)*100).toFixed(2) : 0;
 
   // Só incluir jogos validados no relatório — pendentes não têm resultado para analisar
