@@ -395,7 +395,13 @@ function renderDia(dia, data) {
 async function carregarRelatorio() {
   try {
     // Buscar últimos 7 dias para calcular assertividade
-    const promises = [-6,-5,-4,-3,-2,-1,0].map(i => fetch(`${B}/apostas-resultado/${offsetStr(i)}`).then(r=>r.json()).catch(()=>null));
+    // Calcular início da semana (segunda-feira)
+    const hoje_d = new Date();
+    const br_d = new Date(hoje_d.getTime() - 3*60*60*1000);
+    const diaSem = br_d.getDay(); // 0=dom,1=seg,...,6=sab
+    const diasDesdeSegunda = diaSem === 0 ? 6 : diaSem - 1;
+    const offsets = Array.from({length: diasDesdeSegunda + 1}, (_,i) => -diasDesdeSegunda + i);
+    const promises = offsets.map(i => fetch(`${B}/apostas-resultado/${offsetStr(i)}`).then(r=>r.json()).catch(()=>null));
     const dias = await Promise.all(promises);
     let tG=0, tR=0, relTexto = '';
 
