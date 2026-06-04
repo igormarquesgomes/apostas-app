@@ -460,17 +460,11 @@ function renderPeriodos(semanas, meses) {
   window._semanas = semanas;
   window._meses = meses;
 
-  const renderLista = (mapa, containerId) => {
-    const el = document.getElementById(containerId);
-    if (!el) return;
-    const entries = Object.entries(mapa).sort((a,b)=>b[0].localeCompare(a[0]));
-    el.innerHTML = entries.map(([key, v]) => {
-      const total = v.g + v.r;
-      const pct = total > 0 ? Math.round(v.g/total*100) : null;
-      const cor = pct === null ? 'var(--text3)' : pct >= 65 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
-      const id = 'periodo-'+key.replace(/[^a-z0-9]/gi,'');
-
-      const diasHtml = v.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(dia => {
+  // Renderizar itens filhos (dias dentro de semana, ou semanas dentro de mês)
+  const renderFilhos = (v, tipo) => {
+    if (tipo === 'semanas') {
+      // Dentro de semana: mostrar dias
+      return v.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(dia => {
         const dt = dia.data.substring(8,10)+'/'+dia.data.substring(5,7);
         const dTotal = dia.green+dia.red;
         const dPct = dTotal>0?Math.round(dia.green/dTotal*100):null;
@@ -483,7 +477,66 @@ function renderPeriodos(semanas, meses) {
           </div>
         </div>`;
       }).join('');
+    } else {
+      // Dentro de mês: mostrar semanas
+      // Agrupar dias do mês por semana
+      const semsDoMes = {};
+      v.dias.forEach(dia => {
+        const d = new Date(dia.data+'T12:00:00');
+        const ds = d.getDay();
+        const diasSeg = ds===0?6:ds-1;
+        const seg = new Date(d); seg.setDate(d.getDate()-diasSeg);
+        const segKey = seg.toISOString().substring(0,10);
+        const dom = new Date(seg); dom.setDate(seg.getDate()+6);
+        const domKey = dom.toISOString().substring(0,10);
+        if(!semsDoMes[segKey]) semsDoMes[segKey]={label:`${fmtD(segKey)} – ${fmtD(domKey)}`,g:0,r:0,dias:[]};
+        semsDoMes[segKey].g+=dia.green; semsDoMes[segKey].r+=dia.red;
+        semsDoMes[segKey].dias.push(dia);
+      });
+      return Object.entries(semsDoMes).sort((a,b)=>b[0].localeCompare(a[0])).map(([sk,sv]) => {
+        const sTotal=sv.g+sv.r;
+        const sPct=sTotal>0?Math.round(sv.g/sTotal*100):null;
+        const sCor=sPct===null?'var(--text3)':sPct>=65?'var(--green)':sPct>=50?'var(--amber)':'var(--red)';
+        const sid='mesw-'+sk.replace(/[^a-z0-9]/gi,'');
+        const diasHtml=sv.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(dia=>{
+          const dt=dia.data.substring(8,10)+'/'+dia.data.substring(5,7);
+          const dTotal=dia.green+dia.red;
+          const dPct=dTotal>0?Math.round(dia.green/dTotal*100):null;
+          const dCor=dPct===null?'var(--text3)':dPct>=65?'var(--green)':dPct>=50?'var(--amber)':'var(--red)';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border-radius:4px;background:var(--bg);margin-bottom:2px">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">${dt}</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text3)">${dia.green}G ${dia.red}R</span>
+              <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${dCor}">${dPct!==null?dPct+'%':'--'}</span>
+            </div>
+          </div>`;
+        }).join('');
+        return `<div style="margin-bottom:4px">
+          <div onclick="document.getElementById('${sid}').style.display=document.getElementById('${sid}').style.display==='none'?'block':'none'"
+               style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:5px 8px;border-radius:6px;background:var(--bg);margin-bottom:2px">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">${sv.label}</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text3)">${sv.g}G ${sv.r}R</span>
+              <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${sCor}">${sPct!==null?sPct+'%':'--'}</span>
+              <span style="color:var(--text3);font-size:9px">▾</span>
+            </div>
+          </div>
+          <div id="${sid}" style="display:none;padding:0 4px">${diasHtml}</div>
+        </div>`;
+      }).join('');
+    }
+  };
 
+  const renderLista = (mapa, containerId, tipo) => {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const entries = Object.entries(mapa).sort((a,b)=>b[0].localeCompare(a[0]));
+    el.innerHTML = entries.map(([key, v]) => {
+      const total = v.g + v.r;
+      const pct = total > 0 ? Math.round(v.g/total*100) : null;
+      const cor = pct === null ? 'var(--text3)' : pct >= 65 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+      const id = 'periodo-'+key.replace(/[^a-z0-9]/gi,'');
+      const filhosHtml = renderFilhos(v, tipo);
       return `<div style="margin-bottom:8px">
         <div onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'"
              style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 10px;border-radius:8px;background:var(--card2);margin-bottom:4px">
@@ -494,13 +547,13 @@ function renderPeriodos(semanas, meses) {
             <span style="color:var(--text3);font-size:10px">▼</span>
           </div>
         </div>
-        <div id="${id}" style="display:none;padding:0 4px">${diasHtml}</div>
+        <div id="${id}" style="display:none;padding:0 4px">${filhosHtml}</div>
       </div>`;
     }).join('');
   };
 
-  renderLista(semanas, 'periodos-semanas');
-  renderLista(meses, 'periodos-meses');
+  renderLista(semanas, 'periodos-semanas', 'semanas');
+  renderLista(meses, 'periodos-meses', 'meses');
 }
 
 function renderDiario(dias){
