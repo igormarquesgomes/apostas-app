@@ -121,10 +121,19 @@ async function rodar() {
     log('  ⚠️  API-Football Key não informada — pulando passo 2', 'warn');
   } else {
     try {
-      const url = `https://v3.football.api-sports.io/fixtures?league=71&season=2026&next=5`;
+      // Buscar Operário x Juventude na Série B
+      const url = `https://v3.football.api-sports.io/fixtures?league=72&season=2026&next=10`;
       const data = await get(url, { 'x-apisports-key': AF_KEY });
-      jogosAF = data.response || [];
-      log(`  Próximos jogos Série A: ${jogosAF.length}`, '');
+      const todos = data.response || [];
+      // Filtrar Operário x Juventude se existir, senão pegar os próximos 5
+      const operario = todos.filter(f => {
+        const h = (f.teams?.home?.name||'').toLowerCase();
+        const a = (f.teams?.away?.name||'').toLowerCase();
+        return (h.includes('operario')||h.includes('operário')||a.includes('operario')||a.includes('operário')) ||
+               (h.includes('juventude')||a.includes('juventude'));
+      });
+      jogosAF = operario.length > 0 ? operario : todos.slice(0,5);
+      log(`  Jogos Série B encontrados: ${todos.length} | Operário/Juventude: ${operario.length}`, '');
 
       for (const f of jogosAF) {
         const home = f.teams?.home?.name||'';
