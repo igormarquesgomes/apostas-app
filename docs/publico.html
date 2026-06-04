@@ -6,6 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<meta name="version" content="202606040943">
 <title>OddLab</title>
 <meta name="application-name" content="OddLab">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -290,9 +291,10 @@ async function carregarDia(dia) {
   const dataStr = dia === 'hoje' ? hojeStr() : dia === 'ontem' ? offsetStr(-1) : offsetStr(1);
   if (cacheData[dia]) { renderDia(dia, cacheData[dia]); return; }
   try {
+    const ts = Date.now();
     const [rAp, rMult] = await Promise.all([
-      fetch(`${B}/apostas-resultado/${dataStr}`).then(r=>r.json()),
-      fetch(`${B}/multiplas/${dataStr}`).then(r=>r.json()).catch(()=>null)
+      fetch(`${B}/apostas-resultado/${dataStr}?t=${ts}`).then(r=>r.json()),
+      fetch(`${B}/multiplas/${dataStr}?t=${ts}`).then(r=>r.json()).catch(()=>null)
     ]);
     if (rMult) {
       rAp.multiplas = rMult.multiplas;
@@ -413,9 +415,9 @@ async function carregarRelatorio() {
 
     const assert = tG+tR > 0 ? Math.round(tG/(tG+tR)*100) : null;
 
-    // Buscar relatório semanal do banco
+    // Buscar relatório semanal do banco — sem cache
     try {
-      const rRel = await fetch(`${B}/calibracao`);
+      const rRel = await fetch(`${B}/calibracao?t=${Date.now()}`);
       const dRel = await rRel.json();
       // Preferir semanal, fallback para diário
       const rel = dRel?.semanal || dRel?.diario;
@@ -516,6 +518,19 @@ function switchSub(sub) {
   });
   document.getElementById('sub-simples').style.display = sub==='simples' ? 'block' : 'none';
   document.getElementById('sub-multiplas').style.display = sub==='multiplas' ? 'block' : 'none';
+}
+
+// Verificar se precisa recarregar (cache bust diário)
+const hoje_v = new Date().toISOString().substring(0,10);
+const cacheData_v = localStorage.getItem('oddlab_cache_date');
+if (cacheData_v !== hoje_v) {
+  localStorage.setItem('oddlab_cache_date', hoje_v);
+  // Limpar cache de dados do dia anterior
+  Object.keys(localStorage).filter(k => k.startsWith('oddlab_') && k !== 'oddlab_nome' && k !== 'oddlab_device' && k !== 'oddlab_cache_date').forEach(k => localStorage.removeItem(k));
+  // Se não é primeiro acesso, forçar reload sem cache
+  if (cacheData_v) {
+    window.location.reload(true);
+  }
 }
 
 // Iniciar
