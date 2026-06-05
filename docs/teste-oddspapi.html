@@ -42,7 +42,30 @@
 <button id="btn-salvar" onclick="salvar()">💾 Salvar resultado JSON</button>
 
 <script>
-const PROXY = 'https://api.allorigins.win/raw?url=';
+// Lista de proxies com fallback automático
+const PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
+];
+
+async function get(url) {
+  let lastErr;
+  for (const makeProxy of PROXIES) {
+    try {
+      const r   = await fetch(makeProxy(url), { signal: AbortSignal.timeout(8000) });
+      const txt = await r.text();
+      if (!txt || txt.trim() === '') continue;
+      let parsed;
+      try { parsed = JSON.parse(txt); } catch(e) { continue; }
+      if (parsed && typeof parsed.contents === 'string') {
+        try { return JSON.parse(parsed.contents); } catch(e) { return parsed.contents; }
+      }
+      return parsed;
+    } catch(e) { lastErr = e; }
+  }
+  throw new Error('Todos os proxies falharam: ' + (lastErr?.message || ''));
+}
 let resultado = {};
 
 function log(msg, cls='') {
@@ -103,20 +126,22 @@ async function rodarTudo() {
     log('PASSO 1 — Buscando fixtures de futebol...', 'bold');
 
     let todosFixtures = [];
-    for (let offset = 0; offset <= 7; offset++) {
-      const from = diaOffset(offset);
-      const to   = diaOffset(offset + 1);
-      const url  = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${from}&to=${to}&apiKey=${KEY}`;
+    const dias = [
+      { from: diaOffset(0), label: 'Hoje'   },
+      { from: diaOffset(1), label: 'Amanhã' },
+    ];
+    for (const dia of dias) {
+      const to  = diaOffset(dias.indexOf(dia) + 1);
+      const url = `https://api.oddspapi.io/v4/fixtures?sportId=10&from=${dia.from}&to=${to}&apiKey=${KEY}`;
+      log(`  Buscando ${dia.label} (${dia.from})...`, 'dim');
       try {
         const data = await get(url);
         if (data && data.error) { log(`  ❌ Erro da API: ${data.error.message}`, 'err'); break; }
         const arr = data.fixtures || data.data || (Array.isArray(data) ? data : []);
-        if (arr.length > 0) {
-          todosFixtures.push(...arr);
-          log(`  ${from}: ${arr.length} fixtures (${arr.filter(f=>f.hasOdds).length} com odds)`, 'dim');
-        }
+        todosFixtures.push(...arr);
+        log(`  ${dia.label}: ${arr.length} fixtures (${arr.filter(f=>f.hasOdds).length} com odds)`, arr.length > 0 ? 'dim' : 'warn');
       } catch(e) {
-        log(`  Erro em ${from}: ${e.message}`, 'warn');
+        log(`  Erro em ${dia.label}: ${e.message}`, 'err');
       }
     }
 
