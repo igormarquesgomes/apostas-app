@@ -31,7 +31,7 @@
 <body>
 
 <h1>Teste OddsPapi × Estrela Bet</h1>
-<div class="sub">Diagnóstico em 3 modos — use de cima para baixo &nbsp;·&nbsp; chamadas via corsproxy.io (CORS fix)</div>
+<div class="sub">Diagnóstico em 3 modos — use de cima para baixo &nbsp;·&nbsp; chamadas via allorigins (CORS fix)</div>
 
 <div class="form">
   <label>OddsPapi API Key</label>
@@ -51,8 +51,8 @@
 <button class="save-btn" onclick="salvar()">💾 Salvar JSON</button>
 
 <script>
-// CORS proxy — necessário pois a OddsPapi não permite chamadas diretas do browser
-const PROXY = 'https://corsproxy.io/?url=';
+// CORS proxy — allorigins funciona a partir do GitHub Pages
+const PROXY = 'https://api.allorigins.win/raw?url=';
 
 let resultado = {};
 function log(msg, cls='') {
