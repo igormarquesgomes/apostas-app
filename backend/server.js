@@ -2709,7 +2709,15 @@ app.post('/validar-pendentes', async (req, res) => {
       await agentDiario(ontem);
       console.log(`✅ Relatório de ${ontem} atualizado`);
     } else {
-      console.log(`✅ Ontem (${ontem}): todos validados`);
+      // Mesmo todos validados, garantir que relatório existe e está atualizado
+      const calOntem = await dbGetCalibracaoPorPeriodo('diario', ontem).catch(()=>null);
+      if (!calOntem) {
+        console.log(`📝 Relatório de ${ontem} ausente — gerando...`);
+        await agentDiario(ontem);
+        console.log(`✅ Relatório de ${ontem} gerado`);
+      } else {
+        console.log(`✅ Ontem (${ontem}): todos validados e relatório OK`);
+      }
     }
   }
 
@@ -2721,11 +2729,16 @@ app.post('/validar-pendentes', async (req, res) => {
     if (semResultado || pendentesHoje.length > 0) {
       console.log(`🔄 Pendentes hoje (${hoje}): ${semResultado ? 'sem validação' : pendentesHoje.length + ' pendentes'}`);
       await agentValidar(hoje);
-      // Atualizar relatório após validação
       await agentDiario(hoje);
       console.log(`✅ Relatório de ${hoje} atualizado`);
     } else {
-      console.log(`✅ Hoje (${hoje}): todos validados`);
+      const calHoje = await dbGetCalibracaoPorPeriodo('diario', hoje).catch(()=>null);
+      if (!calHoje) {
+        console.log(`📝 Relatório de hoje ausente — gerando...`);
+        await agentDiario(hoje);
+      } else {
+        console.log(`✅ Hoje (${hoje}): todos validados e relatório OK`);
+      }
     }
   }
 });
@@ -2777,6 +2790,12 @@ app.get('/calibracao', async (req, res) => {
 });
 
 // Endpoint para buscar TODOS os relatórios de calibração (para aba Relatórios)
+app.get('/calibracao/diario/:data', async (req, res) => {
+  const cal = await dbGetCalibracaoPorPeriodo('diario', req.params.data);
+  if (cal) res.json(cal);
+  else res.status(404).json({ erro: 'Relatório não encontrado' });
+});
+
 app.get('/calibracao-todos', async (req, res) => {
   try {
     const [semestrais, mensais, semanais, diarios] = await Promise.all([
