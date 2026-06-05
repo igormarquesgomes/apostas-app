@@ -416,13 +416,25 @@ async function carregarRelatorio() {
 
     const assert = tG+tR > 0 ? Math.round(tG/(tG+tR)*100) : null;
 
-    // Buscar relatório semanal do banco — sem cache
+    // Buscar relatório — semanal preferido, fallback diário mais recente
     try {
-      const rRel = await fetch(`${B}/calibracao?t=${Date.now()}`, {cache:'no-store'});
-      const dRel = await rRel.json();
-      // Preferir semanal, fallback para diário
-      const rel = dRel?.semanal || dRel?.diario;
-      if (rel?.relatorio) relTexto = rel.relatorio;
+      // Tentar semanal primeiro
+      const rSem = await fetch(`${B}/calibracao?t=${Date.now()}`, {cache:'no-store'});
+      const dSem = await rSem.json();
+      if (dSem?.semanal?.relatorio) {
+        relTexto = dSem.semanal.relatorio;
+      } else if (dSem?.diario?.relatorio) {
+        relTexto = dSem.diario.relatorio;
+      }
+      // Se não veio, buscar diário de ontem especificamente
+      if (!relTexto) {
+        const ontem = offsetStr(-1);
+        const rDia = await fetch(`${B}/calibracao/diario/${ontem}?t=${Date.now()}`, {cache:'no-store'});
+        if (rDia.ok) {
+          const dDia = await rDia.json();
+          if (dDia?.relatorio) relTexto = dDia.relatorio;
+        }
+      }
     } catch(e) {}
 
     // Processar relatório — extrair destaques positivos e pontos a melhorar
