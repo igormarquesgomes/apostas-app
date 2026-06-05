@@ -437,27 +437,39 @@ async function carregarRelatorio() {
       }
     } catch(e) {}
 
-    // Processar relatório — extrair destaques positivos e pontos a melhorar
-    const linhas = relTexto ? relTexto.split('\n').filter(l => l.trim().length > 15) : [];
-    // Positivos: linhas que falam de acerto, padrão, mercado bom
-    const positivos = linhas.filter(l => {
-      const ll = l.toLowerCase();
-      return (ll.includes('acert') || ll.includes('green') || ll.includes('identif') ||
-              ll.includes('padrão') || ll.includes('padrao') || ll.includes('mercado') ||
-              ll.includes('assertiv') || ll.includes('destaque') || ll.includes('perform'))
-             && !ll.includes('melhor') && !ll.includes('atenção') && !ll.includes('erro');
-    }).slice(0, 4);
-    // Pontos a melhorar
-    const melhorar = linhas.filter(l => {
-      const ll = l.toLowerCase();
-      return ll.includes('melhor') || ll.includes('atenção') || ll.includes('atencao') ||
-             ll.includes('pivotar') || ll.includes('red flag') || ll.includes('cuidado') ||
-             ll.includes('evitar') || ll.includes('revisar');
-    }).slice(0, 3);
-    // Se não classificou nada, pega as primeiras linhas como destaques
-    if (!positivos.length && linhas.length > 0) {
-      positivos.push(...linhas.slice(0, 4));
-    }
+    // Processar relatório — limpar markdown e exibir diretamente
+    const processarRelatorio = (texto) => {
+      if (!texto) return { positivos: [], melhorar: [] };
+      const linhas = texto.split('\n')
+        .map(l => l
+          .replace(/#{1,4}\s*/g, '')           // remover ## títulos
+          .replace(/\*\*(.*?)\*\*/g, '$1')      // remover **negrito**
+          .replace(/\|.*\|/g, '')               // remover linhas de tabela
+          .replace(/^[-*•]\s+/, '')             // remover bullets
+          .trim()
+        )
+        .filter(l => l.length > 20 && !l.startsWith('---') && !l.startsWith('===') && !l.startsWith('|'));
+
+      const positivos = [], melhorar = [];
+      for (const l of linhas) {
+        const ll = l.toLowerCase();
+        if (ll.includes('melhor') || ll.includes('atenção') || ll.includes('atencao') ||
+            ll.includes('pivotar') || ll.includes('red flag') || ll.includes('evitar') ||
+            ll.includes('cuidado') || ll.includes('❌') || ll.includes('⚠️')) {
+          if (melhorar.length < 3) melhorar.push(l);
+        } else if (ll.includes('acert') || ll.includes('✅') || ll.includes('green') ||
+            ll.includes('padrão') || ll.includes('padrao') || ll.includes('mercado') ||
+            ll.includes('assertiv') || ll.includes('recomend') || ll.includes('identificad')) {
+          if (positivos.length < 4) positivos.push(l);
+        }
+      }
+      // Fallback: se filtros não pegaram nada, pegar as primeiras linhas
+      if (!positivos.length && linhas.length > 0) {
+        positivos.push(...linhas.slice(0, 4));
+      }
+      return { positivos, melhorar };
+    };
+    const { positivos, melhorar } = processarRelatorio(relTexto);
 
     const pct = assert !== null ? assert : 0;
     const barW = Math.min(pct, 100);
