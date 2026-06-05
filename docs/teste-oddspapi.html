@@ -31,7 +31,7 @@
 <body>
 
 <h1>Teste OddsPapi × Estrela Bet</h1>
-<div class="sub">Diagnóstico em 3 modos — use de cima para baixo</div>
+<div class="sub">Diagnóstico em 3 modos — use de cima para baixo &nbsp;·&nbsp; chamadas via corsproxy.io (CORS fix)</div>
 
 <div class="form">
   <label>OddsPapi API Key</label>
@@ -51,6 +51,9 @@
 <button class="save-btn" onclick="salvar()">💾 Salvar JSON</button>
 
 <script>
+// CORS proxy — necessário pois a OddsPapi não permite chamadas diretas do browser
+const PROXY = 'https://corsproxy.io/?url=';
+
 let resultado = {};
 function log(msg, cls='') {
   const el = document.getElementById('log');
@@ -63,7 +66,8 @@ function log(msg, cls='') {
 }
 function clear() { document.getElementById('log').textContent = ''; resultado = {}; }
 async function get(url) {
-  const r = await fetch(url);
+  const proxied = PROXY + encodeURIComponent(url);
+  const r = await fetch(proxied);
   const txt = await r.text();
   try { return JSON.parse(txt); }
   catch(e) { throw new Error(`HTTP ${r.status}: ${txt.substring(0,300)}`); }
@@ -203,23 +207,51 @@ async function testarEstrelaBet() {
         if (eb) {
           log(`    ✅ ESTRELA BET ENCONTRADA!`, 'ok');
           encontrado = true;
-          // Listar mercados
-          const markets = eb.markets || eb;
-          if (typeof markets === 'object') {
-            Object.entries(markets).forEach(([mid, m]) => {
-              log(`      [${mid}] ${m.name||mid}`, 'info');
-              const outs = m.outcomes||m.selections||(Array.isArray(m)?m:[]);
-              outs.slice(0,4).forEach(s => {
-                const odd = parseFloat(s.odds||s.price||s.value||0);
-                log(`        → ${s.name||'?'}: ${odd}`, odd>=1.25?'ok':'dim');
-              });
+          const markets = eb.markets || {};
+          const marketIds = Object.keys(markets);
+          log(`    Mercados disponíveis (${marketIds.length}): ${marketIds.join(', ')}`, 'info');
+
+          // Nomes conhecidos dos mercados
+          const MARKET_NAMES = {
+            '101':'Resultado Final (1X2)', '104':'Ambas Marcam', '106':'Over/Under (handicap 0.5)',
+            '1010':'Over/Under 2.5 gols', '1012':'Over/Under 1.5 gols', '1014':'Over/Under 3.5 gols',
+            '1016':'Over/Under 4.5 gols', '1060':'Asian Handicap -1.5', '1068':'Asian Handicap -0.5',
+            '1076':'Asian Handicap +0.5'
+          };
+          const OUTCOME_NAMES = {
+            '101':'Casa','102':'Empate','103':'Fora','104':'Sim','105':'Não',
+            '106':'Over','107':'Under','1010':'Over 2.5','1011':'Under 2.5',
+            '1012':'Over 1.5','1013':'Under 1.5','1014':'Over 3.5','1015':'Under 3.5'
+          };
+
+          let todasOdds = [];
+          Object.entries(markets).forEach(([mid, m]) => {
+            const mName = MARKET_NAMES[mid] || `Mercado ${mid}`;
+            log(`\n      [${mid}] ${mName}`, 'info');
+            const outcomes = m.outcomes || {};
+            Object.entries(outcomes).forEach(([oid, o]) => {
+              const player = o.players?.['0'] || {};
+              const odd = parseFloat(player.price || 0);
+              const ativo = player.active !== false;
+              const oName = OUTCOME_NAMES[oid] || `Outcome ${oid}`;
+              const flag = odd >= 1.25 && ativo ? '✅' : '  ';
+              log(`        ${flag} ${oName}: ${odd || '—'}${!ativo?' [inativo]':''}`, odd>=1.25&&ativo?'ok':'dim');
+              if (odd > 0) todasOdds.push({ marketId: mid, marketName: mName, outcomeName: oName, price: odd, active: ativo });
             });
-          } else {
-            log('    ' + JSON.stringify(eb).substring(0,300), 'ok');
-          }
-          resultado.estrelabet.push({fixtureId: fid, data: eb});
+          });
+
+          const disponiveis = todasOdds.filter(o => o.price >= 1.25 && o.active);
+          log(`\n    ── Resumo ──`, 'sec2');
+          log(`    Total de odds encontradas: ${todasOdds.length}`, '');
+          log(`    Odds >= 1.25 e ativas: ${disponiveis.length}`, disponiveis.length>0?'ok':'warn');
+          disponiveis.sort((a,b)=>b.price-a.price).forEach(o => {
+            log(`      ${o.price.toFixed(2)} | ${o.marketName} → ${o.outcomeName}`, 'ok');
+          });
+
+          resultado.estrelabet.push({ fixtureId: fid, mercados: marketIds, odds_disponiveis: disponiveis, raw: eb });
         } else {
           log(`    ❌ Estrela Bet não disponível`, 'dim');
+          log(`    Bookmakers que vieram: ${bkList.slice(0,8).join(', ')}`, 'dim');
         }
       } catch(e) {
         log(`    ❌ Erro: ${e.message}`, 'err');
