@@ -2304,7 +2304,7 @@ async function rotinaNoturna() {
   console.log(`\n🌙 Rotina noturna — ${hoje}`);
 
   // 1. Validar e gerar relatório do dia anterior
-  await agentValidar(ontem);
+  await agentValidar(ontem, { forcarWebSearch: true });
   await agentDiario(ontem);
 
   // 2. Semanal: rodar na rotina de domingo→segunda (diaSemana===1 = segunda)
@@ -2775,7 +2775,7 @@ app.post('/validar-pendentes', async (req, res) => {
     const semResultado = !rowOntem.resultados;
     if (semResultado || pendentesOntem.length > 0) {
       console.log(`🔄 Pendentes ontem (${ontem}): ${semResultado ? 'sem validação' : pendentesOntem.length + ' pendentes'}`);
-      await agentValidar(ontem);
+      await agentValidar(ontem, { forcarWebSearch: true });
       // Atualizar relatório após validação
       await agentDiario(ontem);
       console.log(`✅ Relatório de ${ontem} atualizado`);
@@ -2792,26 +2792,8 @@ app.post('/validar-pendentes', async (req, res) => {
     }
   }
 
-  // Verificar hoje
-  const rowHoje = await dbGet(hoje);
-  if (rowHoje?.apostas?.jogos) {
-    const pendentesHoje = rowHoje.resultados?.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
-    const semResultado = !rowHoje.resultados;
-    if (semResultado || pendentesHoje.length > 0) {
-      console.log(`🔄 Pendentes hoje (${hoje}): ${semResultado ? 'sem validação' : pendentesHoje.length + ' pendentes'}`);
-      await agentValidar(hoje);
-      await agentDiario(hoje);
-      console.log(`✅ Relatório de ${hoje} atualizado`);
-    } else {
-      const calHoje = await dbGetCalibracaoPorPeriodo('diario', hoje).catch(()=>null);
-      if (!calHoje) {
-        console.log(`📝 Relatório de hoje ausente — gerando...`);
-        await agentDiario(hoje);
-      } else {
-        console.log(`✅ Hoje (${hoje}): todos validados e relatório OK`);
-      }
-    }
-  }
+  // Não valida hoje — jogos ainda não começaram às 03h
+  console.log(`ℹ️  Hoje (${hoje}): jogos ainda não iniciados — sem validação`);
 });
 
 // Corrigir resultado de uma aposta manualmente
