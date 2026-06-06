@@ -1777,7 +1777,8 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   return 'pendente';
 }
 
-async function agentValidar(data) {
+async function agentValidar(data, opcoes = {}) {
+  const forcarWebSearch = opcoes.forcarWebSearch || false;
   console.log(`\n🔍 Validando ${data}`);
   const row = await dbGet(data);
   if (!row?.apostas?.jogos) { console.log('Sem apostas'); return; }
