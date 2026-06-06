@@ -2081,7 +2081,18 @@ async function agentValidar(data, opcoes = {}) {
               }
               const res = verificarAposta(jogoOriginal, gC, gF, statsWS);
               pend.placar = `${gC}-${gF}`;
-              pend.resultado_aposta = (res === 'pendente' || res === 'sem_stats') ? 'pendente' : res;
+              // Se ainda pendente após web search (stats não encontradas), marcar cancelado/reembolso
+              if (res === 'pendente' || res === 'sem_stats') {
+                if (!statsWS) {
+                  console.log(`    ↩️ Stats não encontradas no web search — marcando reembolso`);
+                  pend.resultado_aposta = 'cancelado';
+                  pend.motivo = 'Stats de escanteios/cartões indisponíveis — reembolso automático';
+                } else {
+                  pend.resultado_aposta = 'pendente';
+                }
+              } else {
+                pend.resultado_aposta = res;
+              }
               pend.motivo = `${pend.time_casa} ${gC} x ${gF} ${pend.time_fora} (web search)`;
               pend.encontrado = true;
               console.log(`    ✅ ${pend.time_casa} x ${pend.time_fora} → ${gC}-${gF} → ${res.toUpperCase()}`);
@@ -2853,6 +2864,42 @@ app.get('/calibracao', async (req, res) => {
 });
 
 // Endpoint para buscar TODOS os relatórios de calibração (para aba Relatórios)
+// Informar stats manualmente (escanteios/cartões) para apostas pendentes
+app.post('/informar-stats', async (req, res) => {
+  const { data, jogo_id, escanteios, cartoes } = req.body;
+  if (!data || !jogo_id) return res.status(400).json({ error: 'data e jogo_id obrigatórios' });
+  try {
+    const row = await dbGet(data);
+    if (!row?.apostas?.jogos) return res.status(404).json({ error: 'Sem apostas para essa data' });
+
+    const jogo = row.apostas.jogos.find(j => j.id === jogo_id);
+    if (!jogo) return res.status(404).json({ error: 'Jogo não encontrado' });
+
+    const resultadosExistentes = row.resultados?.apostas || [];
+    const resExistente = resultadosExistentes.find(r => r.jogo_id === jogo_id);
+    if (!resExistente?.placar) return res.status(400).json({ error: 'Jogo sem placar — valide o placar primeiro' });
+
+    const [gC, gF] = resExistente.placar.split('-').map(Number);
+    const statsInformadas = {
+      escanteiosTotal: escanteios || 0,
+      escanteiosCasa: 0, escanteiosFora: 0,
+      cartoesTotal: cartoes || 0,
+      cartoesCasa: 0, cartoesFora: 0,
+    };
+
+    const resultado = verificarAposta(jogo, gC, gF, statsInformadas);
+    const novosResultados = resultadosExistentes.map(r =>
+      r.jogo_id === jogo_id
+        ? { ...r, resultado_aposta: resultado, motivo: `Stats informadas manualmente: esc=${escanteios||0} cart=${cartoes||0}`, corrigido_manualmente: true }
+        : r
+    );
+
+    await dbSaveResultados(data, { validado_em: new Date().toISOString(), apostas: novosResultados });
+    console.log(`📊 Stats informadas: ${jogo.time_casa} x ${jogo.time_fora} | esc=${escanteios} cart=${cartoes} → ${resultado}`);
+    res.json({ ok: true, resultado });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/calibracao/diario/:data', async (req, res) => {
   const cal = await dbGetCalibracaoPorPeriodo('diario', req.params.data);
   if (cal) res.json(cal);
