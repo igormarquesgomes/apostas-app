@@ -1967,8 +1967,8 @@ async function agentValidar(data) {
         const ehRotina03h = horaAtual >= 2 && horaAtual <= 4;
         const limiteMinutos = horaAtual <= 1 ? 21 * 60 + 30 : 23 * 60 + 59;
 
-        // Web search só na rotina 03h E quando API não encontrou o jogo
-        if (ehRotina03h && !jogoEncontradoNaAPI && minutos <= limiteMinutos) {
+        // Web search na rotina 03h OU quando forçado
+        if ((ehRotina03h || forcarWebSearch) && !jogoEncontradoNaAPI && minutos <= limiteMinutos) {
           resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente_ws', motivo: 'aguardando web search em lote', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
           continue;
         }
@@ -2000,7 +2000,7 @@ async function agentValidar(data) {
         if (resultado === 'pendente') {
           const horaAtual = new Date(new Date().getTime() - 3*60*60*1000).getUTCHours();
           const ehRotina03h = horaAtual >= 2 && horaAtual <= 4;
-          if (ehRotina03h) {
+          if (ehRotina03h || forcarWebSearch) {
             console.log(`    🔍 Stats indisponíveis — enviando para web search`);
             resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente_ws', motivo: 'stats indisponíveis — web search necessário', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
           } else {
