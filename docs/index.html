@@ -476,6 +476,8 @@ function render(jogos,data){
         ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(255,23,68,.15);color:#ff1744;border:1px solid rgba(255,23,68,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✗ RED</span><button onclick="editarResultado(event,${i},dataAtual,${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
         :j.resultado==='cancelado'
         ?`<span style="background:rgba(255,171,0,.1);color:#ffab00;border:1px solid rgba(255,171,0,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">↩ REEMBOLSO</span>`
+        :j.resultado==='pendente' && (j.mercado==='escanteios'||j.mercado==='cartoes'||(j.aposta||'').toLowerCase().includes('escanteio')||(j.aposta||'').toLowerCase().includes('cartao')||(j.aposta||'').toLowerCase().includes('corner'))
+        ?`<button onclick="informarStats(event,'${dataAtual}',${j.id},'${j.aposta||''}','${j.mercado||''}')" style="background:rgba(255,171,0,.1);color:#ffab00;border:1px solid rgba(255,171,0,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;font-weight:600">📊 Informar stats</button>`
         :'';
       const cardStyle=j.resultado==='green'?'border-color:rgba(0,230,118,.35)':j.resultado==='red'?'border-color:rgba(255,23,68,.35)':'';
       html+=`<div class="jogo-card" id="jc${i}" style="${cardStyle}">
@@ -553,6 +555,51 @@ Deixe em branco para manter o placar atual.`, placarAtual.trim() || '');
 function tog(i){
   const ex=document.getElementById('ex'+i),cv=document.getElementById('cv'+i);
   ex.classList.toggle('open');cv.classList.toggle('open');
+}
+
+async function informarStats(event, data, jogoId, aposta, mercado) {
+  event.stopPropagation();
+  const isEsc = mercado==='escanteios' || aposta.toLowerCase().includes('escanteio') || aposta.toLowerCase().includes('corner');
+  const isCart = mercado==='cartoes' || aposta.toLowerCase().includes('cartao') || aposta.toLowerCase().includes('cartão');
+
+  let escanteios = null, cartoes = null;
+  if (isEsc) {
+    const v = prompt(`Total de escanteios no jogo:
+(aposta: ${aposta})`);
+    if (v === null) return;
+    escanteios = parseInt(v);
+    if (isNaN(escanteios)) return alert('Número inválido');
+  }
+  if (isCart) {
+    const v = prompt(`Total de cartões no jogo:
+(lembre: vermelho = 2 cartões)
+(aposta: ${aposta})`);
+    if (v === null) return;
+    cartoes = parseInt(v);
+    if (isNaN(cartoes)) return alert('Número inválido');
+  }
+
+  try {
+    const r = await fetch(`${BACKEND_URL}/informar-stats`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ data, jogo_id: jogoId, escanteios, cartoes })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      alert(`✅ ${j.resultado?.toUpperCase()} — resultado atualizado!`);
+      const r2 = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const d2 = await r2.json();
+      if (d2.apostas?.jogos?.length > 0) {
+        const resultados = d2.resultados?.apostas || [];
+        const jogosComRes = d2.apostas.jogos.map(jg => {
+          const res = resultados.find(x => x.jogo_id === jg.id);
+          return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null};
+        });
+        render(jogosComRes, data);
+      }
+    } else { alert('Erro: ' + (j.error||'desconhecido')); }
+  } catch(e) { alert('Erro: ' + e.message); }
 }
 </script>
 </body>
