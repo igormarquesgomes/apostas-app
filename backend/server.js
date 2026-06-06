@@ -1700,6 +1700,11 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   if (isEscanteios && stats) {
     const esc = stats.escanteiosTotal;
     console.log(`    🔍 Stats escanteios: total=${esc} casa=${stats.escanteiosCasa} fora=${stats.escanteiosFora}`);
+    // Se stats zeradas, a API não tem dados — retornar pendente para web search
+    if (esc === 0 && stats.escanteiosCasa === 0 && stats.escanteiosFora === 0) {
+      console.log(`    ⚠️ Stats escanteios zeradas — sem dados confiáveis, marcando pendente`);
+      return 'pendente';
+    }
     // Linhas completas — de 4.5 a 14.5
     for (const linha of ['4.5','5.5','6.5','7.5','8.5','9.5','10.5','11.5','12.5','13.5','14.5']) {
       const r = checkOverUnder(esc, linha);
@@ -1727,6 +1732,11 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     apostaNorm.includes('yellow');
   if (isCartoes && stats) {
     const cart = stats.cartoesTotal;
+    // Se stats zeradas, API não tem dados — pendente para web search
+    if (cart === 0 && stats.cartoesCasa === 0 && stats.cartoesFora === 0) {
+      console.log(`    ⚠️ Stats cartões zeradas — sem dados confiáveis, marcando pendente`);
+      return 'pendente';
+    }
     // Linhas completas — de 0.5 a 7.5
     for (const linha of ['0.5','1.5','2.5','3.5','4.5','5.5','6.5','7.5']) {
       const r = checkOverUnder(cart, linha);
