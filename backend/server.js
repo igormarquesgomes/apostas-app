@@ -1591,23 +1591,25 @@ async function buscarStatsFixture(fixtureId) {
 
     for (const team of teams) {
       const stats = team.statistics || [];
-      const corners = stats.find(s => s.type === 'Corner Kicks')?.value || 0;
-      const yellowCards = stats.find(s => s.type === 'Yellow Cards')?.value || 0;
-      const redCards = stats.find(s => s.type === 'Red Cards')?.value || 0;
-      const goals = stats.find(s => s.type === 'Goals')?.value || 0;
+      const corners = stats.find(s => s.type === 'Corner Kicks')?.value;
+      const yellowCards = stats.find(s => s.type === 'Yellow Cards')?.value;
+      const redCards = stats.find(s => s.type === 'Red Cards')?.value;
+      const goals = stats.find(s => s.type === 'Goals')?.value;
+      // "null" string da API deve virar 0
+      const parseVal = v => (v === null || v === 'null' || v === undefined) ? 0 : parseInt(v) || 0;
 
       // Cartão vermelho = 2 cartões (amarelo já computado antes do vermelho na maioria dos casos)
-      const yellow = parseInt(yellowCards) || 0;
-      const red = parseInt(redCards) || 0;
+      const yellow = parseVal(yellowCards);
+      const red = parseVal(redCards);
       const cartoesTime = yellow + (red * 2);
       if (teams.indexOf(team) === 0) {
-        escanteiosCasa = parseInt(corners) || 0;
+        escanteiosCasa = parseVal(corners);
         cartoesCasa = cartoesTime;
-        if ((parseInt(goals) || 0) > 0) ambosM = true;
+        if (parseVal(goals) > 0) ambosM = true;
       } else {
-        escanteiosFora = parseInt(corners) || 0;
+        escanteiosFora = parseVal(corners);
         cartoesFora = cartoesTime;
-        if ((parseInt(goals) || 0) > 0) ambosM = true;
+        if (parseVal(goals) > 0) ambosM = true;
       }
     }
 
@@ -1697,6 +1699,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     apostaNorm.includes('escanteio') || apostaNorm.includes('corner') || apostaNorm.includes('canto');
   if (isEscanteios && stats) {
     const esc = stats.escanteiosTotal;
+    console.log(`    🔍 Stats escanteios: total=${esc} casa=${stats.escanteiosCasa} fora=${stats.escanteiosFora}`);
     // Linhas completas — de 4.5 a 14.5
     for (const linha of ['4.5','5.5','6.5','7.5','8.5','9.5','10.5','11.5','12.5','13.5','14.5']) {
       const r = checkOverUnder(esc, linha);
