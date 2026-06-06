@@ -1995,7 +1995,20 @@ async function agentValidar(data) {
         }
         const resultado = verificarAposta(jogo, golsCasa, golsFora, stats);
         console.log(`    ✅ ${placar} | mercado:"${jogo.mercado}" | aposta:"${jogo.aposta}" | casa:"${jogo.time_casa}" | fora:"${jogo.time_fora}" → ${resultado.toUpperCase()}`);
-        resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+
+        // Se verificarAposta retornou pendente (ex: stats zeradas), mandar para web search na rotina 03h
+        if (resultado === 'pendente') {
+          const horaAtual = new Date(new Date().getTime() - 3*60*60*1000).getUTCHours();
+          const ehRotina03h = horaAtual >= 2 && horaAtual <= 4;
+          if (ehRotina03h) {
+            console.log(`    🔍 Stats indisponíveis — enviando para web search`);
+            resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente_ws', motivo: 'stats indisponíveis — web search necessário', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
+          } else {
+            resultados.push({ encontrado: true, placar, resultado_aposta: 'pendente', motivo: 'stats indisponíveis', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+          }
+        } else {
+          resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+        }
       } else {
         console.log(`    ⏳ Resultado não encontrado`);
         resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: 'resultado não encontrado', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
@@ -2010,11 +2023,20 @@ async function agentValidar(data) {
   const pendentesWS = resultados.filter(r => r.resultado_aposta === 'pendente_ws');
   if (pendentesWS.length > 0) {
     try {
-      const lista = pendentesWS.map(r => `${r.time_casa} x ${r.time_fora}`).join(', ');
-      console.log(`\n🔍 Web search em lote: ${pendentesWS.length} jogos (${lista})`);
+      // Separar normais de stats (escanteios/cartões)
+      const pendentesStats = pendentesWS.filter(r =>
+        ['escanteios','cartoes'].includes((r.mercado||'').toLowerCase()) ||
+        (r.aposta||'').toLowerCase().includes('escanteio') ||
+        (r.aposta||'').toLowerCase().includes('corner') ||
+        (r.aposta||'').toLowerCase().includes('cartao'));
+      const lista = pendentesWS.map(r => {
+        const isStats = pendentesStats.includes(r);
+        return isStats ? `${r.time_casa} x ${r.time_fora} (incluir total escanteios e total cartoes)` : `${r.time_casa} x ${r.time_fora}`;
+      }).join(', ');
+      console.log(`\n🔍 Web search em lote: ${pendentesWS.length} jogos (${pendentesStats.length} precisam de stats)`);
       const txt = await chamarIAComBusca(
-        `Busque o resultado final dos seguintes jogos de futebol do dia ${data}. Para cada jogo, responda APENAS com o placar no formato numérico "NomeTime1 N-M NomeTime2" onde N e M são números de 0-9. Se o jogo foi oficialmente cancelado ou adiado pela organização, escreva "cancelado". Se ainda não terminou ou não encontrou resultado, não inclua na resposta.\n\nJogos:\n${lista}`,
-        600
+        `Busque o resultado final dos seguintes jogos de futebol do dia ${data}. Para cada jogo responda: placar no formato 'Time1 N-M Time2'. Se pedido, inclua tambem 'escanteios: X' e 'cartoes: Y' (total do jogo). Se cancelado escreva 'cancelado'. Se nao encontrou nao inclua.\n\nJogos:\n${lista}`,
+        800
       );
       if (txt) {
         for (const pend of pendentesWS) {
@@ -2037,9 +2059,19 @@ async function agentValidar(data) {
             const gC = parseInt(m[1]), gF = parseInt(m[2]);
             const jogoOriginal = jogos.find(j => j.time_casa === pend.time_casa && j.time_fora === pend.time_fora);
             if (jogoOriginal) {
-              const res = verificarAposta(jogoOriginal, gC, gF, null);
+              // Tentar extrair stats (escanteios/cartões) do texto do web search
+              let statsWS = null;
+              const escMatch = txt.match(/escanteios?[:\s]+(\d+)/i);
+              const cartMatch = txt.match(/cart[oõ]es?[:\s]+(\d+)/i);
+              if (escMatch || cartMatch) {
+                const esc = escMatch ? parseInt(escMatch[1]) : 0;
+                const cart = cartMatch ? parseInt(cartMatch[1]) : 0;
+                statsWS = { escanteiosTotal: esc, escanteiosCasa: 0, escanteiosFora: 0, cartoesTotal: cart, cartoesCasa: 0, cartoesFora: 0 };
+                console.log(`    📊 Stats via web search: escanteios=${esc} cartões=${cart}`);
+              }
+              const res = verificarAposta(jogoOriginal, gC, gF, statsWS);
               pend.placar = `${gC}-${gF}`;
-              pend.resultado_aposta = res;
+              pend.resultado_aposta = res === 'pendente' ? 'pendente' : res;
               pend.motivo = `${pend.time_casa} ${gC} x ${gF} ${pend.time_fora} (web search)`;
               pend.encontrado = true;
               console.log(`    ✅ ${pend.time_casa} x ${pend.time_fora} → ${gC}-${gF} → ${res.toUpperCase()}`);
