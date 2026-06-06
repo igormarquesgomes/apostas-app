@@ -1700,10 +1700,10 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   if (isEscanteios && stats) {
     const esc = stats.escanteiosTotal;
     console.log(`    🔍 Stats escanteios: total=${esc} casa=${stats.escanteiosCasa} fora=${stats.escanteiosFora}`);
-    // Se stats zeradas, a API não tem dados — retornar pendente para web search
+    // Se stats zeradas, API não tem dados para essa liga — needs manual review
     if (esc === 0 && stats.escanteiosCasa === 0 && stats.escanteiosFora === 0) {
-      console.log(`    ⚠️ Stats escanteios zeradas — sem dados confiáveis, marcando pendente`);
-      return 'pendente';
+      console.log(`    ⚠️ Stats escanteios zeradas — liga sem cobertura de stats, correção manual necessária`);
+      return 'sem_stats';
     }
     // Linhas completas — de 4.5 a 14.5
     for (const linha of ['4.5','5.5','6.5','7.5','8.5','9.5','10.5','11.5','12.5','13.5','14.5']) {
@@ -1732,10 +1732,10 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     apostaNorm.includes('yellow');
   if (isCartoes && stats) {
     const cart = stats.cartoesTotal;
-    // Se stats zeradas, API não tem dados — pendente para web search
+    // Se stats zeradas, API não tem dados para essa liga — needs manual review
     if (cart === 0 && stats.cartoesCasa === 0 && stats.cartoesFora === 0) {
-      console.log(`    ⚠️ Stats cartões zeradas — sem dados confiáveis, marcando pendente`);
-      return 'pendente';
+      console.log(`    ⚠️ Stats cartões zeradas — liga sem cobertura de stats, correção manual necessária`);
+      return 'sem_stats';
     }
     // Linhas completas — de 0.5 a 7.5
     for (const linha of ['0.5','1.5','2.5','3.5','4.5','5.5','6.5','7.5']) {
@@ -1785,16 +1785,17 @@ async function agentValidar(data, opcoes = {}) {
 
   // Se já validado, verificar se tem pendentes para revalidar
   if (row.resultados) {
-    const pendentes = row.resultados.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
-    if (pendentes.length === 0) {
+    const pendentes = row.resultados.apostas?.filter(r =>
+      r.resultado_aposta === 'pendente' || r.resultado_aposta === 'pendente_ws'
+    ) || [];
+    if (pendentes.length === 0 && !forcarWebSearch) {
       console.log('Já validado completamente — sem pendentes');
       // Mesmo sem pendentes, verificar se múltiplas precisam ser validadas
       const rowM = await dbGetComMultiplas(data);
       const resMultExistente = rowM?.resultados_multiplas;
-      const multPendente = !resMultExistente || 
-        resMultExistente?.multipla_a?.resultado === 'pendente' || 
+      const multPendente = !resMultExistente ||
+        resMultExistente?.multipla_a?.resultado === 'pendente' ||
         resMultExistente?.multipla_b?.resultado === 'pendente';
-      console.log(`🎯 rowM.multiplas: ${rowM?.multiplas ? 'sim' : 'não'} | multPendente: ${multPendente}`);
       if (rowM?.multiplas && multPendente) {
         console.log('🎯 Validando múltiplas pendentes...');
         const resA = await validarMultipla(rowM.multiplas.multipla_a, row.resultados.apostas || []);
@@ -1810,7 +1811,11 @@ async function agentValidar(data, opcoes = {}) {
       }
       return;
     }
-    console.log(`Revalidando ${pendentes.length} apostas pendentes...`);
+    if (forcarWebSearch && pendentes.length === 0) {
+      console.log(`🔄 forcarWebSearch=true — revalidando todos os jogos com web search`);
+    } else {
+      console.log(`Revalidando ${pendentes.length} apostas pendentes...`);
+    }
   }
 
   const jogos = row.apostas.jogos;
@@ -1998,15 +2003,10 @@ async function agentValidar(data, opcoes = {}) {
         console.log(`    ✅ ${placar} | mercado:"${jogo.mercado}" | aposta:"${jogo.aposta}" | casa:"${jogo.time_casa}" | fora:"${jogo.time_fora}" → ${resultado.toUpperCase()}`);
 
         // Se verificarAposta retornou pendente (ex: stats zeradas), mandar para web search na rotina 03h
-        if (resultado === 'pendente') {
-          const horaAtual = new Date(new Date().getTime() - 3*60*60*1000).getUTCHours();
-          const ehRotina03h = horaAtual >= 2 && horaAtual <= 4;
-          if (ehRotina03h || forcarWebSearch) {
-            console.log(`    🔍 Stats indisponíveis — enviando para web search`);
-            resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente_ws', motivo: 'stats indisponíveis — web search necessário', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
-          } else {
-            resultados.push({ encontrado: true, placar, resultado_aposta: 'pendente', motivo: 'stats indisponíveis', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
-          }
+        if (resultado === 'sem_stats') {
+          // Liga sem cobertura de stats — salvar com placar mas marcar para correção manual
+          console.log(`    ⚠️ Liga sem stats — salvo com placar, aguardando correção manual`);
+          resultados.push({ encontrado: true, placar, resultado_aposta: 'pendente', motivo: `Liga sem cobertura de stats — corrija manualmente. Placar: ${placar}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
         } else {
           resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
         }
@@ -2053,17 +2053,23 @@ async function agentValidar(data, opcoes = {}) {
             console.log(`    ⚠️ Cancelado: ${pend.time_casa} x ${pend.time_fora}`);
             continue;
           }
-          // Extrair placar
-          const m = txt.match(new RegExp(nc + '[^\n]*?([0-9]{1,2})\\s*[-x]\\s*([0-9]{1,2})', 'i'))
-                  || txt.match(new RegExp('([0-9]{1,2})\\s*[-x]\\s*([0-9]{1,2})[^\n]*' + nf, 'i'));
-          if (m) {
-            const gC = parseInt(m[1]), gF = parseInt(m[2]);
+          // Se já tem placar conhecido (stats zeradas), usar direto
+          let gC, gF;
+          if (pend.placar_conhecido) {
+            const partes = pend.placar_conhecido.split('-');
+            gC = parseInt(partes[0]); gF = parseInt(partes[1]);
+            console.log(`    📋 Placar já conhecido: ${pend.placar_conhecido} — buscando stats no web search`);
+          } else {
+            const m = txt.match(new RegExp(nc + '[^\n]*?([0-9]{1,2})[-x]([0-9]{1,2})', 'i'))
+                    || txt.match(new RegExp('([0-9]{1,2})[-x]([0-9]{1,2})[^\n]*' + nf, 'i'));
+            if (m) { gC = parseInt(m[1]); gF = parseInt(m[2]); }
+          }
+          if (gC !== undefined && gF !== undefined) {
             const jogoOriginal = jogos.find(j => j.time_casa === pend.time_casa && j.time_fora === pend.time_fora);
             if (jogoOriginal) {
-              // Tentar extrair stats (escanteios/cartões) do texto do web search
               let statsWS = null;
-              const escMatch = txt.match(/escanteios?[:\s]+(\d+)/i);
-              const cartMatch = txt.match(/cart[oõ]es?[:\s]+(\d+)/i);
+              const escMatch = txt.match(/escanteios?[: ]+(\d+)/i);
+              const cartMatch = txt.match(/cart[oe][es]?[: ]+(\d+)/i);
               if (escMatch || cartMatch) {
                 const esc = escMatch ? parseInt(escMatch[1]) : 0;
                 const cart = cartMatch ? parseInt(cartMatch[1]) : 0;
@@ -2072,7 +2078,7 @@ async function agentValidar(data, opcoes = {}) {
               }
               const res = verificarAposta(jogoOriginal, gC, gF, statsWS);
               pend.placar = `${gC}-${gF}`;
-              pend.resultado_aposta = res === 'pendente' ? 'pendente' : res;
+              pend.resultado_aposta = (res === 'pendente' || res === 'sem_stats') ? 'pendente' : res;
               pend.motivo = `${pend.time_casa} ${gC} x ${gF} ${pend.time_fora} (web search)`;
               pend.encontrado = true;
               console.log(`    ✅ ${pend.time_casa} x ${pend.time_fora} → ${gC}-${gF} → ${res.toUpperCase()}`);
