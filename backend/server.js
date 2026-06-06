@@ -2061,6 +2061,7 @@ async function agentValidar(data, opcoes = {}) {
             const partes = pend.placar_conhecido.split('-');
             gC = parseInt(partes[0]); gF = parseInt(partes[1]);
             console.log(`    📋 Placar já conhecido: ${pend.placar_conhecido} — buscando stats no web search`);
+            console.log(`    📄 Texto web search: ${txt.substring(0, 300)}`);
           } else {
             const m = txt.match(new RegExp(nc + '[^\n]*?([0-9]{1,2})[-x]([0-9]{1,2})', 'i'))
                     || txt.match(new RegExp('([0-9]{1,2})[-x]([0-9]{1,2})[^\n]*' + nf, 'i'));
