@@ -1596,13 +1596,17 @@ async function buscarStatsFixture(fixtureId) {
       const redCards = stats.find(s => s.type === 'Red Cards')?.value || 0;
       const goals = stats.find(s => s.type === 'Goals')?.value || 0;
 
+      // Cartão vermelho = 2 cartões (amarelo já computado antes do vermelho na maioria dos casos)
+      const yellow = parseInt(yellowCards) || 0;
+      const red = parseInt(redCards) || 0;
+      const cartoesTime = yellow + (red * 2);
       if (teams.indexOf(team) === 0) {
         escanteiosCasa = parseInt(corners) || 0;
-        cartoesCasa = (parseInt(yellowCards) || 0) + (parseInt(redCards) || 0);
+        cartoesCasa = cartoesTime;
         if ((parseInt(goals) || 0) > 0) ambosM = true;
       } else {
         escanteiosFora = parseInt(corners) || 0;
-        cartoesFora = (parseInt(yellowCards) || 0) + (parseInt(redCards) || 0);
+        cartoesFora = cartoesTime;
         if ((parseInt(goals) || 0) > 0) ambosM = true;
       }
     }
@@ -1640,8 +1644,10 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   // Helper: verificar over/under genérico
   const checkOverUnder = (valor, linha) => {
     const n = parseFloat(linha);
-    if (aposta.includes(`over ${linha}`) || aposta.includes(`mais de ${linha}`)) return valor > n ? 'green' : 'red';
-    if (aposta.includes(`under ${linha}`) || aposta.includes(`menos de ${linha}`)) return valor < n ? 'green' : 'red';
+    // usar apostaNorm para evitar problemas de acentuação — declarada abaixo mas hoisted via let
+    const ap = (typeof apostaNorm !== 'undefined' ? apostaNorm : aposta);
+    if (ap.includes(`over ${linha}`) || ap.includes(`mais de ${linha}`)) return valor > n ? 'green' : 'red';
+    if (ap.includes(`under ${linha}`) || ap.includes(`menos de ${linha}`)) return valor < n ? 'green' : 'red';
     return null;
   };
 
@@ -1687,41 +1693,51 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   }
 
   // ── MERCADO ESCANTEIOS ────────────────────────────────────
-  if (mercado === 'escanteios' && stats) {
+  const isEscanteios = mercado === 'escanteios' ||
+    apostaNorm.includes('escanteio') || apostaNorm.includes('corner') || apostaNorm.includes('canto');
+  if (isEscanteios && stats) {
     const esc = stats.escanteiosTotal;
-    for (const linha of ['7.5','8.5','9.5','10.5','11.5','12.5']) {
+    // Linhas completas — de 4.5 a 14.5
+    for (const linha of ['4.5','5.5','6.5','7.5','8.5','9.5','10.5','11.5','12.5','13.5','14.5']) {
       const r = checkOverUnder(esc, linha);
       if (r) return r;
     }
     // Escanteios por time
-    if (aposta.includes('escanteios casa') || aposta.includes('cantos casa')) {
-      for (const linha of ['3.5','4.5','5.5','6.5']) {
+    if (apostaNorm.includes('escanteios casa') || apostaNorm.includes('cantos casa') || apostaNorm.includes('corner home')) {
+      for (const linha of ['2.5','3.5','4.5','5.5','6.5','7.5']) {
         const r = checkOverUnder(stats.escanteiosCasa, linha);
+        if (r) return r;
+      }
+    }
+    if (apostaNorm.includes('escanteios fora') || apostaNorm.includes('cantos fora') || apostaNorm.includes('corner away')) {
+      for (const linha of ['2.5','3.5','4.5','5.5','6.5','7.5']) {
+        const r = checkOverUnder(stats.escanteiosFora, linha);
         if (r) return r;
       }
     }
   }
 
   // ── MERCADO CARTÕES ───────────────────────────────────────
-  if (mercado === 'cartoes' && stats) {
+  const isCartoes = mercado === 'cartoes' ||
+    apostaNorm.includes('cartao') || apostaNorm.includes('cartão') ||
+    apostaNorm.includes('amarelo') || apostaNorm.includes('card') ||
+    apostaNorm.includes('yellow');
+  if (isCartoes && stats) {
     const cart = stats.cartoesTotal;
-    for (const linha of ['1.5','2.5','3.5','4.5','5.5']) {
+    // Linhas completas — de 0.5 a 7.5
+    for (const linha of ['0.5','1.5','2.5','3.5','4.5','5.5','6.5','7.5']) {
       const r = checkOverUnder(cart, linha);
       if (r) return r;
     }
-    // Cartões por time
-    const nomeCasa = jogo.time_casa?.toLowerCase() || '';
-    const nomeFora = jogo.time_fora?.toLowerCase() || '';
-    const palavrasCasa = nomeCasa.split(' ').filter(p => p.length > 3);
-    const palavrasFora = nomeFora.split(' ').filter(p => p.length > 3);
-    if (palavrasCasa.some(p => aposta.includes(p))) {
-      for (const linha of ['0.5','1.5','2.5']) {
+    // Cartões por time — usar palavrasCasa/palavrasFora já calculadas e apostaNorm
+    if (palavrasCasa.some(p => apostaNorm.includes(p))) {
+      for (const linha of ['0.5','1.5','2.5','3.5']) {
         const r = checkOverUnder(stats.cartoesCasa, linha);
         if (r) return r;
       }
     }
-    if (palavrasFora.some(p => aposta.includes(p))) {
-      for (const linha of ['0.5','1.5','2.5']) {
+    if (palavrasFora.some(p => apostaNorm.includes(p))) {
+      for (const linha of ['0.5','1.5','2.5','3.5']) {
         const r = checkOverUnder(stats.cartoesFora, linha);
         if (r) return r;
       }
@@ -1947,11 +1963,21 @@ async function agentValidar(data) {
 
 
       if (golsCasa !== null && golsFora !== null) {
+        // Inferir mercado pela aposta antes de buscar stats
+        const inferirMercadoPre = (m, a) => {
+          const al = (a||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+          if (al.includes('escanteio') || al.includes('corner') || al.includes('canto')) return 'escanteios';
+          if (al.includes('cartao') || al.includes('amarelo') || al.includes('card') || al.includes('yellow')) return 'cartoes';
+          return m || '';
+        };
+        const mercadoEfetivo = inferirMercadoPre(jogo.mercado?.toLowerCase(), jogo.aposta);
+
         // Buscar stats detalhadas se precisar (cartões/escanteios)
         let stats = null;
-        const mercado = jogo.mercado?.toLowerCase() || '';
-        if (['escanteios','cartoes'].includes(mercado) && fixtureIdUsado) {
+        if (['escanteios','cartoes'].includes(mercadoEfetivo) && fixtureIdUsado) {
+          console.log(`    📊 Buscando stats para mercado: ${mercadoEfetivo}`);
           stats = await buscarStatsFixture(fixtureIdUsado);
+          if (!stats) console.log(`    ⚠️ Stats não encontradas para fixtureId: ${fixtureIdUsado}`);
           await sleep(300);
         }
         const resultado = verificarAposta(jogo, golsCasa, golsFora, stats);
