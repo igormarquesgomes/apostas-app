@@ -2004,9 +2004,9 @@ async function agentValidar(data, opcoes = {}) {
 
         // Se verificarAposta retornou pendente (ex: stats zeradas), mandar para web search na rotina 03h
         if (resultado === 'sem_stats') {
-          // Liga sem cobertura de stats — salvar com placar mas marcar para correção manual
-          console.log(`    ⚠️ Liga sem stats — salvo com placar, aguardando correção manual`);
-          resultados.push({ encontrado: true, placar, resultado_aposta: 'pendente', motivo: `Liga sem cobertura de stats — corrija manualmente. Placar: ${placar}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+          // Stats zeradas — marcar pendente_ws com placar para web search buscar escanteios/cartões
+          console.log(`    ⚠️ Stats zeradas — pendente_ws para web search buscar escanteios/cartões`);
+          resultados.push({ encontrado: true, placar, placar_conhecido: placar, resultado_aposta: 'pendente_ws', motivo: 'stats zeradas — web search buscará escanteios/cartões', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
         } else {
           resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
         }
@@ -2022,6 +2022,8 @@ async function agentValidar(data, opcoes = {}) {
 
   // Web search em lote para todos os pendentes_ws de uma vez
   const pendentesWS = resultados.filter(r => r.resultado_aposta === 'pendente_ws');
+  console.log(`
+📋 Resumo: ${resultados.filter(r=>r.resultado_aposta==='green').length}G ${resultados.filter(r=>r.resultado_aposta==='red').length}R ${resultados.filter(r=>r.resultado_aposta==='pendente').length}P ${pendentesWS.length}WS`);
   if (pendentesWS.length > 0) {
     try {
       // Separar normais de stats (escanteios/cartões)
