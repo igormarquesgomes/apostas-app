@@ -581,7 +581,7 @@ Gere um único relatório complementado que:
 
 Retorne APENAS o texto do relatório complementado, sem títulos extras.`;
 
-      const relatorioComplementado = await chamarIA(promptComplementar, 3000);
+      const relatorioComplementado = await chamarIA(promptComplementar, 1500);
       const relatorioFinal = relatorioComplementado || relatorio;
       const assertividadeFinal = assertividade; // usar a mais recente
 
@@ -845,35 +845,31 @@ async function chamarIA(prompt, maxTokens = 8000) {
 }
 
 // ─── IA com busca web (para estatísticas reais) ─────────────
-async function chamarIAComBusca(prompt, maxTokens = 8000) {
-  const modelos = ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-3-5-sonnet-20241022'];
-  for (const modelo of modelos) {
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: modelo,
-          max_tokens: maxTokens,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      const json = await res.json();
-      if (!json.error) {
-        console.log(`✅ Modelo com busca: ${modelo}`);
-        // Registrar custo
-        const usage = json.usage || {};
-        registrarCusto(modelo, usage.input_tokens || 3000, usage.output_tokens || 800);
-        chamadas.webSearch++;
-        const txt = (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-        return txt;
-      }
-      console.log(`❌ ${modelo}: ${json.error.message}`);
-    } catch(e) { console.log(`❌ ${modelo} busca: ${e.message}`); }
-  }
-  // Fallback sem busca
-  return chamarIA(prompt, maxTokens);
+async function chamarIAComBusca(prompt, maxTokens = 500) {
+  // Usar Haiku — mais barato, web search mínimo
+  const modelo = 'claude-haiku-4-5';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: modelo,
+        max_tokens: maxTokens,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const json = await res.json();
+    if (!json.error) {
+      console.log(`✅ Modelo com busca: ${modelo}`);
+      const usage = json.usage || {};
+      registrarCusto(modelo, usage.input_tokens || 1000, usage.output_tokens || 200);
+      chamadas.webSearch++;
+      return (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    }
+    console.log(`❌ ${modelo} busca: ${json.error?.message}`);
+  } catch(e) { console.log(`❌ ${modelo} busca: ${e.message}`); }
+  return null;
 }
 
 // ─── Memória de calibração ────────────────────────────────────
@@ -1173,10 +1169,10 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
     // Lote 2: tentar com web_search primeiro (mantém qualidade), fallback sem
     console.log('🤖 Lote 2: tentando com web_search...');
-    let txt2 = await chamarIAComBusca(prompt2, 8000);
+    let txt2 = await chamarIAComBusca(prompt2, 2000);
     if (!txt2) {
       console.log('🤖 Lote 2: fallback sem web_search...');
-      txt2 = await chamarIA(prompt2, 8000);
+      txt2 = await chamarIA(prompt2, 2000);
     }
 
     // Se ainda falhou, dividir lote 2 em 2a e 2b
@@ -1187,7 +1183,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 
       // Sublote 2a
       const prompt2a = montarPrompt(montarListaJogos(lote2a, LOTE), blocoMem, df);
-      const txt2a = await chamarIA(prompt2a, 6000);
+      const txt2a = await chamarIA(prompt2a, 2000);
       if (txt2a) {
         try {
           const s = txt2a.indexOf('{'), e = txt2a.lastIndexOf('}');
@@ -1203,7 +1199,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 
       // Sublote 2b
       const prompt2b = montarPrompt(montarListaJogos(lote2b, LOTE + lote2a.length), blocoMem, df);
-      const txt2b = await chamarIA(prompt2b, 6000);
+      const txt2b = await chamarIA(prompt2b, 2000);
       if (txt2b) {
         try {
           const s = txt2b.indexOf('{'), e = txt2b.lastIndexOf('}');
@@ -1237,7 +1233,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
         const lote2bF = lote2.slice(Math.ceil(lote2.length/2));
         for (const [idx, sublote] of [[0, lote2aF],[lote2aF.length, lote2bF]]) {
           const pt = montarPrompt(montarListaJogos(sublote, LOTE+idx), blocoMem, df);
-          const tx = await chamarIA(pt, 5000);
+          const tx = await chamarIA(pt, 1500);
           if (tx) {
             try {
               const s = tx.indexOf('{'), e = tx.lastIndexOf('}');
@@ -1401,7 +1397,7 @@ Retorne SOMENTE JSON:
 }`;
 
   // Múltiplas não precisam de web_search — dados já vêm das estatísticas
-  const txt = await chamarIA(prompt, 4000);
+  const txt = await chamarIA(prompt, 1500);
   if (!txt) return null;
   try {
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
@@ -2080,8 +2076,8 @@ async function agentValidar(data, opcoes = {}) {
       }).join(', ');
       console.log(`\n🔍 Web search em lote: ${pendentesWS.length} jogos (${pendentesStats.length} precisam de stats)`);
       const txt = await chamarIAComBusca(
-        `Busque o resultado final dos seguintes jogos de futebol do dia ${data}. Para cada jogo responda: placar no formato 'Time1 N-M Time2'. Se pedido, inclua tambem 'escanteios: X' e 'cartoes: Y' (total do jogo). Se cancelado escreva 'cancelado'. Se nao encontrou nao inclua.\n\nJogos:\n${lista}`,
-        800
+        `Resultados futebol ${data}. Para cada jogo: "Time1 N-M Time2". Se escanteios/cartoes pedidos inclua "esc:X cart:Y". Se cancelado: "cancelado". Jogos: ${lista}`,
+        300
       );
       if (txt) {
         for (const pend of pendentesWS) {
@@ -2309,7 +2305,7 @@ Máx 500 palavras.`;
   Jogos: ${rB?.jogos_resultado?.map(j=>`${j.time_casa} x ${j.time_fora} (${j.aposta}) → ${j.resultado?.toUpperCase()||'?'}`).join(', ')||'-'}`;
   }
 
-  const relatorio = await chamarIA(`${promptDiario}${blocoMultiplas}\n\nSe as múltiplas deram RED, identifique qual jogo quebrou e sugira alternativa de mercado para próximas múltiplas.`, 3000);
+  const relatorio = await chamarIA(`${promptDiario}${blocoMultiplas}\n\nSe múltiplas RED, identifique jogo que quebrou. Máx 200 palavras.`, 1500);
   if (!relatorio) return;
   await dbSaveCalibracao('diario', data, data, relatorio, parseFloat(assert));
   console.log(`✅ Relatório diário — ${assert}%`);
@@ -2324,7 +2320,7 @@ async function agentSemanal() {
   const media = (diarios.reduce((s,d)=>s+(parseFloat(d.assertividade)||0),0)/diarios.length).toFixed(2);
   const inicio = diarios[diarios.length-1].periodo_inicio;
   const textos = diarios.map((d,i)=>`Dia ${i+1} (${d.periodo_inicio}) — ${d.assertividade}%:\n${d.relatorio}`).join('\n---\n');
-  const relatorio = await chamarIA(`Consolide relatórios diários em semanal. Período: ${inicio} a ${hoje} | Média: ${media}%\n\n${textos}\n\nPatterns, recomendações. Máx 400 palavras.`, 2000);
+  const relatorio = await chamarIA(`Semanal ${inicio}-${hoje} | ${media}% | ${textos.substring(0,1000)} | Padrões e recomendações. Máx 150 palavras.`, 800);
   if (!relatorio) return;
   await dbSaveCalibracao('semanal', inicio, hoje, relatorio, parseFloat(media));
   // Diários apagados na rotina de terça (1 dia depois)
@@ -2338,7 +2334,7 @@ async function agentMensal() {
   const media = (semanais.reduce((s,x)=>s+(parseFloat(x.assertividade)||0),0)/semanais.length).toFixed(2);
   const inicio = semanais[semanais.length-1].periodo_inicio;
   const textos = semanais.map((s,i)=>`Semana ${i+1} (${s.periodo_inicio}→${s.periodo_fim}) — ${s.assertividade}%:\n${s.relatorio}`).join('\n---\n');
-  const relatorio = await chamarIA(`Consolide semanais em mensal. Período: ${inicio} a ${hoje} | Média: ${media}%\n\n${textos}\n\n${parseFloat(media)>=80?'Acima de 80% — mantenha.':'Abaixo de 80% — o que mudar?'} Máx 500 palavras.`, 3000);
+  const relatorio = await chamarIA(`Mensal ${inicio}-${hoje} | ${media}% | ${textos.substring(0,1200)} | ${parseFloat(media)>=80?'Mantenha padrão.':'O que mudar?'} Máx 200 palavras.`, 1000);
   if (!relatorio) return;
   await dbSaveCalibracao('mensal', inicio, hoje, relatorio, parseFloat(media));
   // Semanais apagados na rotina do dia 02 (1 dia depois)
@@ -2352,7 +2348,7 @@ async function agentSemestral() {
   const media = (mensais.reduce((s,m)=>s+(parseFloat(m.assertividade)||0),0)/mensais.length).toFixed(2);
   const inicio = mensais[mensais.length-1].periodo_inicio;
   const textos = mensais.map((m,i)=>`Mês ${i+1} (${m.periodo_inicio}→${m.periodo_fim}) — ${m.assertividade}%:\n${m.relatorio}`).join('\n---\n');
-  const relatorio = await chamarIA(`Consolide mensais em semestral. Período: ${inicio} a ${hoje} | Média: ${media}%\n\n${textos}\n\nEvolução, padrões, estratégias. Máx 600 palavras.`, 4000);
+  const relatorio = await chamarIA(`Semestral ${inicio}-${hoje} | ${media}% | ${textos.substring(0,1500)} | Evolução e estratégias. Máx 250 palavras.`, 1200);
   if (!relatorio) return;
   await dbSaveCalibracao('semestral', inicio, hoje, relatorio, parseFloat(media));
   // Mensais apagados na rotina do dia 02 do mês seguinte (1 dia depois)
