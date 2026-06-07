@@ -1624,6 +1624,36 @@ async function buscarStatsFixture(fixtureId) {
 }
 
 // Verificar se aposta bateu baseado no resultado e estatísticas
+// ─── Agente IA para validação de apostas complexas ─────────────────────────
+async function agentValidarAposta(jogo, golsCasa, golsFora, stats) {
+  const statsTexto = stats ? `Escanteios: ${stats.escanteiosTotal} | Cartões: ${stats.cartoesTotal}` : 'Sem stats disponíveis';
+  const prompt = `Você é um validador de apostas esportivas. Analise se a aposta abaixo deu GREEN ou RED.
+
+JOGO: ${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}
+APOSTA: ${jogo.aposta}
+MERCADO: ${jogo.mercado || 'não informado'}
+${statsTexto}
+
+REGRAS:
+- Handicap asiático: ex. "Argentina -1.5 gols" significa Argentina precisa vencer por 2+ gols
+- Handicap +1.5 significa o time pode perder por 1 ou vencer/empatar
+- X2: visitante vence OU empate
+- 1X: mandante vence OU empate  
+- Double chance: igual ao acima
+- Ambos marcam / BTTS: ambos os times marcaram pelo menos 1 gol
+- Over/Under: total de gols do jogo
+- Vence ou empata: time não pode perder
+- Margem de gols: diferença entre os times
+
+Responda APENAS com uma palavra: GREEN ou RED`;
+
+  const resposta = await chamarIA(prompt, 50);
+  const r = resposta?.toLowerCase().trim();
+  if (r?.includes('green')) return 'green';
+  if (r?.includes('red')) return 'red';
+  return 'pendente';
+}
+
 function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   const total = golsCasa + golsFora;
   const aposta = jogo.aposta?.toLowerCase() || '';
@@ -1999,7 +2029,19 @@ async function agentValidar(data, opcoes = {}) {
           if (!stats) console.log(`    ⚠️ Stats não encontradas para fixtureId: ${fixtureIdUsado}`);
           await sleep(300);
         }
-        const resultado = verificarAposta(jogo, golsCasa, golsFora, stats);
+        let resultado = verificarAposta(jogo, golsCasa, golsFora, stats);
+
+        // Se pendente, tentar agente IA para interpretar apostas complexas (handicap, X2, etc)
+        if (resultado === 'pendente') {
+          console.log(`    🤖 Tentando agente IA para aposta complexa...`);
+          try {
+            resultado = await agentValidarAposta(jogo, golsCasa, golsFora, stats);
+            console.log(`    🤖 Agente IA: ${resultado.toUpperCase()}`);
+          } catch(e) {
+            console.log(`    ⚠️ Agente IA falhou: ${e.message}`);
+          }
+        }
+
         console.log(`    ✅ ${placar} | mercado:"${jogo.mercado}" | aposta:"${jogo.aposta}" | casa:"${jogo.time_casa}" | fora:"${jogo.time_fora}" → ${resultado.toUpperCase()}`);
 
         // Se verificarAposta retornou pendente (ex: stats zeradas), mandar para web search na rotina 03h
