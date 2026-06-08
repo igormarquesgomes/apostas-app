@@ -1103,45 +1103,14 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   }
 
   function montarPrompt(listaJogos, blocoMem, df) {
-    return `Você é um analista de apostas esportivas experiente. Para cada jogo, raciocine como um apostador profissional que busca a melhor relação entre confiança e risco.
-
-DATA: ${df}
+    return `Analista de apostas. DATA: ${df}
 ${blocoMem}
-JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
+JOGOS:
 ${listaJogos}
 
-PROCESSO DE ANÁLISE para cada jogo (raciocine internamente antes de decidir):
-
-PASSO 1 — Entenda o perfil do jogo:
-- Qual time tem vantagem clara? Existe vantagem real ou é equilibrado?
-- O histórico H2H e forma recente confirmam essa vantagem?
-- Use web_search para verificar lesões, escalações e contexto atual
-
-PASSO 2 — Avalie a aposta mais natural:
-- Se encontrou uma aposta clara, ela é segura o suficiente?
-- Existe uma forma de manter a mesma direção com mais segurança?
-  (ex: time tem vantagem mas jogo é imprevisível → dupla chance em vez de vitória simples)
-  (ex: jogo deve ter poucos gols mas há incerteza → Under 3.5 em vez de Under 2.5)
-  (ex: time favorito provavelmente marca → "time X marca" como segurança)
-
-PASSO 3 — Se o jogo for imprevisível em resultado/gols:
-- Analise os padrões de escanteios: ambos os times têm média consistente? O padrão é claro?
-- Analise os padrões de cartões: jogos entre esses times costumam ter mais ou menos cartões?
-- Se escanteios ou cartões tiverem padrão mais confiável que resultado/gols, prefira esses mercados
-
-PASSO 4 — Decisão final:
-- Escolha a aposta com maior confiança real, não a mais óbvia
-- Nunca force uma aposta arriscada só para seguir o mercado mais comum
-- A justificativa deve explicar POR QUE essa aposta específica foi escolhida em vez de alternativas
-
-REGRAS:
-- Série A e Série B têm análise OBRIGATÓRIA
-- Preencha TODOS os campos com valores numéricos reais — nunca use "-"
-- Use o histórico de calibração para evitar padrões que já erraram
-
-Retorne SOMENTE JSON válido:
-{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"V V E D V","forma_fora":"D E V V D","justificativa":"Analisei vitória do time casa mas jogo é equilibrado. Optei por dupla chance pois casa tem leve vantagem sem garantia. Escanteios também considerados mas média inconsistente (7-11 nos últimos jogos)."}]}
-
+Use web_search para verificar lesões e contexto atual.
+RESPONDA SOMENTE COM JSON VÁLIDO, sem nenhum texto antes ou depois:
+{"jogos":[{"id":1,"liga":"Série B","tipo_liga":"b","time_casa":"A","time_fora":"B","horario":"19:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Razão breve."}]}
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
   }
 
@@ -1492,9 +1461,9 @@ async function validarMultipla(multipla, resultadosApostas) {
     const j = multipla.jogos[idx];
     try {
       console.log(`  🔍 Web search múltipla: ${j.time_casa} x ${j.time_fora}`);
-      const txt = await chamarIAComBusca(
+      const txt = await chamarIA(
         `Placar final do jogo ${j.time_casa} x ${j.time_fora}. Responda apenas X-Y ou "cancelado".`,
-        300
+        50
       );
       if (txt) {
         if (/cancelado|adiado|suspens/i.test(txt)) {
@@ -2101,7 +2070,7 @@ async function agentValidar(data, opcoes = {}) {
         return isStats ? `${r.time_casa} x ${r.time_fora} (incluir total escanteios e total cartoes)` : `${r.time_casa} x ${r.time_fora}`;
       }).join(', ');
       console.log(`\n🔍 Web search em lote: ${pendentesWS.length} jogos (${pendentesStats.length} precisam de stats)`);
-      const txt = await chamarIAComBusca(
+      const txt = await chamarIA(
         `Resultados futebol ${data}. Para cada jogo: "Time1 N-M Time2". Se escanteios/cartoes pedidos inclua "esc:X cart:Y". Se cancelado: "cancelado". Jogos: ${lista}`,
         300
       );
