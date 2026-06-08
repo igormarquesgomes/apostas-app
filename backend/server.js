@@ -1031,12 +1031,18 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   // Filtrar times já selecionados (para complemento)
   if (timesIgnorar.size > 0) {
     const antes = jogos.length;
-    jogos = jogos.filter(j =>
+    const jogosNovos = jogos.filter(j =>
       !timesIgnorar.has(j.timeCasa?.toLowerCase()) &&
       !timesIgnorar.has(j.timeFora?.toLowerCase())
     );
-    if (antes !== jogos.length) console.log(`🚫 ${antes - jogos.length} jogos filtrados (duplicatas)`);
-    jogos = jogos.slice(0, metaJogos);
+    if (antes !== jogosNovos.length) console.log(`🚫 ${antes - jogosNovos.length} jogos filtrados (duplicatas)`);
+    if (jogosNovos.length > 0) {
+      jogos = jogosNovos.slice(0, metaJogos);
+    } else {
+      // Sem jogos novos após filtro — usar todos sem filtrar times
+      console.log(`⚠️ Todos jogos filtrados como duplicatas — usando jogos disponíveis sem filtro de times`);
+      jogos = jogos.slice(0, metaJogos);
+    }
   }
 
   console.log(`\nJogos selecionados: ${jogos.length}`);
