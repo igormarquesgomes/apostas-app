@@ -850,31 +850,33 @@ async function chamarIA(prompt, maxTokens = 8000) {
 }
 
 // ─── IA com busca web (para estatísticas reais) ─────────────
-async function chamarIAComBusca(prompt, maxTokens = 3500, usarSonnet = false) {
-  // Sonnet para análise complexa (lote 1), Haiku para o resto
-  const modelo = usarSonnet ? 'claude-sonnet-4-5' : 'claude-haiku-4-5';
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: modelo,
-        max_tokens: maxTokens,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const json = await res.json();
-    if (!json.error) {
-      console.log(`✅ Modelo com busca: ${modelo}`);
-      const usage = json.usage || {};
-      registrarCusto(modelo, usage.input_tokens || 1000, usage.output_tokens || 200);
-      chamadas.webSearch++;
-      return (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    }
-    console.log(`❌ ${modelo} busca: ${json.error?.message}`);
-  } catch(e) { console.log(`❌ ${modelo} busca: ${e.message}`); }
-  return null;
+async function chamarIAComBusca(prompt, maxTokens = 8000) {
+  const modelos = ['claude-sonnet-4-5', 'claude-haiku-4-5'];
+  for (const modelo of modelos) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: modelo,
+          max_tokens: maxTokens,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const json = await res.json();
+      if (!json.error) {
+        console.log(`✅ Modelo com busca: ${modelo}`);
+        const usage = json.usage || {};
+        registrarCusto(modelo, usage.input_tokens || 3000, usage.output_tokens || 800);
+        chamadas.webSearch++;
+        const txt = (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+        return txt;
+      }
+      console.log(`❌ ${modelo}: ${json.error.message}`);
+    } catch(e) { console.log(`❌ ${modelo} busca: ${e.message}`); }
+  }
+  return chamarIA(prompt, maxTokens);
 }
 
 // ─── Memória de calibração ────────────────────────────────────
@@ -1132,73 +1134,75 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     }).join('\n');
   }
 
-  // Prompt simples para lote 2 — usa só dados da API, sem web search
-  function montarPromptSimples(listaJogos, df) {
-    return `Analista de apostas. DATA: ${df}
-Analise os jogos abaixo usando APENAS as estatísticas fornecidas (forma, média gols, escanteios, cartões, H2H).
-Não use informações externas. Escolha a aposta mais segura baseada nos dados disponíveis.
-JOGOS:
-${listaJogos}
-
-RESPONDA SOMENTE COM JSON VÁLIDO, sem nenhum texto antes ou depois:
-{"jogos":[{"id":1,"liga":"Liga","tipo_liga":"b","time_casa":"A","time_fora":"B","horario":"19:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"media","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Baseado nas médias de gols e forma recente."}]}
-tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
-  }
-
   function montarPrompt(listaJogos, blocoMem, df) {
-    return `Analista de apostas. DATA: ${df}
+    return `Você é um analista de apostas esportivas experiente. Para cada jogo, raciocine como um apostador profissional que busca a melhor relação entre confiança e risco.
+
+DATA: ${df}
 ${blocoMem}
-JOGOS:
+JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
 ${listaJogos}
 
-Use web_search para verificar lesões e contexto atual.
-RESPONDA SOMENTE COM JSON VÁLIDO, sem nenhum texto antes ou depois:
-{"jogos":[{"id":1,"liga":"Série B","tipo_liga":"b","time_casa":"A","time_fora":"B","horario":"19:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Razão breve."}]}
+PROCESSO DE ANÁLISE para cada jogo (raciocine internamente antes de decidir):
+
+PASSO 1 — Entenda o perfil do jogo:
+- Qual time tem vantagem clara? Existe vantagem real ou é equilibrado?
+- O histórico H2H e forma recente confirmam essa vantagem?
+- Use web_search para verificar lesões, escalações e contexto atual
+
+PASSO 2 — Avalie a aposta mais natural:
+- Se encontrou uma aposta clara, ela é segura o suficiente?
+- Existe uma forma de manter a mesma direção com mais segurança?
+
+PASSO 3 — Se o jogo for imprevisível em resultado/gols:
+- Analise os padrões de escanteios e cartões
+
+PASSO 4 — Decisão final:
+- Escolha a aposta com maior confiança real
+
+REGRAS:
+- Série A e Série B têm análise OBRIGATÓRIA
+- Preencha TODOS os campos com valores numéricos reais
+
+Retorne SOMENTE JSON válido:
+{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise breve."}]}
+
 tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
   }
 
   // Lote 1: prioritários (Série A, B, Copa, ligas europeias principais) → Sonnet
   // Lote 2: resto (ligas menores) → Haiku com só dados da API
-  const lote1 = jogos.filter(j => (j.pri || 6) <= 4);
-  const lote2 = jogos.filter(j => (j.pri || 6) > 4);
-  const LOTE = lote1.length; // offset para IDs do lote 2
-  console.log(`📦 Lote 1 (Sonnet): ${lote1.length} jogos prioritários | Lote 2 (Haiku): ${lote2.length} jogos`);
+  // Dividir em 2 lotes para não ultrapassar rate limit de tokens
+  const LOTE = 8;
+  const lote1 = jogos.slice(0, LOTE);
+  const lote2 = jogos.slice(LOTE);
 
   let jogosResultado = [];
 
-  // Lote 1: só processar se tiver jogos
-  if (lote1.length > 0) {
-    const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
-    console.log(`\n🤖 Lote 1: ${lote1.length} jogos (Sonnet)...`);
-    const txt1 = await chamarIAComBusca(prompt1, 3500, true);
-    if (txt1) {
-      try {
-        const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
-        if (s1 !== -1) {
-          const r1 = JSON.parse(txt1.slice(s1, e1+1));
-          jogosResultado = [...(r1.jogos || [])];
-          console.log(`✅ Lote 1: ${jogosResultado.length} apostas geradas`);
-        }
-      } catch(e) { console.error('❌ Erro parse lote 1:', e.message); }
-    } else {
-      console.error('❌ Lote 1: sem resposta da IA');
-    }
+  const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
+  console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
+  const txt1 = await chamarIAComBusca(prompt1);
+  
+  if (txt1) {
+    try {
+      const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
+      if (s1 !== -1) {
+        const r1 = JSON.parse(txt1.slice(s1, e1+1));
+        jogosResultado = [...(r1.jogos || [])];
+        console.log(`✅ Lote 1: ${jogosResultado.length} apostas geradas`);
+      }
+    } catch(e) { console.error('❌ Erro parse lote 1:', e.message); }
   } else {
-    console.log(`⏭️ Lote 1 vazio — pulando para lote 2`);
+    console.error('❌ Lote 1: sem resposta da IA');
   }
 
   if (lote2.length > 0) {
     console.log(`\n⏳ Aguardando 90s antes do lote 2 (rate limit)...`);
     await sleep(90000); // 90s para garantir reset do rate limit de tokens/min
-    // Se lote 1 vazio, usar Sonnet para garantir qualidade. Senão Haiku (complementar)
-    const usarSonnetL2 = lote1.length === 0;
-    console.log(`\n🤖 Lote 2: ${lote2.length} jogos (${usarSonnetL2?'Sonnet':'Haiku'}, só dados API)...`);
-    const prompt2 = usarSonnetL2
-      ? montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df)
-      : montarPromptSimples(montarListaJogos(lote2, LOTE), df);
-    let txt2 = usarSonnetL2
-      ? await chamarIAComBusca(prompt2, 3500, true)
-      : await chamarIA(prompt2, 3500);
+    console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
+    const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
+    // Lote 2: tentar com web_search primeiro (mantém qualidade), fallback sem
+    console.log('🤖 Lote 2: tentando com web_search...');
+    let txt2 = await chamarIAComBusca(prompt2);
     if (!txt2) {
       console.log('🤖 Lote 2: tentando novamente...');
       txt2 = await chamarIA(prompt2, 3500);
