@@ -1793,6 +1793,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   if (mercado === 'resultado') {
     const apostaMencCasa = palavrasCasa.some(p => apostaNorm.includes(p));
     const apostaMencFora = !apostaMencCasa && palavrasFora.some(p => apostaNorm.includes(p));
+    console.log(`    🔎 resultado: apostaNorm="${apostaNorm}" mencCasa=${apostaMencCasa} mencFora=${apostaMencFora} casaVence=${casaVence} foraVence=${foraVence}`);
 
     if (aposta.includes('empate') && !aposta.includes('vence') && !aposta.includes('dupla')) return empate ? 'green' : 'red';
     if (aposta.includes('ou empat') || aposta.includes('vence ou empat') || aposta.includes('dupla chance') || aposta.includes('nao perde') || aposta.includes('não perde') || aposta.includes('x2') || aposta.includes('1x') || aposta.includes('12')) {
