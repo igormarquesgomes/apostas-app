@@ -521,34 +521,11 @@ async function dbGetComMultiplas(data) {
 
 async function dbSave(data, apostas) {
   try {
-    const existing = await dbGet(data);
-    if (existing) {
-      // Registro existe — PATCH só no campo apostas
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
-        method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ apostas })
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        console.error(`❌ dbSave PATCH erro ${res.status}: ${err}`);
-      } else {
-        console.log(`💾 dbSave PATCH OK — ${data} | ${apostas?.jogos?.length || 0} jogos`);
-      }
-    } else {
-      // Registro novo — POST
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ data, apostas })
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        console.error(`❌ dbSave POST erro ${res.status}: ${err}`);
-      } else {
-        console.log(`💾 dbSave POST OK — ${data} | ${apostas?.jogos?.length || 0} jogos`);
-      }
-    }
+    await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ data, apostas })
+    });
   } catch(e) { console.error('Erro dbSave:', e.message); }
 }
 
@@ -903,47 +880,25 @@ async function chamarIAComBusca(prompt, maxTokens = 8000) {
 }
 
 // ─── Memória de calibração ────────────────────────────────────
-// Extrair só padrões de mercado do relatório — ignorar restrições de liga
-function extrairPadroesRelatorio(relatorio) {
-  if (!relatorio) return '';
-  const linhas = relatorio.split('\n');
-  const padroes = linhas.filter(l => {
-    const ll = l.toLowerCase();
-    // Incluir linhas sobre mercados e padrões
-    return (ll.includes('over') || ll.includes('under') || ll.includes('btts') ||
-            ll.includes('ambos') || ll.includes('acert') || ll.includes('falh') ||
-            ll.includes('green') || ll.includes('red') || ll.includes('%')) &&
-    // Excluir linhas que restringem ligas ou volume
-    !ll.includes('excluir') && !ll.includes('suspender') && !ll.includes('vetar') &&
-    !ll.includes('apenas série') && !ll.includes('top 5') && !ll.includes('máximo') &&
-    !ll.includes('maximo') && !ll.includes('ligas regionais') && !ll.includes('eliminar');
-  }).slice(0, 8);
-  return padroes.join('\n');
-}
-
 async function buscarMemoria() {
-  // Buscar todos os tipos de relatório + últimos 7 diários
-  const [semestral, mensal, semanal, diarios] = await Promise.all([
-    dbGetCalibracao('semestral'),
+  // Mensal (visão macro) + Semanal (tendência recente) + último diário (ontem)
+  const [mensal, semanal, diarios] = await Promise.all([
     dbGetCalibracao('mensal'),
     dbGetCalibracao('semanal'),
-    dbGetCalibracoes('diario', 7)
+    dbGetCalibracoes('diario', 1)
   ]);
 
   let mem = '';
 
-  // Semestral e mensal — contexto macro
-  if (semestral) mem += `[SEMESTRAL ${semestral.periodo_inicio}→${semestral.periodo_fim} | ${semestral.assertividade}%]\n${extrairPadroesRelatorio(semestral.relatorio)}\n\n`;
-  if (mensal)    mem += `[MENSAL ${mensal.periodo_inicio}→${mensal.periodo_fim} | ${mensal.assertividade}%]\n${extrairPadroesRelatorio(mensal.relatorio)}\n\n`;
-  if (semanal)   mem += `[SEMANAL ${semanal.periodo_inicio}→${semanal.periodo_fim} | ${semanal.assertividade}%]\n${extrairPadroesRelatorio(semanal.relatorio)}\n\n`;
+  // Mensal — padrões consolidados de longo prazo
+  if (mensal) mem += `[MENSAL ${mensal.periodo_inicio}→${mensal.periodo_fim} | assertividade: ${mensal.assertividade}%]\n${mensal.relatorio.substring(0, 600)}\n\n`;
 
-  // Todos os diários disponíveis — do mais antigo para o mais recente
-  if (diarios?.length) {
-    const diariosList = [...diarios].reverse(); // mais antigo primeiro
-    diariosList.forEach(d => {
-      mem += `[DIÁRIO ${d.periodo_inicio} | ${d.assertividade}%]\n${d.relatorio.substring(0,400)}\n\n`;
-    });
-  }
+  // Semanal — tendência da semana atual
+  if (semanal) mem += `[SEMANAL ${semanal.periodo_inicio}→${semanal.periodo_fim} | assertividade: ${semanal.assertividade}%]\n${semanal.relatorio.substring(0, 600)}\n\n`;
+
+  // Último diário — o que aconteceu ontem especificamente
+  const ultimoDiario = diarios?.[0];
+  if (ultimoDiario) mem += `[DIÁRIO ${ultimoDiario.periodo_inicio} | assertividade: ${ultimoDiario.assertividade}%]\n${ultimoDiario.relatorio.substring(0, 500)}\n\n`;
 
   return mem;
 }
@@ -1158,38 +1113,48 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   }
 
   function montarPrompt(listaJogos, blocoMem, df) {
+    const blocoHistorico = blocoMem ? `HISTÓRICO DE CALIBRAÇÃO:
+Use este histórico para calibrar suas apostas de hoje. Mantenha o que está dando green, corrija o que está dando red.
+- O que está funcionando: reforce esses padrões de mercado e liga
+- O que está falhando: evite repetir o mesmo tipo de aposta nessas ligas/mercados
+- Assertividade é o guia: acima de 70% o padrão está bom, abaixo disso precisa corrigir o mercado escolhido
+
+${blocoMem}` : '';
+
     return `Você é um analista de apostas esportivas experiente. Para cada jogo, raciocine como um apostador profissional que busca a melhor relação entre confiança e risco.
 
 DATA: ${df}
-${blocoMem}
+${blocoHistorico}
 JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
 ${listaJogos}
 
 PROCESSO DE ANÁLISE para cada jogo (raciocine internamente antes de decidir):
 
-PASSO 1 — Entenda o perfil do jogo:
-- Qual time tem vantagem clara? Existe vantagem real ou é equilibrado?
-- O histórico H2H e forma recente confirmam essa vantagem?
+PASSO 1 — Consulte o histórico de calibração acima:
+- Existe padrão de green ou red para essa liga ou mercado específico?
+- Se a liga tem histórico de red em Over, considere Under ou resultado
+- Se a liga tem histórico de green em determinado mercado, priorize ele
+
+PASSO 2 — Entenda o perfil do jogo:
+- Qual time tem vantagem clara? O H2H e forma recente confirmam?
 - Use web_search para verificar lesões, escalações e contexto atual
 
-PASSO 2 — Avalie a aposta mais natural:
-- Se encontrou uma aposta clara, ela é segura o suficiente?
-- Existe uma forma de manter a mesma direção com mais segurança?
-
-PASSO 3 — Se o jogo for imprevisível em resultado/gols:
-- Analise os padrões de escanteios e cartões
+PASSO 3 — Avalie a aposta com base nos dois fatores:
+- O que os dados do jogo indicam + o que o histórico de calibração confirma
+- Se o jogo for imprevisível em resultado/gols, analise escanteios e cartões
 
 PASSO 4 — Decisão final:
-- Escolha a aposta com maior confiança real
+- Escolha a aposta com maior confiança real, priorizando o que já funcionou
 
 REGRAS:
 - Série A e Série B têm análise OBRIGATÓRIA
 - Preencha TODOS os campos com valores numéricos reais
 
 Retorne SOMENTE JSON válido:
-{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise breve."}]}
+{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Under 2.5 gols","mercado_backup":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise breve."}]}
 
-tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
+tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.
+aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd esteja baixa.`;
   }
 
   // Lote 1: prioritários (Série A, B, Copa, ligas europeias principais) → Sonnet
@@ -1203,7 +1168,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 
   const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
   console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
-  const txt1 = await chamarIAComBusca(prompt1);
+  const txt1 = await chamarIAComBusca(prompt1, 3500);
   
   if (txt1) {
     try {
@@ -1219,17 +1184,12 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   }
 
   if (lote2.length > 0) {
-    console.log(`\n⏳ Aguardando 90s antes do lote 2 (rate limit)...`);
-    await sleep(90000); // 90s para garantir reset do rate limit de tokens/min
-    console.log(`\n🤖 Lote 2: ${lote2.length} jogos...`);
+    console.log(`\n⏳ Aguardando 60s antes do lote 2 (rate limit)...`);
+    await sleep(60000);
+    console.log(`\n🤖 Lote 2: ${lote2.length} jogos (Haiku, sem web_search)...`);
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
-    // Lote 2: tentar com web_search primeiro (mantém qualidade), fallback sem
-    console.log('🤖 Lote 2: tentando com web_search...');
-    let txt2 = await chamarIAComBusca(prompt2);
-    if (!txt2) {
-      console.log('🤖 Lote 2: fallback sem web_search...');
-      txt2 = await chamarIA(prompt2, 8000);
-    }
+    // Lote 2: ligas complementares → Haiku sem web_search (economia de custo)
+    let txt2 = await chamarIA(prompt2, 2000);
 
     // Se ainda falhou, dividir lote 2 em 2a e 2b
     if (!txt2) {
@@ -1535,30 +1495,35 @@ async function validarMultipla(multipla, resultadosApostas) {
     return resultado;
   })];
 
-  // Buscar via web search para jogos não encontrados
-  // Web search individual para cada jogo não encontrado
-  for (let idx = 0; idx < multipla.jogos.length; idx++) {
-    if (resultadosJogos[idx] !== 'nao_encontrado') continue;
-    const j = multipla.jogos[idx];
+  // Buscar via web search em lote para todos os não encontrados
+  const naoEncontradosIdx = multipla.jogos.map((_, i) => i).filter(i => resultadosJogos[i] === 'nao_encontrado');
+  if (naoEncontradosIdx.length > 0) {
     try {
-      console.log(`  🔍 Web search múltipla: ${j.time_casa} x ${j.time_fora}`);
+      const listaWS = naoEncontradosIdx.map(i => `${multipla.jogos[i].time_casa} x ${multipla.jogos[i].time_fora}`).join(', ');
+      console.log(`  🔍 Web search múltiplas em lote: ${listaWS}`);
       const txt = await chamarIA(
-        `Placar final do jogo ${j.time_casa} x ${j.time_fora}. Responda apenas X-Y ou "cancelado".`,
-        50
+        `Placares finais futebol. Para cada jogo responda "Time1 N-M Time2" ou "cancelado". Jogos: ${listaWS}`,
+        150
       );
       if (txt) {
-        if (/cancelado|adiado|suspens/i.test(txt)) {
-          resultadosJogos[idx] = 'cancelado';
-        } else {
-          const m = txt.match(/(\d+)\s*[-x]\s*(\d+)/);
-          if (m) {
-            const gC = parseInt(m[1]), gF = parseInt(m[2]);
-            resultadosJogos[idx] = verificarAposta({...j}, gC, gF, null);
-            console.log(`  ✅ Web search: ${j.time_casa} x ${j.time_fora} → ${gC}-${gF} → ${resultadosJogos[idx].toUpperCase()}`);
+        for (const idx of naoEncontradosIdx) {
+          const j = multipla.jogos[idx];
+          const nc = j.time_casa.split(' ')[0].toLowerCase();
+          const nf = j.time_fora.split(' ')[0].toLowerCase();
+          if (/cancelado|adiado|suspens/i.test(txt.split('\n').find(l => l.toLowerCase().includes(nc)) || '')) {
+            resultadosJogos[idx] = 'cancelado';
+          } else {
+            const m = txt.match(new RegExp(nc + '[^\n]*?(\d+)[-x](\d+)', 'i'))
+                    || txt.match(new RegExp('(\d+)[-x](\d+)[^\n]*' + nf, 'i'));
+            if (m) {
+              const gC = parseInt(m[1]), gF = parseInt(m[2]);
+              resultadosJogos[idx] = verificarAposta({...j}, gC, gF, null);
+              console.log(`  ✅ Web search lote: ${j.time_casa} x ${j.time_fora} → ${gC}-${gF} → ${resultadosJogos[idx].toUpperCase()}`);
+            }
           }
         }
       }
-    } catch(e) { console.log(`  ⚠️ Web search falhou: ${e.message}`); }
+    } catch(e) { console.log(`  ⚠️ Web search múltiplas falhou: ${e.message}`); }
   }
 
   // Converter nao_encontrado restantes para pendente
@@ -2438,9 +2403,9 @@ async function rotinaNoturna() {
   const diaDoMes = parseInt(hoje.substring(8,10));
   console.log(`\n🌙 Rotina noturna — ${hoje}`);
 
-  // 1. Validar e gerar relatório do dia anterior
+  // 1. Validar o dia anterior — relatório gerado apenas na rotina 03h (validar-pendentes)
+  // onde todos os jogos já terminaram e o resultado é completo
   await agentValidar(ontem, { forcarWebSearch: true });
-  await agentDiario(ontem);
 
   // 2. Semanal: rodar na rotina de domingo→segunda (diaSemana===1 = segunda)
   if (diaDaSemana === 1) {
@@ -2911,11 +2876,16 @@ app.post('/validar-pendentes', async (req, res) => {
     if (semResultado || pendentesOntem.length > 0) {
       console.log(`🔄 Pendentes ontem (${ontem}): ${semResultado ? 'sem validação' : pendentesOntem.length + ' pendentes'}`);
       await agentValidar(ontem, { forcarWebSearch: true });
-      // Atualizar relatório após validação
-      await agentDiario(ontem);
-      console.log(`✅ Relatório de ${ontem} atualizado`);
+      // Gerar relatório diário — só aqui (03h), quando todos os jogos já terminaram
+      const calExistente = await dbGetCalibracaoPorPeriodo('diario', ontem).catch(()=>null);
+      if (!calExistente) {
+        await agentDiario(ontem);
+        console.log(`✅ Relatório de ${ontem} gerado`);
+      } else {
+        console.log(`✅ Relatório de ${ontem} já existe — mantendo`);
+      }
     } else {
-      // Mesmo todos validados, garantir que relatório existe e está atualizado
+      // Todos validados — garantir que relatório existe, mas não reger se já tem
       const calOntem = await dbGetCalibracaoPorPeriodo('diario', ontem).catch(()=>null);
       if (!calOntem) {
         console.log(`📝 Relatório de ${ontem} ausente — gerando...`);
