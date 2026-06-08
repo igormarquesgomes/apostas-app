@@ -1007,10 +1007,14 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
       // Ignorar países com ligas muito fracas (não aplicar a ligas World)
       if (!isWorldLeague && PAISES_IGNORAR_COMP.has(paisLower)) continue;
 
-      // Ligas World sem ID mapeado — aceitar como amistoso com pri=75
+      // Ligas World sem ID mapeado — separar amistosos masculinos de seleção dos demais
       if (isWorldLeague) {
+        const ligaLowerW = ligaNome.toLowerCase();
+        const isAmistososMasc = ligaLowerW.includes('friendly') || ligaLowerW.includes('international') || ligaLowerW.includes('amistoso');
+        // Amistosos masculinos de seleção: pri 85 (depois das africanas/oriente médio pri 80, antes do resto pri 200)
+        const priWorld = isAmistososMasc ? 85 : 150;
         if (!jogosComp.has(key))
-          jogosComp.set(key, { liga: `${ligaNome}`, tipo: 'copa', pri: 75, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+          jogosComp.set(key, { liga: `${ligaNome}`, tipo: 'copa', pri: priWorld, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
         continue;
       }
 
@@ -1060,7 +1064,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     }
     const faltam = metaJogos - jogos.length;
     // Pegar o dobro do necessário para ter reserva após filtro de timesIgnorar
-    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 3)];
+    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 5)];
   }
 
   // Filtrar times já selecionados (para complemento)
