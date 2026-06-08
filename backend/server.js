@@ -1789,6 +1789,24 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     }
   }
 
+  // ── HANDICAP ASIÁTICO ─────────────────────────────────────
+  // Ex: "Inglaterra -1.5 gols", "Argentina -1.5", "Brasil +1.5"
+  const handicapMatch = apostaNorm.match(/([+-]\d+\.?\d*)\s*(gol|goal)?/);
+  if (handicapMatch) {
+    const hcap = parseFloat(handicapMatch[1]);
+    const apostaMencCasaHc = palavrasCasa.some(p => apostaNorm.includes(p));
+    const apostaMencForaHc = palavrasFora.some(p => apostaNorm.includes(p));
+    if (apostaMencCasaHc || apostaMencForaHc) {
+      const difGols = golsCasa - golsFora; // positivo = casa vence
+      const difAjustado = apostaMencCasaHc ? difGols + hcap : -difGols + hcap;
+      console.log(`    🔎 handicap: ${apostaMencCasaHc?'casa':'fora'} hcap=${hcap} dif=${difGols} ajustado=${difAjustado}`);
+      if (difAjustado > 0) return 'green';
+      if (difAjustado < 0) return 'red';
+      // Exatamente 0 = push (empate asiático) = reembolso
+      return 'cancelado';
+    }
+  }
+
   // ── MERCADO RESULTADO ─────────────────────────────────────
   if (mercado === 'resultado') {
     const apostaMencCasa = palavrasCasa.some(p => apostaNorm.includes(p));
