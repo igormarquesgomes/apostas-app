@@ -1164,30 +1164,41 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   const LOTE = lote1.length; // offset para IDs do lote 2
   console.log(`📦 Lote 1 (Sonnet): ${lote1.length} jogos prioritários | Lote 2 (Haiku): ${lote2.length} jogos`);
 
-  const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
-  console.log(`\n🤖 Lote 1: ${lote1.length} jogos (Sonnet)...`);
-  const txt1 = await chamarIAComBusca(prompt1, 3500, true); // Sonnet para lote 1
-  
   let jogosResultado = [];
-  if (txt1) {
-    try {
-      const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
-      if (s1 !== -1) {
-        const r1 = JSON.parse(txt1.slice(s1, e1+1));
-        jogosResultado = [...(r1.jogos || [])];
-        console.log(`✅ Lote 1: ${jogosResultado.length} apostas geradas`);
-      }
-    } catch(e) { console.error('❌ Erro parse lote 1:', e.message); }
+
+  // Lote 1: só processar se tiver jogos
+  if (lote1.length > 0) {
+    const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
+    console.log(`\n🤖 Lote 1: ${lote1.length} jogos (Sonnet)...`);
+    const txt1 = await chamarIAComBusca(prompt1, 3500, true);
+    if (txt1) {
+      try {
+        const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
+        if (s1 !== -1) {
+          const r1 = JSON.parse(txt1.slice(s1, e1+1));
+          jogosResultado = [...(r1.jogos || [])];
+          console.log(`✅ Lote 1: ${jogosResultado.length} apostas geradas`);
+        }
+      } catch(e) { console.error('❌ Erro parse lote 1:', e.message); }
+    } else {
+      console.error('❌ Lote 1: sem resposta da IA');
+    }
   } else {
-    console.error('❌ Lote 1: sem resposta da IA');
+    console.log(`⏭️ Lote 1 vazio — pulando para lote 2`);
   }
 
   if (lote2.length > 0) {
     console.log(`\n⏳ Aguardando 90s antes do lote 2 (rate limit)...`);
     await sleep(90000); // 90s para garantir reset do rate limit de tokens/min
-    console.log(`\n🤖 Lote 2: ${lote2.length} jogos (Haiku, só dados API)...`);
-    const prompt2 = montarPromptSimples(montarListaJogos(lote2, LOTE), df);
-    let txt2 = await chamarIA(prompt2, 3500); // Haiku sem web search
+    // Se lote 1 vazio, usar Sonnet para garantir qualidade. Senão Haiku (complementar)
+    const usarSonnetL2 = lote1.length === 0;
+    console.log(`\n🤖 Lote 2: ${lote2.length} jogos (${usarSonnetL2?'Sonnet':'Haiku'}, só dados API)...`);
+    const prompt2 = usarSonnetL2
+      ? montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df)
+      : montarPromptSimples(montarListaJogos(lote2, LOTE), df);
+    let txt2 = usarSonnetL2
+      ? await chamarIAComBusca(prompt2, 3500, true)
+      : await chamarIA(prompt2, 3500);
     if (!txt2) {
       console.log('🤖 Lote 2: tentando novamente...');
       txt2 = await chamarIA(prompt2, 3500);
