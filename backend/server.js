@@ -1795,7 +1795,8 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     const apostaMencFora = !apostaMencCasa && palavrasFora.some(p => apostaNorm.includes(p));
     console.log(`    🔎 resultado: apostaNorm="${apostaNorm}" mencCasa=${apostaMencCasa} mencFora=${apostaMencFora} casaVence=${casaVence} foraVence=${foraVence}`);
 
-    if (aposta.includes('empate') && !aposta.includes('vence') && !aposta.includes('dupla')) return empate ? 'green' : 'red';
+    // Empate simples — só se não houver indicação de dupla chance (ou empate, X2, 1X)
+    if (aposta.includes('empate') && !aposta.includes('vence') && !aposta.includes('vitoria') && !aposta.includes('vitória') && !aposta.includes('dupla') && !aposta.includes('ou empat') && !aposta.includes('x2') && !aposta.includes('1x')) return empate ? 'green' : 'red';
     if (aposta.includes('ou empat') || aposta.includes('vence ou empat') || aposta.includes('dupla chance') || aposta.includes('nao perde') || aposta.includes('não perde') || aposta.includes('x2') || aposta.includes('1x') || aposta.includes('12')) {
       if (aposta.includes('x2') || apostaMencFora) return (foraVence || empate) ? 'green' : 'red';
       if (aposta.includes('1x') || apostaMencCasa) return (casaVence || empate) ? 'green' : 'red';
