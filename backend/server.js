@@ -260,6 +260,11 @@ const LIGAS_PRIORITY = {
   34:  { nome:'Eliminatórias UEFA',    tipo:'copa', pri:65, selecaoCampea:true },
   // Amistosos internacionais (só seleções campeãs)
   10:  { nome:'Amistoso Internacional',tipo:'copa', pri:66, selecaoCampea:true },
+  // Amistosos femininos — aceitar todas as seleções adultas
+  666: { nome:'Amistoso Feminino',tipo:'copa', pri:67 },
+  // Qualificação Copa do Mundo feminina
+  880: { nome:'Eliminatórias Copa Feminina',tipo:'copa', pri:64 },
+  1206:{ nome:'Nations League Feminina CONMEBOL',tipo:'copa', pri:64 },
 };
 
 // IDs a ignorar explicitamente (ligas brasileiras que NÃO são prioritárias)
@@ -873,6 +878,24 @@ async function chamarIAComBusca(prompt, maxTokens = 3500, usarSonnet = false) {
 }
 
 // ─── Memória de calibração ────────────────────────────────────
+// Extrair só padrões de mercado do relatório — ignorar restrições de liga
+function extrairPadroesRelatorio(relatorio) {
+  if (!relatorio) return '';
+  const linhas = relatorio.split('\n');
+  const padroes = linhas.filter(l => {
+    const ll = l.toLowerCase();
+    // Incluir linhas sobre mercados e padrões
+    return (ll.includes('over') || ll.includes('under') || ll.includes('btts') ||
+            ll.includes('ambos') || ll.includes('acert') || ll.includes('falh') ||
+            ll.includes('green') || ll.includes('red') || ll.includes('%')) &&
+    // Excluir linhas que restringem ligas ou volume
+    !ll.includes('excluir') && !ll.includes('suspender') && !ll.includes('vetar') &&
+    !ll.includes('apenas série') && !ll.includes('top 5') && !ll.includes('máximo') &&
+    !ll.includes('maximo') && !ll.includes('ligas regionais') && !ll.includes('eliminar');
+  }).slice(0, 8);
+  return padroes.join('\n');
+}
+
 async function buscarMemoria() {
   // Buscar todos os tipos de relatório + últimos 7 diários
   const [semestral, mensal, semanal, diarios] = await Promise.all([
@@ -885,9 +908,9 @@ async function buscarMemoria() {
   let mem = '';
 
   // Semestral e mensal — contexto macro
-  if (semestral) mem += `[SEMESTRAL ${semestral.periodo_inicio}→${semestral.periodo_fim} | ${semestral.assertividade}%]\n${semestral.relatorio.substring(0,500)}\n\n`;
-  if (mensal)    mem += `[MENSAL ${mensal.periodo_inicio}→${mensal.periodo_fim} | ${mensal.assertividade}%]\n${mensal.relatorio.substring(0,500)}\n\n`;
-  if (semanal)   mem += `[SEMANAL ${semanal.periodo_inicio}→${semanal.periodo_fim} | ${semanal.assertividade}%]\n${semanal.relatorio.substring(0,600)}\n\n`;
+  if (semestral) mem += `[SEMESTRAL ${semestral.periodo_inicio}→${semestral.periodo_fim} | ${semestral.assertividade}%]\n${extrairPadroesRelatorio(semestral.relatorio)}\n\n`;
+  if (mensal)    mem += `[MENSAL ${mensal.periodo_inicio}→${mensal.periodo_fim} | ${mensal.assertividade}%]\n${extrairPadroesRelatorio(mensal.relatorio)}\n\n`;
+  if (semanal)   mem += `[SEMANAL ${semanal.periodo_inicio}→${semanal.periodo_fim} | ${semanal.assertividade}%]\n${extrairPadroesRelatorio(semanal.relatorio)}\n\n`;
 
   // Todos os diários disponíveis — do mais antigo para o mais recente
   if (diarios?.length) {
@@ -920,7 +943,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     if (status !== 'NS') continue;
 
     // Filtrar Sub
-    const subRegex = /\bU\d{2}\b/i;
+    const subRegex = /\bU(1[7-9]|20)\b/i;
     const ligaNome = f.league?.name || '';
     if (subRegex.test(timeCasa) || subRegex.test(timeFora) || subRegex.test(ligaNome)) continue;
 
@@ -975,10 +998,19 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
     } else {
       // Complementares — definir tipo CORRETO e prioridade pelo país
+      // Para ligas "World", tentar inferir pelo nome da liga ou aceitar como amistoso
       const paisLower = pais.toLowerCase();
+      const isWorldLeague = paisLower === 'world';
 
-      // Ignorar países com ligas muito fracas
-      if (PAISES_IGNORAR_COMP.has(paisLower)) continue;
+      // Ignorar países com ligas muito fracas (não aplicar a ligas World)
+      if (!isWorldLeague && PAISES_IGNORAR_COMP.has(paisLower)) continue;
+
+      // Ligas World sem ID mapeado — aceitar como amistoso com pri=75
+      if (isWorldLeague) {
+        if (!jogosComp.has(key))
+          jogosComp.set(key, { liga: `${ligaNome}`, tipo: 'copa', pri: 75, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+        continue;
+      }
 
       let priComp = 20;
       let tipoComp = 'other';
@@ -1025,24 +1057,22 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
       }
     }
     const faltam = metaJogos - jogos.length;
-    jogos = [...jogos, ...compFiltrado.slice(0, faltam)];
+    // Pegar o dobro do necessário para ter reserva após filtro de timesIgnorar
+    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 3)];
   }
 
   // Filtrar times já selecionados (para complemento)
   if (timesIgnorar.size > 0) {
     const antes = jogos.length;
-    const jogosNovos = jogos.filter(j =>
-      !timesIgnorar.has(j.timeCasa?.toLowerCase()) &&
-      !timesIgnorar.has(j.timeFora?.toLowerCase())
-    );
-    if (antes !== jogosNovos.length) console.log(`🚫 ${antes - jogosNovos.length} jogos filtrados (duplicatas)`);
-    if (jogosNovos.length > 0) {
-      jogos = jogosNovos.slice(0, metaJogos);
-    } else {
-      // Sem jogos novos após filtro — usar todos sem filtrar times
-      console.log(`⚠️ Todos jogos filtrados como duplicatas — usando jogos disponíveis sem filtro de times`);
-      jogos = jogos.slice(0, metaJogos);
-    }
+    const jogosNovos = jogos.filter(j => {
+      const casa = j.timeCasa?.toLowerCase();
+      const fora = j.timeFora?.toLowerCase();
+      return !timesIgnorar.has(casa) && !timesIgnorar.has(fora);
+    });
+    const filtrados = antes - jogosNovos.length;
+    if (filtrados > 0) console.log(`🚫 ${filtrados} jogos filtrados (duplicatas)`);
+    jogos = jogosNovos.slice(0, metaJogos);
+    if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis`);
   }
 
   console.log(`\nJogos selecionados: ${jogos.length}`);
@@ -1131,6 +1161,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
   // Lote 2: resto (ligas menores) → Haiku com só dados da API
   const lote1 = jogos.filter(j => (j.pri || 6) <= 4);
   const lote2 = jogos.filter(j => (j.pri || 6) > 4);
+  const LOTE = lote1.length; // offset para IDs do lote 2
   console.log(`📦 Lote 1 (Sonnet): ${lote1.length} jogos prioritários | Lote 2 (Haiku): ${lote2.length} jogos`);
 
   const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
