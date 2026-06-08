@@ -845,7 +845,7 @@ async function chamarIA(prompt, maxTokens = 8000) {
 }
 
 // ─── IA com busca web (para estatísticas reais) ─────────────
-async function chamarIAComBusca(prompt, maxTokens = 500) {
+async function chamarIAComBusca(prompt, maxTokens = 3500) {
   // Usar Haiku — mais barato, web search mínimo
   const modelo = 'claude-haiku-4-5';
   try {
@@ -1169,10 +1169,10 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
     // Lote 2: tentar com web_search primeiro (mantém qualidade), fallback sem
     console.log('🤖 Lote 2: tentando com web_search...');
-    let txt2 = await chamarIAComBusca(prompt2, 2000);
+    let txt2 = await chamarIAComBusca(prompt2, 3500);
     if (!txt2) {
       console.log('🤖 Lote 2: fallback sem web_search...');
-      txt2 = await chamarIA(prompt2, 2000);
+      txt2 = await chamarIA(prompt2, 3500);
     }
 
     // Se ainda falhou, dividir lote 2 em 2a e 2b
@@ -1183,7 +1183,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 
       // Sublote 2a
       const prompt2a = montarPrompt(montarListaJogos(lote2a, LOTE), blocoMem, df);
-      const txt2a = await chamarIA(prompt2a, 2000);
+      const txt2a = await chamarIA(prompt2a, 3000);
       if (txt2a) {
         try {
           const s = txt2a.indexOf('{'), e = txt2a.lastIndexOf('}');
@@ -1199,7 +1199,7 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
 
       // Sublote 2b
       const prompt2b = montarPrompt(montarListaJogos(lote2b, LOTE + lote2a.length), blocoMem, df);
-      const txt2b = await chamarIA(prompt2b, 2000);
+      const txt2b = await chamarIA(prompt2b, 3000);
       if (txt2b) {
         try {
           const s = txt2b.indexOf('{'), e = txt2b.lastIndexOf('}');
