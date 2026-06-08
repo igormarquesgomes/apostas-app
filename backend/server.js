@@ -1204,8 +1204,8 @@ tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confia
     console.log('🤖 Lote 2: tentando com web_search...');
     let txt2 = await chamarIAComBusca(prompt2);
     if (!txt2) {
-      console.log('🤖 Lote 2: tentando novamente...');
-      txt2 = await chamarIA(prompt2, 3500);
+      console.log('🤖 Lote 2: fallback sem web_search...');
+      txt2 = await chamarIA(prompt2, 8000);
     }
 
     // Se ainda falhou, dividir lote 2 em 2a e 2b
