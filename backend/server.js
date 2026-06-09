@@ -487,6 +487,29 @@ async function dbSaveLiga(nomeLiga, ligaId, pais) {
   } catch(e) { console.error('Erro dbSaveLiga:', e.message); }
 }
 
+// ─── Atualizar stats de liga ─────────────────────────────────
+async function dbUpdateLigaStats(ligaId, green, red) {
+  if (!ligaId) return;
+  try {
+    // Buscar valores atuais
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}&select=green,red,total`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await res.json();
+    if (!rows?.length) return;
+    const atual = rows[0];
+    const novoGreen = (atual.green || 0) + green;
+    const novoRed   = (atual.red   || 0) + red;
+    const novoTotal = (atual.total || 0) + green + red;
+    await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ green: novoGreen, red: novoRed, total: novoTotal })
+    });
+  } catch(e) { console.error('Erro dbUpdateLigaStats:', e.message); }
+}
+
 // ─── Múltiplas ───────────────────────────────────────────────
 async function dbSaveMultiplas(data, multiplas) {
   try {
@@ -1034,6 +1057,39 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         // Salvar liga complementar no banco automaticamente
         dbSaveLiga(`${ligaNome} (${pais})`, ligaId, pais).catch(()=>{});
         jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+    }
+  }
+
+  // Enriquecer complementares com assertividade real da liga (se disponível)
+  const ligaIds = [...new Set([...jogosComp.values()].map(j => j.ligaId).filter(Boolean))];
+  const assertividadeLigas = new Map();
+  if (ligaIds.length > 0) {
+    try {
+      const ids = ligaIds.join(',');
+      const resL = await fetch(
+        `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=in.(${ids})&select=liga_id,green,red,total`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      );
+      const rowsL = await resL.json();
+      for (const row of (rowsL || [])) {
+        if (row.total >= 3) { // mínimo 3 apostas para considerar o histórico
+          const assert = Math.round((row.green / row.total) * 100);
+          assertividadeLigas.set(row.liga_id, assert);
+        }
+      }
+    } catch(e) { /* silencioso — fallback para pri fixa */ }
+  }
+
+  // Ajustar pri dos complementares com base na assertividade real
+  for (const [key, jogo] of jogosComp) {
+    const assert = assertividadeLigas.get(jogo.ligaId);
+    if (assert !== undefined) {
+      // Mapear assertividade → faixa de prioridade (menor = melhor)
+      // 80%+ → pri 60 | 70-79% → pri 70 | 60-69% → pri 80 | <60% → mantém pri original
+      if (assert >= 80)      jogo.pri = Math.min(jogo.pri, 60);
+      else if (assert >= 70) jogo.pri = Math.min(jogo.pri, 70);
+      else if (assert >= 60) jogo.pri = Math.min(jogo.pri, 80);
+      // Abaixo de 60% — mantém a prioridade original (não promove liga fraca)
     }
   }
 
@@ -2367,6 +2423,21 @@ Máx 500 palavras.`;
   if (!relatorio) return;
   await dbSaveCalibracao('diario', data, data, relatorio, parseFloat(assert));
   console.log(`✅ Relatório diário — ${assert}%`);
+
+  // Atualizar stats de green/red por liga na ligas_conhecidas
+  const statsPorLiga = {};
+  for (const res of resultadosValidados) {
+    const aposta = apostas.find(x => x.id === res.jogo_id);
+    if (!aposta?.ligaId) continue;
+    if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0 };
+    if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
+    else if (res.resultado_aposta === 'red') statsPorLiga[aposta.ligaId].red++;
+  }
+  const updatePromises = Object.entries(statsPorLiga).map(([ligaId, s]) =>
+    dbUpdateLigaStats(parseInt(ligaId), s.green, s.red)
+  );
+  await Promise.all(updatePromises);
+  console.log(`📊 Stats de ligas atualizadas: ${Object.keys(statsPorLiga).length} liga(s)`);
 }
 
 async function agentSemanal() {
@@ -2813,6 +2884,58 @@ app.post('/rotina-04h30', async (req, res) => {
 app.post('/rotina-05h', async (req, res) => {
   res.json({ mensagem: 'Rotina 05h (múltiplas) iniciada' });
   rotinaMultiplas().catch(console.error);
+});
+
+// Sincronizar histórico de assertividade das ligas com dados reais dos últimos 60 dias
+app.post('/sincronizar-ligas', async (req, res) => {
+  res.json({ mensagem: 'Sincronização de ligas iniciada' });
+  try {
+    const hoje = hojeStr();
+    // Buscar últimos 60 dias
+    const promises = [];
+    for (let i = 0; i < 60; i++) {
+      const d = diaOffset(hoje, -i);
+      promises.push(dbGet(d).catch(() => null));
+    }
+    const dias = (await Promise.all(promises)).filter(d => d?.apostas?.jogos?.length && d?.resultados?.apostas?.length);
+
+    // Consolidar green/red por ligaId
+    const statsPorLiga = {};
+    for (const dia of dias) {
+      const apostas = dia.apostas.jogos;
+      const resultados = dia.resultados.apostas;
+      for (const res of resultados) {
+        if (!['green','red'].includes(res.resultado_aposta)) continue;
+        const aposta = apostas.find(x => x.id === res.jogo_id);
+        if (!aposta?.ligaId) continue;
+        if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, total: 0 };
+        if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
+        else statsPorLiga[aposta.ligaId].red++;
+        statsPorLiga[aposta.ligaId].total++;
+      }
+    }
+
+    // Atualizar cada liga no banco (zerar e reescrever para evitar dupla contagem)
+    let atualizadas = 0;
+    for (const [ligaId, s] of Object.entries(statsPorLiga)) {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}`, {
+          method: 'PATCH',
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ green: s.green, red: s.red, total: s.total })
+        });
+        atualizadas++;
+      } catch(e) { console.error(`Erro atualizando liga ${ligaId}:`, e.message); }
+    }
+    console.log(`✅ Sincronização concluída: ${atualizadas} ligas atualizadas com histórico real`);
+    Object.entries(statsPorLiga)
+      .sort((a,b) => (b[1].total - a[1].total))
+      .slice(0, 10)
+      .forEach(([id, s]) => {
+        const pct = Math.round((s.green/s.total)*100);
+        console.log(`  Liga ${id}: ${pct}% (${s.green}G/${s.red}R — ${s.total} apostas)`);
+      });
+  } catch(e) { console.error('Erro sincronização ligas:', e.message); }
 });
 
 app.post('/rotina-noturna', async (req, res) => {
