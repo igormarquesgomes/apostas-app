@@ -264,7 +264,12 @@ async function entrar() {
 async function verificarUsuario() {
   const deviceId = getDeviceId();
   const nomeSalvo = localStorage.getItem('oddlab_nome');
-  if (nomeSalvo) { iniciarApp(nomeSalvo); return; }
+  if (nomeSalvo) {
+    // Atualizar ultimo_acesso em background mesmo com nome salvo
+    fetch(`${B}/oddlab/usuario/${deviceId}`).catch(()=>{});
+    iniciarApp(nomeSalvo);
+    return;
+  }
   try {
     const r = await fetch(`${B}/oddlab/usuario/${deviceId}`);
     const d = await r.json();
