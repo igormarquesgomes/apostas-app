@@ -1230,10 +1230,23 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     return lista.map((j, i) => {
       const s = j._stats;
       const sc = s?.statsCasa, sf = s?.statsFora;
+      // Assertividade por mercado dessa liga (se disponível)
+      const st = ligaStatsMap?.get(j.ligaId);
+      let ligaPerf = '';
+      if (st?.mercados) {
+        const mercPerf = Object.entries(st.mercados)
+          .filter(([, m]) => (m.green + m.red) >= 2)
+          .map(([mercado, m]) => {
+            const tot = m.green + m.red;
+            const pct = Math.round((m.green / tot) * 100);
+            return `${mercado}:${pct}%(${m.green}G/${m.red}R)`;
+          }).join(' ');
+        if (mercPerf) ligaPerf = `\n   LigaPerf: ${mercPerf}`;
+      }
       return `${offsetId+i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}
    Casa: forma=${sc?.forma||'?'} gols/jogo=${sc?.mediaGols||'?'} esc=${sc?.mediaEscanteios||'?'} cart=${sc?.mediaCartoes||'?'}
    Fora: forma=${sf?.forma||'?'} gols/jogo=${sf?.mediaGols||'?'} esc=${sf?.mediaEscanteios||'?'} cart=${sf?.mediaCartoes||'?'}
-   H2H: ${sc?.h2hTexto||'sem dados'}`;
+   H2H: ${sc?.h2hTexto||'sem dados'}${ligaPerf}`;
     }).join('\n');
   }
 
@@ -1246,40 +1259,43 @@ Use este histórico para calibrar suas apostas de hoje. Mantenha o que está dan
 
 ${blocoMem}` : '';
 
-    return `Você é um analista de apostas esportivas experiente. Para cada jogo, raciocine como um apostador profissional que busca a melhor relação entre confiança e risco.
+    return `Você é um analista de apostas esportivas experiente. Para cada jogo, avalie TODOS os mercados antes de decidir.
 
 DATA: ${df}
 ${blocoHistorico}
 JOGOS COM ESTATÍSTICAS REAIS (últimos 10 jogos de cada time):
 ${listaJogos}
 
-PROCESSO DE ANÁLISE para cada jogo (raciocine internamente antes de decidir):
+PROCESSO OBRIGATÓRIO para cada jogo:
 
-PASSO 1 — Consulte o histórico de calibração acima:
-- Existe padrão de green ou red para essa liga ou mercado específico?
-- Se a liga tem histórico de red em Over, considere Under ou resultado
-- Se a liga tem histórico de green em determinado mercado, priorize ele
+PASSO 1 — Consulte o histórico de calibração:
+- Qual mercado está performando melhor NESSA LIGA especificamente?
+- Se gols está com red histórico nessa liga, priorize escanteios, cartões ou resultado
 
-PASSO 2 — Entenda o perfil do jogo:
-- Qual time tem vantagem clara? O H2H e forma recente confirmam?
-- Use web_search para verificar lesões, escalações e contexto atual
+PASSO 2 — Avalie CADA mercado separadamente com os dados disponíveis:
+- GOLS: média combinada, H2H gols, padrão Over/Under
+- RESULTADO: força relativa, forma recente, H2H vencedor
+- ESCANTEIOS: média escanteios casa+fora, estilo de jogo
+- CARTÕES: média cartões, rivalidade, importância do jogo
+- Use web_search para lesões, escalações e contexto atual
 
-PASSO 3 — Avalie a aposta com base nos dois fatores:
-- O que os dados do jogo indicam + o que o histórico de calibração confirma
-- Se o jogo for imprevisível em resultado/gols, analise escanteios e cartões
+PASSO 3 — Classifique os mercados por confiança (alta/media/baixa/nao_recomendado)
 
-PASSO 4 — Decisão final:
-- Escolha a aposta com maior confiança real, priorizando o que já funcionou
+PASSO 4 — Escolha o mercado com maior confiança E que seja coerente com a análise.
+REGRA CRÍTICA: a justificativa DEVE explicar por que escolheu ESSE mercado e não outro.
+Se escrever "Under 2.5 é confiável" mas apostar Over 1.5, está ERRADO — seja coerente.
 
 REGRAS:
 - Série A e Série B têm análise OBRIGATÓRIA
 - Preencha TODOS os campos com valores numéricos reais
+- alternativas: listar TODOS os 4 mercados com aposta, confiança e razão
 
 Retorne SOMENTE JSON válido:
-{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Under 2.5 gols","mercado_backup":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise breve."}]}
+{"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","razao_escolha":"Média combinada 3.1 gols, H2H 4/5 com Over 2.5, histórico da liga 70% green em gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise completa do jogo.","alternativas":[{"mercado":"gols","aposta":"Over 2.5 gols","confianca":"alta","razao":"média 3.1 gols, H2H favorável"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"forma recente melhor em casa"},{"mercado":"escanteios","aposta":"Over 8.5 escanteios","confianca":"media","razao":"média 9.2 escanteios combinados"},{"mercado":"cartoes","aposta":"Over 3.5 cartões","confianca":"baixa","razao":"média 3.1, jogo sem rivalidade"}]}]}
 
-tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.
-aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd esteja baixa.`;
+tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa/nao_recomendado.
+razao_escolha: frase curta explicando por que esse mercado e não outro.
+alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais ao menos confiável.`;
   }
 
   // Lote 1: prioritários (Série A, B, Copa, ligas europeias principais) → Sonnet
@@ -2488,6 +2504,7 @@ Máx 500 palavras.`;
   console.log(`✅ Relatório diário — ${assert}%`);
 
   // Atualizar stats de green/red por liga na ligas_conhecidas
+  // Usar alternativas salvas para calcular assertividade REAL por mercado
   const statsPorLiga = {};
   for (const res of resultadosValidados) {
     const aposta = apostas.find(x => x.id === res.jogo_id);
@@ -2495,11 +2512,25 @@ Máx 500 palavras.`;
     if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, mercados: {} };
     if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
     else if (res.resultado_aposta === 'red') statsPorLiga[aposta.ligaId].red++;
-    // Acumular por mercado
+
+    // Acumular mercado principal apostado
     const mercado = aposta.mercado || 'gols';
     if (!statsPorLiga[aposta.ligaId].mercados[mercado]) statsPorLiga[aposta.ligaId].mercados[mercado] = { green: 0, red: 0 };
     if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].mercados[mercado].green++;
     else if (res.resultado_aposta === 'red') statsPorLiga[aposta.ligaId].mercados[mercado].red++;
+
+    // Acumular mercados ALTERNATIVOS — calcular o que teria dado green com o placar real
+    if (res.placar && aposta.alternativas?.length) {
+      for (const alt of aposta.alternativas) {
+        if (alt.mercado === mercado) continue; // já contou acima
+        const jogoAlt = { ...aposta, mercado: alt.mercado, aposta: alt.aposta };
+        const resultadoAlt = verificarAposta(jogoAlt, ...res.placar.split('-').map(Number), null);
+        if (!['green','red'].includes(resultadoAlt)) continue;
+        if (!statsPorLiga[aposta.ligaId].mercados[alt.mercado]) statsPorLiga[aposta.ligaId].mercados[alt.mercado] = { green: 0, red: 0 };
+        if (resultadoAlt === 'green') statsPorLiga[aposta.ligaId].mercados[alt.mercado].green++;
+        else statsPorLiga[aposta.ligaId].mercados[alt.mercado].red++;
+      }
+    }
   }
   const updatePromises = Object.entries(statsPorLiga).map(([ligaId, s]) =>
     Promise.all(Object.entries(s.mercados || {}).map(([mercado, ms]) =>
