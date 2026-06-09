@@ -2284,7 +2284,27 @@ async function agentValidar(data, opcoes = {}) {
           console.log(`    ⚠️ Stats zeradas — pendente_ws para web search buscar escanteios/cartões`);
           resultados.push({ encontrado: true, placar, placar_conhecido: placar, resultado_aposta: 'pendente_ws', motivo: 'stats zeradas — web search buscará escanteios/cartões', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
         } else {
-          resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta });
+          // Calcular resultado real de cada mercado alternativo
+          const mercadosResult = {};
+          if (golsCasa !== null && golsFora !== null) {
+            const totalGols = golsCasa + golsFora;
+            // Gols
+            mercadosResult.gols = {
+              'Over 2.5': totalGols > 2.5 ? 'green' : 'red',
+              'Under 2.5': totalGols < 2.5 ? 'green' : 'red',
+              'Over 1.5': totalGols > 1.5 ? 'green' : 'red',
+              'Ambos marcam': (golsCasa > 0 && golsFora > 0) ? 'green' : 'red'
+            };
+            // Resultado
+            mercadosResult.resultado = {
+              'Casa vence': golsCasa > golsFora ? 'green' : 'red',
+              'Fora vence': golsFora > golsCasa ? 'green' : 'red',
+              'Empate': golsCasa === golsFora ? 'green' : 'red',
+              'Dupla casa (1X)': golsCasa >= golsFora ? 'green' : 'red',
+              'Dupla fora (X2)': golsFora >= golsCasa ? 'green' : 'red'
+            };
+          }
+          resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercados_resultado: mercadosResult });
         }
       } else {
         console.log(`    ⏳ Resultado não encontrado`);
@@ -2512,22 +2532,72 @@ async function agentDiario(data) {
   // Identificar jogos com confiança baixa (potenciais red flags)
   const baixaConfianca = apostas.filter(a => a.confianca === 'baixa').map(a => `${a.time_casa} x ${a.time_fora}`);
 
-  const promptDiario = `Analise as apostas do dia ${data}. Assertividade: ${assert}% (${g} green, ${r} red${p>0?`, ${p} ainda pendentes`:''}). Analise apenas os jogos já validados.
+  // Calcular distribuição por mercado apostado
+  const mercadoApostado = {};
+  const mercadoGreen = {};
+  for (const res of resultadosValidados) {
+    const a = apostas.find(x => x.id === res.jogo_id);
+    const merc = a?.mercado || 'gols';
+    mercadoApostado[merc] = (mercadoApostado[merc] || 0) + 1;
+    if (res.resultado_aposta === 'green') mercadoGreen[merc] = (mercadoGreen[merc] || 0) + 1;
+  }
+  const distMercado = Object.entries(mercadoApostado).map(([m, n]) => {
+    const g2 = mercadoGreen[m] || 0;
+    const pct = Math.round((g2/n)*100);
+    return `${m}: ${n} apostas → ${pct}% (${g2}G/${n-g2}R)`;
+  }).join(' | ');
 
-RESULTADOS (com mercados alternativos que teriam dado GREEN):
+  // Calcular mercados subapostados (nunca ou pouco apostado mas teriam performado bem)
+  const mercadosAlternativos = { gols: {green:0,total:0}, resultado: {green:0,total:0}, escanteios: {green:0,total:0}, cartoes: {green:0,total:0} };
+  for (const res of resultadosValidados) {
+    if (!res.mercados_resultado) continue;
+    for (const [merc, apostasDict] of Object.entries(res.mercados_resultado)) {
+      for (const [aposta, resAlt] of Object.entries(apostasDict)) {
+        if (!mercadosAlternativos[merc]) continue;
+        mercadosAlternativos[merc].total++;
+        if (resAlt === 'green') mercadosAlternativos[merc].green++;
+      }
+    }
+  }
+  const subapostados = Object.entries(mercadosAlternativos)
+    .filter(([merc, s]) => s.total > 0)
+    .map(([merc, s]) => {
+      const pct = Math.round((s.green/s.total)*100);
+      const apostado = mercadoApostado[merc] || 0;
+      const flag = apostado === 0 ? ' ← NUNCA APOSTADO HOJE' : apostado <= 1 ? ' ← SUBAPOSTADO' : '';
+      return `${merc}: ${pct}% de greens possíveis${flag}`;
+    }).join('\n');
+
+  const promptDiario = `Analise as apostas do dia ${data}. Assertividade: ${assert}% (${g} green, ${r} red${p>0?`, ${p} pendentes`:''}).
+
+DISTRIBUIÇÃO POR MERCADO APOSTADO HOJE:
+${distMercado}
+
+RESULTADOS DETALHADOS (com o que teria dado GREEN):
 ${detalhes}
 
-${padroesTexto ? `PADRÕES IDENTIFICADOS POR LIGA (mercados que mais dariam GREEN hoje):\n${padroesTexto}` : ''}
+${padroesTexto ? `PADRÕES POR LIGA:\n${padroesTexto}` : ''}
 
-${baixaConfianca.length > 0 ? `JOGOS COM BAIXA CONFIANÇA: ${baixaConfianca.join(', ')}` : ''}
+MERCADOS E SUAS TAXAS DE GREEN HOJE (apostados ou não):
+${subapostados}
 
-INSTRUÇÕES:
-1. Para cada liga com jogos RED, identifique qual mercado teria sido mais seguro
-2. Destaque padrões recorrentes: ex. "Liga X tem historicamente Under 2.5 em 3/3 jogos hoje"
-3. Para apostas de confiança baixa, sugira o mercado alternativo mais seguro baseado nos padrões
-4. Identifique red flags: ligas ou tipos de jogo onde é melhor pivotar para mercados alternativos
-5. Seja específico com números — ex. "Over 2.5 gols daria GREEN em 5 dos 7 jogos hoje"
-Máx 500 palavras.`;
+${baixaConfianca.length > 0 ? `APOSTAS DE CONFIANÇA BAIXA: ${baixaConfianca.join(', ')}` : ''}
+
+ESCREVA O RELATÓRIO NESTA ESTRUTURA EXATA:
+
+O QUE FIZ:
+[por mercado: quantas apostas, % green, avaliação]
+
+O QUE DEIXEI PASSAR:
+[jogos específicos onde outro mercado teria dado green — cite o jogo, o mercado ignorado e o resultado]
+
+PADRÃO IDENTIFICADO:
+[o que está funcionando, o que não está, por liga]
+
+INSTRUÇÃO PARA AMANHÃ:
+[ações específicas: "priorizar escanteios quando média ≥ X", "evitar Over 2.5 em liga Y", etc.]
+
+Seja direto e acionável. Máx 400 palavras. A IA que ler este relatório amanhã deve saber EXATAMENTE o que fazer diferente.`;
 
   // Incluir resultado das múltiplas no relatório
   const rowM = await dbGetComMultiplas(data);
