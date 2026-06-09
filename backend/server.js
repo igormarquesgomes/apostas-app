@@ -1579,6 +1579,7 @@ REGRAS:
 - Múltipla A: odd total entre 3.50 e 4.50 (mais jogos)
 - Múltipla B: odd total entre 2.50 e 3.49 (menos jogos, mais seguro)
 - Use APENAS jogos da lista acima
+- CRÍTICO: copie time_casa e time_fora EXATAMENTE como aparecem na lista — nunca inverta a ordem dos times
 - A aposta de cada jogo PODE ser diferente da aposta simples do dia
 - Escolha o mercado com MAIOR probabilidade de acerto para cada jogo
 - Não repita necessariamente os mesmos jogos nas duas múltiplas
@@ -1644,18 +1645,26 @@ async function validarMultipla(multipla, resultadosApostas) {
 
   const resultadosJogos = [...multipla.jogos.map(j => {
     // Buscar por casa+fora OU fora+casa (ordem pode variar)
-    const res = resultadosApostas.find(r =>
+    const resNormal = resultadosApostas.find(r =>
       match(r.time_casa, j.time_casa) && match(r.time_fora, j.time_fora)
-    ) || resultadosApostas.find(r =>
+    );
+    const resInvertido = !resNormal && resultadosApostas.find(r =>
       match(r.time_fora, j.time_casa) && match(r.time_casa, j.time_fora)
     );
+    const res = resNormal || resInvertido;
+    const timesInvertidos = !!resInvertido;
     if (!res) {
       console.log(`  ⚠️ Não encontrado: "${j.time_casa}" x "${j.time_fora}"`);
       return 'nao_encontrado';
     }
     if (res.resultado_aposta === 'cancelado') return 'cancelado';
     if (res.resultado_aposta === 'pendente' || !res.placar) return 'pendente';
-    const [gC, gF] = res.placar.split('-').map(Number);
+    let [gC, gF] = res.placar.split('-').map(Number);
+    // Se times estavam invertidos na múltipla, inverter gols para cálculo correto
+    if (timesInvertidos) {
+      [gC, gF] = [gF, gC];
+      console.log(`  🔄 Times invertidos na múltipla: ${j.time_casa} x ${j.time_fora} — gols ajustados para ${gC}-${gF}`);
+    }
     // Inferir mercado pela aposta quando não está definido
     const inferirMercado = (aposta) => {
       const a = aposta?.toLowerCase() || '';
