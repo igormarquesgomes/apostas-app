@@ -82,6 +82,18 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .backup-t{font-size:12px;color:var(--text2);padding:8px 12px;background:var(--s1);border-left:2px solid var(--amber);display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .backup-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px;background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2);white-space:nowrap;}
 .razao-l{font-size:9px;font-family:var(--mono);color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.card-tabs{display:flex;gap:2px;margin-bottom:10px;background:var(--s2);border-radius:6px;padding:3px;}
+.card-tab{flex:1;font-family:var(--mono);font-size:9px;padding:5px 8px;border-radius:4px;border:none;background:transparent;color:var(--text3);cursor:pointer;text-transform:uppercase;letter-spacing:.06em;transition:all .15s;}
+.card-tab.active{background:var(--s1);color:var(--green);}
+.card-panel{display:none;}.card-panel.active{display:block;}
+.merc-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);}
+.merc-row:last-child{border-bottom:none;}
+.merc-name{font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;width:70px;flex-shrink:0;}
+.merc-aposta{font-size:11px;color:var(--text2);flex:1;}
+.merc-res{font-size:9px;font-family:var(--mono);font-weight:700;padding:2px 7px;border-radius:20px;}
+.merc-res.green{background:rgba(0,230,118,.15);color:var(--green);}
+.merc-res.red{background:rgba(255,23,68,.12);color:var(--red);}
+.merc-res.na{background:var(--s2);color:var(--text3);}
 .razao-t{font-size:12px;color:var(--text2);line-height:1.7;padding:10px 12px;background:var(--s1);border-left:2px solid var(--green2);}
 .alts-l{font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;}
 .alt-row{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--s1);border-radius:6px;margin-bottom:4px;gap:8px;}
@@ -530,34 +542,40 @@ function render(jogos,data){
             <div class="sm"><div class="sm-l">Forma casa</div><div class="sm-v" style="font-size:10px">${j.forma_casa||'-'}</div></div>
             <div class="sm"><div class="sm-l">Forma fora</div><div class="sm-v" style="font-size:10px">${j.forma_fora||'-'}</div></div>
           </div>
-          <div class="justif-l">Justificativa</div>
-          <div class="justif-t">${j.justificativa||'-'}</div>
-          ${j.aposta_backup ? `
-          <div class="backup-l" style="margin-top:10px">⚡ Aposta backup</div>
-          <div class="backup-t">
-            <span>${j.aposta_backup}</span>
-            <span class="backup-badge">${{gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'}[j.mercado_backup]||j.mercado_backup||'—'}</span>
-          </div>` : ''}
-          ${j.razao_escolha || j.alternativas?.length ? `
-          <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">
+          <div class="card-tabs">
+            <button class="card-tab active" onclick="switchTab(event,'pub')">Aposta</button>
+            <button class="card-tab" onclick="switchTab(event,'analise')">Análise</button>
+          </div>
+          <div class="card-panel active" id="pub_${j.id}_${dataAtual}">
+            <div class="justif-l">Justificativa</div>
+            <div class="justif-t">${j.justificativa||'-'}</div>
+            ${j.aposta_backup ? `
+            <div class="backup-l" style="margin-top:10px">⚡ Aposta backup</div>
+            <div class="backup-t">
+              <span>${j.aposta_backup}</span>
+              <span class="backup-badge">${{gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'}[j.mercado_backup]||j.mercado_backup||'—'}</span>
+            </div>` : ''}
+          </div>
+          <div class="card-panel" id="analise_${j.id}_${dataAtual}">
             ${j.razao_escolha ? `
             <div class="razao-l">🎯 Razão da escolha</div>
             <div class="razao-t" style="font-size:11px;padding:8px 12px;background:var(--s1);border-left:2px solid rgba(0,230,118,.3);color:var(--text2);line-height:1.6;margin-bottom:10px">${j.razao_escolha}</div>` : ''}
             ${j.alternativas?.length ? `
-            <div class="alts-l">📊 Mercados alternativos</div>
+            <div class="alts-l">📊 Todos os mercados</div>
             ${j.alternativas.map(alt => {
               const nomes = {gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
               const resAlt = j.placar ? calcularResultadoAlt(alt, j.placar) : null;
-              const resHtml = resAlt ? `<span class="alt-res ${resAlt}">${resAlt.toUpperCase()}</span>` : '';
+              const resHtml = resAlt ? `<span class="alt-res ${resAlt}">${resAlt.toUpperCase()}</span>` : '<span class="alt-res na">—</span>';
               const razaoHtml = alt.razao ? `<span style="font-size:10px;color:var(--text3);display:block;margin-top:2px">${alt.razao}</span>` : '';
-              return `<div class="alt-row">
-                <span class="alt-mercado">${nomes[alt.mercado]||alt.mercado}</span>
+              const isPrincipal = alt.mercado === j.mercado && alt.aposta === j.aposta;
+              return `<div class="alt-row" style="${isPrincipal?'background:rgba(0,230,118,.04);border-radius:4px;padding:5px 6px;':''}">
+                <span class="alt-mercado">${nomes[alt.mercado]||alt.mercado}${isPrincipal?' ★':''}</span>
                 <div style="flex:1"><span class="alt-aposta">${alt.aposta||'-'}</span>${razaoHtml}</div>
                 <span class="alt-conf ${alt.confianca||'baixa'}">${alt.confianca||'-'}</span>
                 ${resHtml}
               </div>`;
-            }).join('')}` : ''}
-          </div>` : ''}
+            }).join('')}` : '<div style="color:var(--text3);font-size:11px;padding:8px 0">Análise disponível a partir de amanhã</div>'}
+          </div>
         </div>
       </div>`;
       i++;
@@ -565,6 +583,17 @@ function render(jogos,data){
   });
   document.getElementById('tw').innerHTML=`<div class="jogos-wrap">${html}</div>`;
   exp=new Set();
+}
+
+function switchTab(event, tab) {
+  const card = event.target.closest('.jogo-det');
+  card.querySelectorAll('.card-tab').forEach(t => t.classList.remove('active'));
+  card.querySelectorAll('.card-panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  const panels = card.querySelectorAll('.card-panel');
+  const idx = tab === 'pub' ? 0 : 1;
+  if (panels[idx]) panels[idx].classList.add('active');
+  event.stopPropagation();
 }
 
 function calcularResultadoAlt(alt, placar) {
