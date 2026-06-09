@@ -81,6 +81,19 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .backup-l{font-size:9px;font-family:var(--mono);color:var(--amber);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 4px;}
 .backup-t{font-size:12px;color:var(--text2);padding:8px 12px;background:var(--s1);border-left:2px solid var(--amber);display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .backup-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px;background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2);white-space:nowrap;}
+.razao-l{font-size:9px;font-family:var(--mono);color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.razao-t{font-size:12px;color:var(--text2);line-height:1.7;padding:10px 12px;background:var(--s1);border-left:2px solid var(--green2);}
+.alts-l{font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;}
+.alt-row{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--s1);border-radius:6px;margin-bottom:4px;gap:8px;}
+.alt-mercado{font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:20px;background:var(--s2);color:var(--text2);text-transform:uppercase;white-space:nowrap;}
+.alt-aposta{font-size:12px;color:var(--text2);flex:1;}
+.alt-conf{font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:20px;white-space:nowrap;}
+.alt-conf.alta{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.2);}
+.alt-conf.media{background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2);}
+.alt-conf.baixa{background:rgba(255,23,68,.08);color:var(--red);border:1px solid rgba(255,23,68,.2);}
+.alt-res{font-size:10px;font-family:var(--mono);font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.alt-res.green{background:rgba(0,230,118,.15);color:var(--green);}
+.alt-res.red{background:rgba(255,23,68,.12);color:var(--red);}
 .empty-state{text-align:center;padding:4rem 2rem;color:var(--text3);}
 .empty-state svg{width:36px;height:36px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;opacity:.3;}
 .loading-state{text-align:center;padding:4rem 2rem;}
@@ -520,10 +533,30 @@ function render(jogos,data){
           <div class="justif-l">Justificativa</div>
           <div class="justif-t">${j.justificativa||'-'}</div>
           ${j.aposta_backup ? `
-          <div class="backup-l">⚡ Aposta backup</div>
+          <div class="backup-l" style="margin-top:10px">⚡ Aposta backup</div>
           <div class="backup-t">
             <span>${j.aposta_backup}</span>
             <span class="backup-badge">${{gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'}[j.mercado_backup]||j.mercado_backup||'—'}</span>
+          </div>` : ''}
+          ${j.razao_escolha || j.alternativas?.length ? `
+          <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">
+            ${j.razao_escolha ? `
+            <div class="razao-l">🎯 Razão da escolha</div>
+            <div class="razao-t" style="font-size:11px;padding:8px 12px;background:var(--s1);border-left:2px solid rgba(0,230,118,.3);color:var(--text2);line-height:1.6;margin-bottom:10px">${j.razao_escolha}</div>` : ''}
+            ${j.alternativas?.length ? `
+            <div class="alts-l">📊 Mercados alternativos</div>
+            ${j.alternativas.map(alt => {
+              const nomes = {gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
+              const resAlt = j.placar ? calcularResultadoAlt(alt, j.placar) : null;
+              const resHtml = resAlt ? `<span class="alt-res ${resAlt}">${resAlt.toUpperCase()}</span>` : '';
+              const razaoHtml = alt.razao ? `<span style="font-size:10px;color:var(--text3);display:block;margin-top:2px">${alt.razao}</span>` : '';
+              return `<div class="alt-row">
+                <span class="alt-mercado">${nomes[alt.mercado]||alt.mercado}</span>
+                <div style="flex:1"><span class="alt-aposta">${alt.aposta||'-'}</span>${razaoHtml}</div>
+                <span class="alt-conf ${alt.confianca||'baixa'}">${alt.confianca||'-'}</span>
+                ${resHtml}
+              </div>`;
+            }).join('')}` : ''}
           </div>` : ''}
         </div>
       </div>`;
@@ -532,6 +565,31 @@ function render(jogos,data){
   });
   document.getElementById('tw').innerHTML=`<div class="jogos-wrap">${html}</div>`;
   exp=new Set();
+}
+
+function calcularResultadoAlt(alt, placar) {
+  if (!placar || !alt?.aposta) return null;
+  const m = placar.match(/(\d+)-(\d+)/);
+  if (!m) return null;
+  const gc = parseInt(m[1]), gf = parseInt(m[2]);
+  const total = gc + gf;
+  const ap = (alt.aposta || '').toLowerCase();
+  const merc = alt.mercado || 'gols';
+  if (merc === 'gols') {
+    const n = parseFloat(ap.match(/[\d.]+/)?.[0]);
+    if (ap.includes('over') || ap.includes('mais')) return total > n ? 'green' : 'red';
+    if (ap.includes('under') || ap.includes('menos')) return total < n ? 'green' : 'red';
+    if (ap.includes('ambas') || ap.includes('btts')) return (gc > 0 && gf > 0) ? 'green' : 'red';
+  }
+  if (merc === 'resultado') {
+    if (ap.includes('empate') || ap === 'x') return gc === gf ? 'green' : 'red';
+    const casaVence = gc > gf, foraVence = gf > gc;
+    if (ap.includes('casa') || ap.includes('home') || ap.match(/^1/)) return casaVence ? 'green' : 'red';
+    if (ap.includes('fora') || ap.includes('away') || ap.match(/^2/)) return foraVence ? 'green' : 'red';
+    if (ap.includes('x2') || ap.includes('dupla fora')) return (gc <= gf) ? 'green' : 'red';
+    if (ap.includes('1x') || ap.includes('dupla casa')) return (gc >= gf) ? 'green' : 'red';
+  }
+  return null;
 }
 
 async function editarResultado(event, idx, data, jogoId, resultadoAtual){
