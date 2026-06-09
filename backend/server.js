@@ -1168,7 +1168,7 @@ aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd
 
   const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
   console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
-  const txt1 = await chamarIAComBusca(prompt1, 3500);
+  const txt1 = await chamarIAComBusca(prompt1, 5000);
   
   if (txt1) {
     try {
@@ -1189,7 +1189,7 @@ aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd
     console.log(`\n🤖 Lote 2: ${lote2.length} jogos (Haiku, sem web_search)...`);
     const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
     // Lote 2: ligas complementares → Haiku sem web_search (economia de custo)
-    let txt2 = await chamarIA(prompt2, 2000);
+    let txt2 = await chamarIA(prompt2, 5000);
 
     // Se ainda falhou, dividir lote 2 em 2a e 2b
     if (!txt2) {
@@ -1199,7 +1199,7 @@ aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd
 
       // Sublote 2a
       const prompt2a = montarPrompt(montarListaJogos(lote2a, LOTE), blocoMem, df);
-      const txt2a = await chamarIA(prompt2a, 3000);
+      const txt2a = await chamarIA(prompt2a, 3500);
       if (txt2a) {
         try {
           const s = txt2a.indexOf('{'), e = txt2a.lastIndexOf('}');
@@ -1215,7 +1215,7 @@ aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd
 
       // Sublote 2b
       const prompt2b = montarPrompt(montarListaJogos(lote2b, LOTE + lote2a.length), blocoMem, df);
-      const txt2b = await chamarIA(prompt2b, 3000);
+      const txt2b = await chamarIA(prompt2b, 3500);
       if (txt2b) {
         try {
           const s = txt2b.indexOf('{'), e = txt2b.lastIndexOf('}');
@@ -1249,7 +1249,7 @@ aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd
         const lote2bF = lote2.slice(Math.ceil(lote2.length/2));
         for (const [idx, sublote] of [[0, lote2aF],[lote2aF.length, lote2bF]]) {
           const pt = montarPrompt(montarListaJogos(sublote, LOTE+idx), blocoMem, df);
-          const tx = await chamarIA(pt, 1500);
+          const tx = await chamarIA(pt, 2500);
           if (tx) {
             try {
               const s = tx.indexOf('{'), e = tx.lastIndexOf('}');
