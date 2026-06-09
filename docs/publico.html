@@ -396,87 +396,103 @@ function renderDia(dia, data) {
 
 async function carregarRelatorio() {
   try {
-    // Buscar últimos 7 dias para calcular assertividade
-    // Calcular início da semana (segunda-feira)
+    // Buscar últimos 7 dias (da segunda-feira até hoje)
     const hoje_d = new Date();
     const br_d = new Date(hoje_d.getTime() - 3*60*60*1000);
-    const diaSem = br_d.getDay(); // 0=dom,1=seg,...,6=sab
+    const diaSem = br_d.getDay();
     const diasDesdeSegunda = diaSem === 0 ? 6 : diaSem - 1;
     const offsets = Array.from({length: diasDesdeSegunda + 1}, (_,i) => -diasDesdeSegunda + i);
     const tsRel = Date.now();
     const promises = offsets.map(i => fetch(`${B}/apostas-resultado/${offsetStr(i)}?t=${tsRel}`).then(r=>r.json()).catch(()=>null));
     const dias = await Promise.all(promises);
-    let tG=0, tR=0, relTexto = '';
 
+    // Calcular stats da semana
+    let tG=0, tR=0;
+    const statsPorDia = [];
     for (const dia of dias.filter(Boolean)) {
       const res = dia.resultados?.apostas || [];
-      tG += res.filter(r=>r.resultado_aposta==='green').length;
-      tR += res.filter(r=>r.resultado_aposta==='red').length;
+      const g = res.filter(r=>r.resultado_aposta==='green').length;
+      const r = res.filter(r=>r.resultado_aposta==='red').length;
+      tG += g; tR += r;
+      if (g+r > 0) statsPorDia.push({ g, r, pct: Math.round(g/(g+r)*100) });
     }
-
     const assert = tG+tR > 0 ? Math.round(tG/(tG+tR)*100) : null;
+    const meta = 70;
+    const tendencia = statsPorDia.length >= 2
+      ? statsPorDia[statsPorDia.length-1].pct - statsPorDia[0].pct
+      : 0;
 
-    // Buscar relatório — semanal preferido, fallback diário mais recente
+    // Buscar relatório calibração — semanal preferido, fallback diário
+    let relTexto = '', tipoRel = '';
     try {
-      // Tentar semanal primeiro
       const rSem = await fetch(`${B}/calibracao?t=${Date.now()}`, {cache:'no-store'});
       const dSem = await rSem.json();
-      if (dSem?.semanal?.relatorio) {
-        relTexto = dSem.semanal.relatorio;
-      } else if (dSem?.diario?.relatorio) {
-        relTexto = dSem.diario.relatorio;
-      }
-      // Se não veio, buscar diário de ontem especificamente
+      if (dSem?.semanal?.relatorio) { relTexto = dSem.semanal.relatorio; tipoRel = 'semanal'; }
+      else if (dSem?.diario?.relatorio) { relTexto = dSem.diario.relatorio; tipoRel = 'diário'; }
       if (!relTexto) {
-        const ontem = offsetStr(-1);
-        const rDia = await fetch(`${B}/calibracao/diario/${ontem}?t=${Date.now()}`, {cache:'no-store'});
-        if (rDia.ok) {
-          const dDia = await rDia.json();
-          if (dDia?.relatorio) relTexto = dDia.relatorio;
-        }
+        const rDia = await fetch(`${B}/calibracao/diario/${offsetStr(-1)}?t=${Date.now()}`, {cache:'no-store'});
+        if (rDia.ok) { const dDia = await rDia.json(); if (dDia?.relatorio) { relTexto = dDia.relatorio; tipoRel = 'diário'; } }
       }
     } catch(e) {}
 
-    // Processar relatório — limpar markdown e exibir diretamente
-    const processarRelatorio = (texto) => {
-      if (!texto) return { positivos: [], melhorar: [] };
-      const linhas = texto.split('\n')
-        .map(l => l
-          .replace(/#{1,4}\s*/g, '')           // remover ## títulos
-          .replace(/\*\*(.*?)\*\*/g, '$1')      // remover **negrito**
-          .replace(/\|.*\|/g, '')               // remover linhas de tabela
-          .replace(/^[-*•]\s+/, '')             // remover bullets
-          .trim()
-        )
-        .filter(l => l.length > 20 && !l.startsWith('---') && !l.startsWith('===') && !l.startsWith('|'));
+    // Extrair seções estruturadas do novo formato de relatório
+    const extrairSecao = (texto, cabecalho) => {
+      if (!texto) return [];
+      const linhas = texto.split('\n');
+      const idx = linhas.findIndex(l => l.toUpperCase().includes(cabecalho.toUpperCase()));
+      if (idx === -1) return [];
+      const resultado = [];
+      for (let i = idx+1; i < linhas.length && resultado.length < 3; i++) {
+        const l = linhas[i].replace(/^[-*•]\s*/, '').replace(/\*\*(.*?)\*\*/g,'$1').trim();
+        // Parar se encontrou outro cabeçalho de seção
+        if (l.match(/^[A-ZÁÉÍÓÚ\s]{4,}:$/) || l.startsWith('---')) break;
+        if (l.length > 15) resultado.push(l);
+      }
+      return resultado;
+    };
 
-      const positivos = [], melhorar = [];
+    // Limpar texto simples removendo markdown
+    const limpar = t => t
+      .replace(/#{1,4}\s*/g,'')
+      .replace(/\*\*(.*?)\*\*/g,'$1')
+      .replace(/^[-*•]\s*/,'')
+      .trim();
+
+    // Tentar extrair seções do novo formato
+    let destaques = extrairSecao(relTexto, 'O QUE FIZ');
+    let instrucoes = extrairSecao(relTexto, 'INSTRUÇÃO PARA AMANHÃ');
+    let padroes = extrairSecao(relTexto, 'PADRÃO IDENTIFICADO');
+
+    // Fallback: filtrar por palavras-chave se não achou seções estruturadas
+    if (!destaques.length && !instrucoes.length && relTexto) {
+      const linhas = relTexto.split('\n').map(limpar).filter(l => l.length > 20);
       for (const l of linhas) {
         const ll = l.toLowerCase();
-        if (ll.includes('melhor') || ll.includes('atenção') || ll.includes('atencao') ||
-            ll.includes('pivotar') || ll.includes('red flag') || ll.includes('evitar') ||
-            ll.includes('cuidado') || ll.includes('❌') || ll.includes('⚠️')) {
-          if (melhorar.length < 3) melhorar.push(l);
-        } else if (ll.includes('acert') || ll.includes('✅') || ll.includes('green') ||
-            ll.includes('padrão') || ll.includes('padrao') || ll.includes('mercado') ||
-            ll.includes('assertiv') || ll.includes('recomend') || ll.includes('identificad')) {
-          if (positivos.length < 4) positivos.push(l);
+        if (ll.includes('green') || ll.includes('acert') || ll.includes('✅') || ll.includes('assertiv')) {
+          if (destaques.length < 3) destaques.push(l);
+        } else if (ll.includes('amanhã') || ll.includes('prioriz') || ll.includes('evitar') || ll.includes('aumentar') || ll.includes('reduzir')) {
+          if (instrucoes.length < 3) instrucoes.push(l);
         }
       }
-      // Fallback: se filtros não pegaram nada, pegar as primeiras linhas
-      if (!positivos.length && linhas.length > 0) {
-        positivos.push(...linhas.slice(0, 4));
-      }
-      return { positivos, melhorar };
-    };
-    const { positivos, melhorar } = processarRelatorio(relTexto);
+    }
+
+    // Montar badge de tendência
+    const tendBadge = tendencia > 5
+      ? `<span style="font-size:10px;color:#0F766E;background:#CCFBF1;padding:2px 8px;border-radius:20px;font-weight:600">↑ em alta</span>`
+      : tendencia < -5
+      ? `<span style="font-size:10px;color:#BE123C;background:#FFE4E6;padding:2px 8px;border-radius:20px;font-weight:600;opacity:.8">↓ em queda</span>`
+      : tG+tR > 0
+      ? `<span style="font-size:10px;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:20px;font-weight:600">→ estável</span>`
+      : '';
 
     const pct = assert !== null ? assert : 0;
+    const barColor = pct >= meta ? '#0F766E' : pct >= 50 ? '#D97706' : '#BE123C';
     const barW = Math.min(pct, 100);
+
     document.getElementById('stats-rel').innerHTML = `
       <div class="stat-grid">
         <div class="stat hl">
-          <div class="stat-val" style="color:#0F766E;font-size:24px">${assert !== null ? assert+'%' : '--'}</div>
+          <div class="stat-val" style="color:${barColor};font-size:24px">${assert !== null ? assert+'%' : '--'}</div>
           <div class="stat-lbl" style="color:#2DD4BF">semana</div>
         </div>
         <div class="stat">
@@ -484,34 +500,67 @@ async function carregarRelatorio() {
           <div class="stat-lbl" style="color:#2DD4BF">greens</div>
         </div>
         <div class="stat">
-          <div class="stat-val" style="color:#BE123C;opacity:0.6">${tR}</div>
-          <div class="stat-lbl" style="color:#FDA4AF;opacity:0.6">reds</div>
+          <div class="stat-val" style="color:#BE123C;opacity:0.7">${tR}</div>
+          <div class="stat-lbl" style="color:#FDA4AF;opacity:0.7">reds</div>
         </div>
       </div>
+
       <div class="bar-wrap">
         <div class="bar-header">
-          <div class="bar-title">assertividade semanal</div>
-          <div class="bar-pct">${assert !== null ? assert : '--'}<span>%</span></div>
+          <div class="bar-title">assertividade da semana ${tendBadge}</div>
+          <div class="bar-pct" style="color:${barColor}">${assert !== null ? assert : '--'}<span>%</span></div>
         </div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${barW}%"></div></div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${barColor}"></div></div>
         <div class="bar-sub">
           <span style="color:#0F766E;font-weight:500">${tG} greens</span>
-          <span style="color:#BE123C;opacity:0.6">${tR} reds</span>
-          <span style="color:#94A3B8">meta 70%</span>
+          <span style="color:#BE123C;opacity:0.7">${tR} reds</span>
+          <span style="color:#94A3B8">meta ${meta}%</span>
         </div>
       </div>
+
       <div class="rule"></div>
-      ${positivos.length > 0 ? `
-      <div class="rel-card">
+
+      <div class="rel-card" style="margin-bottom:10px;border-left:3px solid #0F766E">
+        <div class="rel-title" style="color:#0F766E">como estamos evoluindo</div>
+        <div class="rel-item" style="border:none;padding-bottom:0">
+          <div class="dot dot-green"></div>
+          <div>O sistema analisa dados históricos de cada liga para escolher o mercado com maior probabilidade de acerto — gols, resultado, escanteios ou cartões.</div>
+        </div>
+        <div class="rel-item" style="border:none;padding:6px 0 0">
+          <div class="dot dot-green"></div>
+          <div>A cada dia, aprendemos com os resultados e ajustamos automaticamente o foco para os mercados que estão performando melhor.</div>
+        </div>
+        ${assert !== null && assert < meta ? `
+        <div class="rel-item" style="border:none;padding:6px 0 0">
+          <div class="dot" style="background:#D97706"></div>
+          <div>Estamos em fase de calibração — o modelo está aprendendo os padrões das ligas para aumentar a assertividade em direção à meta de ${meta}%.</div>
+        </div>` : assert !== null && assert >= meta ? `
+        <div class="rel-item" style="border:none;padding:6px 0 0">
+          <div class="dot dot-green"></div>
+          <div>Assertividade acima da meta de ${meta}% esta semana. O sistema continua refinando os padrões para manter a consistência.</div>
+        </div>` : ''}
+      </div>
+
+      ${destaques.length > 0 ? `
+      <div class="rel-card" style="margin-bottom:10px">
         <div class="rel-title">destaques da semana</div>
-        ${positivos.map(l=>`<div class="rel-item"><div class="dot dot-green"></div><div>${l.replace(/^[-•*]\s*/,'')}</div></div>`).join('')}
+        ${destaques.map(l=>`<div class="rel-item"><div class="dot dot-green"></div><div>${l}</div></div>`).join('')}
       </div>` : ''}
-      ${melhorar.length > 0 ? `
-      <div class="rel-card">
-        <div class="rel-title">pontos a melhorar</div>
-        ${melhorar.map(l=>`<div class="rel-item"><div class="dot dot-amber"></div><div>${l.replace(/^[-•*]\s*/,'')}</div></div>`).join('')}
+
+      ${instrucoes.length > 0 ? `
+      <div class="rel-card" style="margin-bottom:10px">
+        <div class="rel-title">foco para os próximos dias</div>
+        ${instrucoes.map(l=>`<div class="rel-item"><div class="dot" style="background:#0F766E;opacity:0.5"></div><div>${l}</div></div>`).join('')}
       </div>` : ''}
-      ${!positivos.length && !melhorar.length ? '<div class="empty">relatório semanal ainda não disponível</div>' : ''}
+
+      ${!relTexto ? `
+      <div class="rel-card" style="background:#F0FDFA;border:1px solid #99F6E4">
+        <div class="rel-title" style="color:#0F766E">relatório em preparação</div>
+        <div class="rel-item" style="border:none">
+          <div class="dot dot-green"></div>
+          <div>O relatório semanal é gerado automaticamente ao final de cada semana com a análise completa dos resultados e ajustes para a próxima semana.</div>
+        </div>
+      </div>` : ''}
     `;
   } catch(e) {
     document.getElementById('stats-rel').innerHTML = '<div class="empty">erro ao carregar relatório</div>';
