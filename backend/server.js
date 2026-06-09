@@ -1273,17 +1273,22 @@ PASSO 1 — Consulte o histórico de calibração:
 - Se gols está com red histórico nessa liga, priorize escanteios, cartões ou resultado
 
 PASSO 2 — Avalie CADA mercado separadamente com os dados disponíveis:
-- GOLS: média combinada, H2H gols, padrão Over/Under
-- RESULTADO: força relativa, forma recente, H2H vencedor
-- ESCANTEIOS: média escanteios casa+fora, estilo de jogo
-- CARTÕES: média cartões, rivalidade, importância do jogo
+- GOLS: média combinada casa+fora, H2H gols, padrão Over/Under nos últimos jogos
+- RESULTADO: força relativa, forma recente, H2H vencedor, vantagem clara?
+- ESCANTEIOS: some média escanteios casa + fora. Se ≥ 9.0 → Over 8.5 é confiável. Se ≥ 11.0 → Over 10.5 é alta confiança. Escanteios dependem menos do resultado — são mais previsíveis.
+- CARTÕES: some média cartões casa + fora. Se ≥ 4.5 → Over 3.5 é confiável. Se ≥ 6.0 → Over 4.5 é alta confiança. Rivalidades, jogos diretos e ligas físicas aumentam cartões.
 - Use web_search para lesões, escalações e contexto atual
 
 PASSO 3 — Classifique os mercados por confiança (alta/media/baixa/nao_recomendado)
+CRITÉRIO OBJETIVO para alta confiança em escanteios/cartões:
+- Escanteios alta: média combinada ≥ 10.0 OU histórico H2H consistente com muitos escanteios
+- Cartões alta: média combinada ≥ 5.5 OU rivalidade intensa OU jogo de pressão (rebaixamento, título)
+- Nunca classifique como baixa escanteios/cartões apenas por ser mercado menos comum — avalie os dados
 
-PASSO 4 — Escolha o mercado com maior confiança E que seja coerente com a análise.
+PASSO 4 — Escolha o mercado com maior confiança E coerente com a análise.
 REGRA CRÍTICA: a justificativa DEVE explicar por que escolheu ESSE mercado e não outro.
 Se escrever "Under 2.5 é confiável" mas apostar Over 1.5, está ERRADO — seja coerente.
+NUNCA retorne confiança baixa como aposta principal — se o melhor disponível é baixa, pivote para o segundo melhor.
 
 REGRAS:
 - Série A e Série B têm análise OBRIGATÓRIA
@@ -1494,26 +1499,45 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     console.log(`✅ Odds reais aplicadas`);
   }
 
-  // Pivotar apostas com confiança baixa usando alternativas estruturadas
+  // ── Pós-processamento: pivotar para confiança alta quando possível ──────────
   for (const jogo of resultado.jogos) {
-    if (jogo.confianca !== 'baixa') continue;
     if (!jogo.alternativas?.length) continue;
-    // Buscar primeira alternativa com confiança alta ou media e mercado diferente
+
+    const confAtual = jogo.confianca || 'media';
+
+    // Aposta alta → nunca pivota, fica onde está
+    if (confAtual === 'alta') continue;
+
+    // Buscar melhor alternativa disponível:
+    // - Se baixa: aceita alta ou media
+    // - Se media: só pivota se encontrar alta
+    const confAlvo = confAtual === 'baixa' ? ['alta', 'media'] : ['alta'];
+
     const melhor = jogo.alternativas.find(a =>
-      ['alta','media'].includes(a.confianca) &&
-      a.mercado !== jogo.mercado &&
-      a.aposta
+      confAlvo.includes(a.confianca) && a.aposta
     );
+
     if (melhor) {
-      console.log(`  ⚡ Pivotando por baixa confiança: ${jogo.time_casa} x ${jogo.time_fora} → ${melhor.aposta} [${melhor.mercado}] (${melhor.confianca})`);
+      const motivo = confAtual === 'baixa' ? 'baixa confiança' : 'existe alta confiança disponível';
+      console.log(`  ⚡ Pivotando (${motivo}): ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} [${confAtual}] → ${melhor.aposta} [${melhor.mercado}] (${melhor.confianca})`);
       jogo.aposta_original = jogo.aposta_original || jogo.aposta;
       jogo.mercado_original = jogo.mercado_original || jogo.mercado;
       jogo.aposta = melhor.aposta;
       jogo.mercado = melhor.mercado;
       jogo.confianca = melhor.confianca;
-      jogo.razao_escolha = `Pivotado por baixa confiança — ${melhor.razao}`;
+      jogo.razao_escolha = `Pivotado (${motivo}): ${melhor.razao}`;
+    } else {
+      if (confAtual === 'media') {
+        console.log(`  ℹ️  Mantendo média: ${jogo.time_casa} x ${jogo.time_fora} — sem alternativa alta disponível`);
+      }
     }
   }
+
+  // Log distribuição final por confiança
+  const distConf = resultado.jogos.reduce((acc, j) => {
+    acc[j.confianca] = (acc[j.confianca] || 0) + 1; return acc;
+  }, {});
+  console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}`);
 
   return resultado;
 }
