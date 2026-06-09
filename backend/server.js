@@ -2829,7 +2829,7 @@ async function rotina04h() {
 async function rotina05h() {
   const hoje = hojeStr();
   const amanha = diaOffset(hoje, 1);
-  console.log(`\n⏰ Rotina 05h — verificando integridade de ${hoje} e ${amanha}`);
+  console.log(`\n⏰ Rotina 04h — verificando integridade de ${hoje} e ${amanha}`);
 
   for (const diaAlvo of [hoje, amanha]) {
     const row = await dbGetComMultiplas(diaAlvo);
@@ -3033,7 +3033,7 @@ app.get('/apostas/:periodo', async (req, res) => {
 async function rotinaMultiplas() {
   const hoje = hojeStr();
   const amanha = diaOffset(hoje, 1);
-  console.log(`\n⏰ Rotina 05h (múltiplas) — verificando ${hoje} e ${amanha}`);
+  console.log(`\n⏰ Rotina 04h30 (múltiplas) — verificando ${hoje} e ${amanha}`);
 
   for (const diaAlvo of [hoje, amanha]) {
     const row = await dbGetComMultiplas(diaAlvo);
@@ -3079,18 +3079,24 @@ async function rotinaMultiplas() {
   console.log('✅ Rotina de múltiplas concluída');
 }
 
+// Rotinas do cron — ordem:
+// 03h00 → /validar-pendentes   (valida ontem, gera relatório diário)
+// 03h30 → /rotina-04h          (gera apostas de hoje e amanhã)
+// 04h00 → /rotina-04h30        (verifica 15 jogos, complementa se faltar, corrige fixtureIds)
+// 04h30 → /rotina-05h          (verifica e gera múltiplas)
+
 app.post('/rotina-04h', async (req, res) => {
-  res.json({ mensagem: 'Rotina 04h iniciada' });
+  res.json({ mensagem: 'Rotina 03h30 — gerando apostas' });
   rotina04h().catch(console.error);
 });
 
 app.post('/rotina-04h30', async (req, res) => {
-  res.json({ mensagem: 'Rotina 04h30 iniciada' });
+  res.json({ mensagem: 'Rotina 04h00 — verificando integridade e complementando' });
   rotina05h().catch(console.error);
 });
 
 app.post('/rotina-05h', async (req, res) => {
-  res.json({ mensagem: 'Rotina 05h (múltiplas) iniciada' });
+  res.json({ mensagem: 'Rotina 04h30 — verificando e gerando múltiplas' });
   rotinaMultiplas().catch(console.error);
 });
 
