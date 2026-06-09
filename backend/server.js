@@ -488,12 +488,11 @@ async function dbSaveLiga(nomeLiga, ligaId, pais) {
 }
 
 // ─── Atualizar stats de liga ─────────────────────────────────
-async function dbUpdateLigaStats(ligaId, green, red) {
+async function dbUpdateLigaStats(ligaId, green, red, mercado) {
   if (!ligaId) return;
   try {
-    // Buscar valores atuais
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}&select=green,red,total`,
+      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}&select=green,red,total,mercados`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     );
     const rows = await res.json();
@@ -502,10 +501,17 @@ async function dbUpdateLigaStats(ligaId, green, red) {
     const novoGreen = (atual.green || 0) + green;
     const novoRed   = (atual.red   || 0) + red;
     const novoTotal = (atual.total || 0) + green + red;
+    // Atualizar mercados jsonb
+    const mercados = atual.mercados || {};
+    if (mercado) {
+      if (!mercados[mercado]) mercados[mercado] = { green: 0, red: 0 };
+      mercados[mercado].green += green;
+      mercados[mercado].red   += red;
+    }
     await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}`, {
       method: 'PATCH',
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ green: novoGreen, red: novoRed, total: novoTotal })
+      body: JSON.stringify({ green: novoGreen, red: novoRed, total: novoTotal, mercados })
     });
   } catch(e) { console.error('Erro dbUpdateLigaStats:', e.message); }
 }
@@ -857,7 +863,13 @@ async function coletarEstatisticas(teamId, teamNome, ligaId, oponenteId) {
     mediaGols,
     mediaEscanteios: countStats > 0 ? (totalEscanteios / countStats).toFixed(1) : '-',
     mediaCartoes: countStats > 0 ? (totalCartoes / countStats).toFixed(1) : '-',
-    h2hTexto: h2h.slice(0,3).map(f => `${f.teams?.home?.name} ${f.goals?.home}-${f.goals?.away} ${f.teams?.away?.name}`).join(' | ') || 'Sem H2H'
+    h2hTexto: h2h.slice(0,5).map(f => {
+      const data = (f.fixture?.date||'').substring(0,10);
+      const gh = f.goals?.home ?? '-', ga = f.goals?.away ?? '-';
+      const totalGols = (typeof gh === 'number' && typeof ga === 'number') ? ` (${gh+ga}g)` : '';
+      const home = f.teams?.home?.name || '?', away = f.teams?.away?.name || '?';
+      return `${data} ${home} ${gh}-${ga} ${away}${totalGols}`;
+    }).join(' | ') || 'Sem H2H'
   };
 }
 
@@ -1060,8 +1072,49 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     }
   }
 
+  // Buscar assertividade por liga E por mercado para enriquecer prompt e complemento
+  const todasLigaIdsComp = [...new Set([...jogosComp.values()].map(j => j.ligaId).filter(Boolean))];
+  // Também buscar ligas dos jogos prioritários para injetar no prompt
+  const todasLigaIdsPri = [...new Set([...jogosMap.values()].map(j => j.ligaId).filter(Boolean))];
+  const todasLigaIds = [...new Set([...todasLigaIdsComp, ...todasLigaIdsPri])];
+  const ligaStatsMap = new Map(); // ligaId → { green, red, total, mercados, assertividade }
+  if (todasLigaIds.length > 0) {
+    try {
+      const ids = todasLigaIds.join(',');
+      const resL = await fetch(
+        `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=in.(${ids})&select=liga_id,nome,green,red,total,mercados`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      );
+      const rowsL = await resL.json();
+      for (const row of (rowsL || [])) {
+        if (row.total >= 3) {
+          const assert = Math.round((row.green / row.total) * 100);
+          ligaStatsMap.set(row.liga_id, { ...row, assertividade: assert });
+        }
+      }
+    } catch(e) { /* silencioso */ }
+  }
+
+  // Montar bloco de assertividade por liga para injetar no prompt
+  if (ligaStatsMap.size > 0) {
+    let blocoLigas = '\nASSERTIVIDADE HISTÓRICA POR LIGA (use para escolher mercado):\n';
+    for (const [ligaId, st] of ligaStatsMap) {
+      const mercadosTexto = Object.entries(st.mercados || {})
+        .filter(([, m]) => (m.green + m.red) >= 2)
+        .map(([mercado, m]) => {
+          const tot = m.green + m.red;
+          const pct = Math.round((m.green / tot) * 100);
+          return `${mercado}: ${pct}% (${m.green}G/${m.red}R)`;
+        }).join(' | ');
+      blocoLigas += `  Liga ${ligaId} (${st.nome||'?'}): geral ${st.assertividade}%${mercadosTexto ? ' — ' + mercadosTexto : ''}
+`;
+    }
+    blocoMem = (blocoMem || '') + blocoLigas;
+    console.log(`📊 Assertividade de ${ligaStatsMap.size} liga(s) injetada no prompt`);
+  }
+
   // Enriquecer complementares com assertividade real da liga (se disponível)
-  const ligaIds = [...new Set([...jogosComp.values()].map(j => j.ligaId).filter(Boolean))];
+  const ligaIds = todasLigaIdsComp;
   const assertividadeLigas = new Map();
   if (ligaIds.length > 0) {
     try {
@@ -1082,14 +1135,13 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
 
   // Ajustar pri dos complementares com base na assertividade real
   for (const [key, jogo] of jogosComp) {
-    const assert = assertividadeLigas.get(jogo.ligaId);
-    if (assert !== undefined) {
-      // Mapear assertividade → faixa de prioridade (menor = melhor)
-      // 80%+ → pri 60 | 70-79% → pri 70 | 60-69% → pri 80 | <60% → mantém pri original
+    const st = ligaStatsMap.get(jogo.ligaId);
+    if (st) {
+      const assert = st.assertividade;
       if (assert >= 80)      jogo.pri = Math.min(jogo.pri, 60);
       else if (assert >= 70) jogo.pri = Math.min(jogo.pri, 70);
       else if (assert >= 60) jogo.pri = Math.min(jogo.pri, 80);
-      // Abaixo de 60% — mantém a prioridade original (não promove liga fraca)
+      else if (assert < 40 && st.total >= 5) jogo.pri = Math.max(jogo.pri, 180); // rebaixar ligas fracas
     }
   }
 
@@ -1404,11 +1456,22 @@ aposta_backup: segunda melhor aposta para o jogo caso a principal falhe ou a odd
       const oddReal = selecionarOdd(oddsJogo, jogo.aposta, jogo.time_casa, jogo.time_fora);
 
       if (oddReal) {
-        jogo.odd_mercado = parseFloat(oddReal); // odd real do mercado
-        // Se odd do mercado for muito baixa (< 1.20), alertar
-        if (parseFloat(oddReal) < 1.20) {
+        jogo.odd_mercado = parseFloat(oddReal);
+        // Odd mínima por mercado
+        const oddMin = { gols: 1.40, resultado: 1.50, escanteios: 1.55, cartoes: 1.55 }[jogo.mercado] || 1.35;
+        if (parseFloat(oddReal) < oddMin) {
           jogo.alerta_odd = true;
           jogo.confianca = 'baixa';
+          // Tentar pivotar para aposta_backup se disponível
+          if (jogo.aposta_backup && jogo.mercado_backup) {
+            console.log(`  ⚡ Pivotando ${jogo.time_casa} x ${jogo.time_fora}: odd ${oddReal} < ${oddMin} → ${jogo.aposta_backup}`);
+            jogo.aposta_original = jogo.aposta;
+            jogo.mercado_original = jogo.mercado;
+            jogo.aposta = jogo.aposta_backup;
+            jogo.mercado = jogo.mercado_backup;
+            jogo.confianca = 'media';
+            jogo.alerta_odd = false;
+          }
         }
       }
     }
@@ -2429,12 +2492,19 @@ Máx 500 palavras.`;
   for (const res of resultadosValidados) {
     const aposta = apostas.find(x => x.id === res.jogo_id);
     if (!aposta?.ligaId) continue;
-    if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0 };
+    if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, mercados: {} };
     if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
     else if (res.resultado_aposta === 'red') statsPorLiga[aposta.ligaId].red++;
+    // Acumular por mercado
+    const mercado = aposta.mercado || 'gols';
+    if (!statsPorLiga[aposta.ligaId].mercados[mercado]) statsPorLiga[aposta.ligaId].mercados[mercado] = { green: 0, red: 0 };
+    if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].mercados[mercado].green++;
+    else if (res.resultado_aposta === 'red') statsPorLiga[aposta.ligaId].mercados[mercado].red++;
   }
   const updatePromises = Object.entries(statsPorLiga).map(([ligaId, s]) =>
-    dbUpdateLigaStats(parseInt(ligaId), s.green, s.red)
+    Promise.all(Object.entries(s.mercados || {}).map(([mercado, ms]) =>
+      dbUpdateLigaStats(parseInt(ligaId), ms.green, ms.red, mercado)
+    ))
   );
   await Promise.all(updatePromises);
   console.log(`📊 Stats de ligas atualizadas: ${Object.keys(statsPorLiga).length} liga(s)`);
@@ -2899,7 +2969,7 @@ app.post('/sincronizar-ligas', async (req, res) => {
     }
     const dias = (await Promise.all(promises)).filter(d => d?.apostas?.jogos?.length && d?.resultados?.apostas?.length);
 
-    // Consolidar green/red por ligaId
+    // Consolidar green/red por ligaId e por mercado
     const statsPorLiga = {};
     for (const dia of dias) {
       const apostas = dia.apostas.jogos;
@@ -2908,21 +2978,26 @@ app.post('/sincronizar-ligas', async (req, res) => {
         if (!['green','red'].includes(res.resultado_aposta)) continue;
         const aposta = apostas.find(x => x.id === res.jogo_id);
         if (!aposta?.ligaId) continue;
-        if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, total: 0 };
+        if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, total: 0, mercados: {} };
         if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
         else statsPorLiga[aposta.ligaId].red++;
         statsPorLiga[aposta.ligaId].total++;
+        // Acumular por mercado
+        const mercado = aposta.mercado || 'gols';
+        if (!statsPorLiga[aposta.ligaId].mercados[mercado]) statsPorLiga[aposta.ligaId].mercados[mercado] = { green: 0, red: 0 };
+        if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].mercados[mercado].green++;
+        else statsPorLiga[aposta.ligaId].mercados[mercado].red++;
       }
     }
 
-    // Atualizar cada liga no banco (zerar e reescrever para evitar dupla contagem)
+    // Atualizar cada liga no banco com green/red/total/mercados
     let atualizadas = 0;
     for (const [ligaId, s] of Object.entries(statsPorLiga)) {
       try {
         await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}`, {
           method: 'PATCH',
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ green: s.green, red: s.red, total: s.total })
+          body: JSON.stringify({ green: s.green, red: s.red, total: s.total, mercados: s.mercados })
         });
         atualizadas++;
       } catch(e) { console.error(`Erro atualizando liga ${ligaId}:`, e.message); }
