@@ -261,10 +261,10 @@ const LIGAS_PRIORITY = {
   // Amistosos internacionais (só seleções campeãs)
   10:  { nome:'Amistoso Internacional',tipo:'copa', pri:66, selecaoCampea:true },
   // Amistosos femininos — aceitar todas as seleções adultas
-  666: { nome:'Amistoso Feminino',tipo:'copa', pri:67 },
+  666: { nome:'Amistoso Feminino',tipo:'copa', pri:95 },
   // Qualificação Copa do Mundo feminina
-  880: { nome:'Eliminatórias Copa Feminina',tipo:'copa', pri:64 },
-  1206:{ nome:'Nations League Feminina CONMEBOL',tipo:'copa', pri:64 },
+  880: { nome:'Eliminatórias Copa Feminina',tipo:'copa', pri:92 },
+  1206:{ nome:'Nations League Feminina CONMEBOL',tipo:'copa', pri:92 },
 };
 
 // IDs a ignorar explicitamente (ligas brasileiras que NÃO são prioritárias)
@@ -521,11 +521,24 @@ async function dbGetComMultiplas(data) {
 
 async function dbSave(data, apostas) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
-      body: JSON.stringify({ data, apostas })
-    });
+    const existing = await dbGet(data);
+    if (existing) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ apostas })
+      });
+      if (!res.ok) { const err = await res.text(); console.error(`❌ dbSave PATCH erro ${res.status}: ${err}`); }
+      else console.log(`💾 dbSave PATCH OK — ${data} | ${apostas?.jogos?.length || 0} jogos`);
+    } else {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ data, apostas })
+      });
+      if (!res.ok) { const err = await res.text(); console.error(`❌ dbSave POST erro ${res.status}: ${err}`); }
+      else console.log(`💾 dbSave POST OK — ${data} | ${apostas?.jogos?.length || 0} jogos`);
+    }
   } catch(e) { console.error('Erro dbSave:', e.message); }
 }
 
