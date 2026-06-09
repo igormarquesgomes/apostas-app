@@ -1494,6 +1494,27 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     console.log(`✅ Odds reais aplicadas`);
   }
 
+  // Pivotar apostas com confiança baixa usando alternativas estruturadas
+  for (const jogo of resultado.jogos) {
+    if (jogo.confianca !== 'baixa') continue;
+    if (!jogo.alternativas?.length) continue;
+    // Buscar primeira alternativa com confiança alta ou media e mercado diferente
+    const melhor = jogo.alternativas.find(a =>
+      ['alta','media'].includes(a.confianca) &&
+      a.mercado !== jogo.mercado &&
+      a.aposta
+    );
+    if (melhor) {
+      console.log(`  ⚡ Pivotando por baixa confiança: ${jogo.time_casa} x ${jogo.time_fora} → ${melhor.aposta} [${melhor.mercado}] (${melhor.confianca})`);
+      jogo.aposta_original = jogo.aposta_original || jogo.aposta;
+      jogo.mercado_original = jogo.mercado_original || jogo.mercado;
+      jogo.aposta = melhor.aposta;
+      jogo.mercado = melhor.mercado;
+      jogo.confianca = melhor.confianca;
+      jogo.razao_escolha = `Pivotado por baixa confiança — ${melhor.razao}`;
+    }
+  }
+
   return resultado;
 }
 
