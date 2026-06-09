@@ -1226,28 +1226,51 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     console.log('📚 Sem memória de calibração disponível');
   }
 
-  function montarListaJogos(lista, offsetId = 0) {
+  function montarListaJogos(lista, offsetId = 0, reduzido = false) {
     return lista.map((j, i) => {
       const s = j._stats;
       const sc = s?.statsCasa, sf = s?.statsFora;
-      // Assertividade por mercado dessa liga (se disponível)
-      const st = ligaStatsMap?.get(j.ligaId);
+      // Assertividade por mercado dessa liga (se disponível) — só no modo completo
       let ligaPerf = '';
-      if (st?.mercados) {
-        const mercPerf = Object.entries(st.mercados)
-          .filter(([, m]) => (m.green + m.red) >= 2)
-          .map(([mercado, m]) => {
-            const tot = m.green + m.red;
-            const pct = Math.round((m.green / tot) * 100);
-            return `${mercado}:${pct}%(${m.green}G/${m.red}R)`;
-          }).join(' ');
-        if (mercPerf) ligaPerf = `\n   LigaPerf: ${mercPerf}`;
+      if (!reduzido) {
+        const st = ligaStatsMap?.get(j.ligaId);
+        if (st?.mercados) {
+          const mercPerf = Object.entries(st.mercados)
+            .filter(([, m]) => (m.green + m.red) >= 2)
+            .map(([mercado, m]) => {
+              const tot = m.green + m.red;
+              const pct = Math.round((m.green / tot) * 100);
+              return `${mercado}:${pct}%(${m.green}G/${m.red}R)`;
+            }).join(' ');
+          if (mercPerf) ligaPerf = `\n   LigaPerf: ${mercPerf}`;
+        }
+      }
+      if (reduzido) {
+        // Modo reduzido para lote 2 — só essencial, sem H2H completo
+        return `${offsetId+i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}
+   Casa: forma=${sc?.forma||'?'} gols=${sc?.mediaGols||'?'} esc=${sc?.mediaEscanteios||'?'} cart=${sc?.mediaCartoes||'?'}
+   Fora: forma=${sf?.forma||'?'} gols=${sf?.mediaGols||'?'} esc=${sf?.mediaEscanteios||'?'} cart=${sf?.mediaCartoes||'?'}`;
       }
       return `${offsetId+i+1}. ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}
    Casa: forma=${sc?.forma||'?'} gols/jogo=${sc?.mediaGols||'?'} esc=${sc?.mediaEscanteios||'?'} cart=${sc?.mediaCartoes||'?'}
    Fora: forma=${sf?.forma||'?'} gols/jogo=${sf?.mediaGols||'?'} esc=${sf?.mediaEscanteios||'?'} cart=${sf?.mediaCartoes||'?'}
    H2H: ${sc?.h2hTexto||'sem dados'}${ligaPerf}`;
     }).join('\n');
+  }
+
+  function montarPromptReduzido(listaJogos, df) {
+    return `Analista de apostas. DATA: ${df}
+JOGOS:
+${listaJogos}
+
+Para cada jogo avalie gols, resultado, escanteios e cartões pelos dados.
+Escolha a aposta mais confiável. Nunca retorne confiança baixa como principal.
+Escanteios alta: média combinada ≥ 10.0. Cartões alta: média combinada ≥ 5.5.
+
+Retorne SOMENTE JSON:
+{"jogos":[{"id":1,"liga":"Liga","tipo_liga":"eu","time_casa":"A","time_fora":"B","horario":"15:00","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","razao_escolha":"média 3.1 gols","odd_sugerida":"1.80","confianca":"alta","media_gols_casa":"1.6","media_gols_fora":"1.5","media_escanteios":"9.2","media_cartoes":"3.8","forma_casa":"VVDEV","forma_fora":"DEVVD","justificativa":"Análise.","alternativas":[{"mercado":"gols","aposta":"Over 2.5","confianca":"alta","razao":"média alta"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"boa forma"},{"mercado":"escanteios","aposta":"Over 8.5","confianca":"media","razao":"média 9.2"},{"mercado":"cartoes","aposta":"Over 3.5","confianca":"baixa","razao":"média baixa"}]}]}
+
+tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
   }
 
   function montarPrompt(listaJogos, blocoMem, df) {
@@ -1332,83 +1355,52 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
   if (lote2.length > 0) {
     console.log(`\n⏳ Aguardando 60s antes do lote 2 (rate limit)...`);
     await sleep(60000);
-    console.log(`\n🤖 Lote 2: ${lote2.length} jogos (Haiku, sem web_search)...`);
-    const prompt2 = montarPrompt(montarListaJogos(lote2, LOTE), blocoMem, df);
-    // Lote 2: ligas complementares → Haiku sem web_search (economia de custo)
-    let txt2 = await chamarIA(prompt2, 5000);
+    console.log(`\n🤖 Lote 2: ${lote2.length} jogos (Haiku, sublotes de 5)...`);
 
-    // Se ainda falhou, dividir lote 2 em 2a e 2b
-    if (!txt2) {
-      console.log('⚠️ Lote 2 falhou — dividindo em sublotes 2a e 2b...');
-      const lote2a = lote2.slice(0, Math.ceil(lote2.length / 2));
-      const lote2b = lote2.slice(Math.ceil(lote2.length / 2));
-
-      // Sublote 2a
-      const prompt2a = montarPrompt(montarListaJogos(lote2a, LOTE), blocoMem, df);
-      const txt2a = await chamarIA(prompt2a, 3500);
-      if (txt2a) {
-        try {
-          const s = txt2a.indexOf('{'), e = txt2a.lastIndexOf('}');
-          if (s !== -1) {
-            const r = JSON.parse(txt2a.slice(s, e+1));
-            jogosResultado = [...jogosResultado, ...(r.jogos || [])];
-            console.log(`✅ Sublote 2a: ${r.jogos?.length || 0} apostas`);
-          }
-        } catch(e) { console.error('❌ Erro parse 2a:', e.message); }
-      }
-
-      await sleep(30000);
-
-      // Sublote 2b
-      const prompt2b = montarPrompt(montarListaJogos(lote2b, LOTE + lote2a.length), blocoMem, df);
-      const txt2b = await chamarIA(prompt2b, 3500);
-      if (txt2b) {
-        try {
-          const s = txt2b.indexOf('{'), e = txt2b.lastIndexOf('}');
-          if (s !== -1) {
-            const r = JSON.parse(txt2b.slice(s, e+1));
-            jogosResultado = [...jogosResultado, ...(r.jogos || [])];
-            console.log(`✅ Sublote 2b: ${r.jogos?.length || 0} apostas`);
-          }
-        } catch(e) { console.error('❌ Erro parse 2b:', e.message); }
-      }
-    } else {
+    // Função auxiliar para parse robusto de JSON
+    function parseJogos(txt) {
+      if (!txt) return null;
       try {
-        // Parse robusto — pega o JSON completo mesmo com texto extra
-        let jsonTxt = txt2;
-        const s2 = txt2.indexOf('{"jogos"');
-        const e2 = txt2.lastIndexOf('}');
-        if (s2 !== -1) jsonTxt = txt2.slice(s2, e2+1);
-        else {
-          const s2b = txt2.indexOf('{');
-          if (s2b !== -1) jsonTxt = txt2.slice(s2b, e2+1);
-        }
-        const r2 = JSON.parse(jsonTxt);
-        const jogos2 = r2.jogos || [];
-        jogosResultado = [...jogosResultado, ...jogos2];
-        console.log(`✅ Lote 2: ${jogos2.length} apostas geradas`);
-      } catch(e) {
-        console.error('❌ Erro parse lote 2:', e.message);
-        // Tentar sublotes como último recurso
-        console.log('⚠️ Tentando sublotes...');
-        const lote2aF = lote2.slice(0, Math.ceil(lote2.length/2));
-        const lote2bF = lote2.slice(Math.ceil(lote2.length/2));
-        for (const [idx, sublote] of [[0, lote2aF],[lote2aF.length, lote2bF]]) {
-          const pt = montarPrompt(montarListaJogos(sublote, LOTE+idx), blocoMem, df);
-          const tx = await chamarIA(pt, 2500);
-          if (tx) {
-            try {
-              const s = tx.indexOf('{'), e = tx.lastIndexOf('}');
-              if (s !== -1) {
-                const r = JSON.parse(tx.slice(s,e+1));
-                jogosResultado = [...jogosResultado, ...(r.jogos||[])];
-                console.log(`✅ Sublote: ${r.jogos?.length||0} apostas`);
-              }
-            } catch(err) { console.error('❌ Erro sublote:', err.message); }
-            await sleep(20000);
+        const s = txt.indexOf('{"jogos"') !== -1 ? txt.indexOf('{"jogos"') : txt.indexOf('{');
+        const e = txt.lastIndexOf('}');
+        if (s === -1 || e === -1) return null;
+        const r = JSON.parse(txt.slice(s, e+1));
+        return r.jogos || [];
+      } catch(err) { return null; }
+    }
+
+    // Sublotes fixos de 5 jogos — prompt completo, tamanho controlado
+    const TAMANHO_SUBLOTE = 5;
+    const sublotes = [];
+    for (let i = 0; i < lote2.length; i += TAMANHO_SUBLOTE) {
+      sublotes.push(lote2.slice(i, i + TAMANHO_SUBLOTE));
+    }
+    console.log(`  Dividido em ${sublotes.length} sublote(s) de até ${TAMANHO_SUBLOTE} jogos`);
+
+    let offsetAtual = LOTE;
+    for (const [si, sublote] of sublotes.entries()) {
+      if (si > 0) await sleep(15000);
+      const ptS = montarPrompt(montarListaJogos(sublote, offsetAtual), blocoMem, df);
+      const txS = await chamarIA(ptS, 4000);
+      const jogosS = parseJogos(txS);
+      if (jogosS === null) {
+        // Parse falhou — tentar jogo a jogo com prompt completo
+        console.log(`  ⚠️ Sublote ${si+1} falhou — tentando jogo a jogo...`);
+        for (const [ji, jogoUnico] of sublote.entries()) {
+          await sleep(5000);
+          const ptU = montarPrompt(montarListaJogos([jogoUnico], offsetAtual + ji), blocoMem, df);
+          const txU = await chamarIA(ptU, 1500);
+          const jogosU = parseJogos(txU);
+          if (jogosU?.length) {
+            jogosResultado = [...jogosResultado, ...jogosU];
+            console.log(`  ✅ Jogo ${offsetAtual + ji + 1}: ${jogoUnico.timeCasa} x ${jogoUnico.timeFora}`);
           }
         }
+      } else if (jogosS.length > 0) {
+        jogosResultado = [...jogosResultado, ...jogosS];
+        console.log(`  ✅ Sublote ${si+1}: ${jogosS.length} apostas`);
       }
+      offsetAtual += sublote.length;
     }
   }
 
