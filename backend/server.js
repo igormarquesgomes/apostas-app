@@ -1321,7 +1321,7 @@ REGRAS:
 Retorne SOMENTE JSON válido:
 {"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","razao_escolha":"Média combinada 3.1 gols, H2H 4/5 com Over 2.5, histórico da liga 70% green em gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise completa do jogo.","alternativas":[{"mercado":"gols","aposta":"Over 2.5 gols","confianca":"alta","razao":"média 3.1 gols, H2H favorável"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"forma recente melhor em casa"},{"mercado":"escanteios","aposta":"Over 8.5 escanteios","confianca":"media","razao":"média 9.2 escanteios combinados"},{"mercado":"cartoes","aposta":"Over 3.5 cartões","confianca":"baixa","razao":"média 3.1, jogo sem rivalidade"}]}]}
 
-tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa/nao_recomendado.
+tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca da aposta principal: alta/media/baixa (NUNCA nao_recomendado — se nenhum mercado presta, escolha o menos ruim com baixa). confianca nas alternativas: alta/media/baixa/nao_recomendado.
 razao_escolha: frase curta explicando por que esse mercado e não outro.
 alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais ao menos confiável.`;
   }
@@ -1491,26 +1491,32 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     console.log(`✅ Odds reais aplicadas`);
   }
 
-  // ── Pós-processamento: pivotar para confiança alta quando possível ──────────
+  // ── Pós-processamento: pivotar para confiança alta, descartar complementares sem opção ──────────
+  const jogosFinais = [];
   for (const jogo of resultado.jogos) {
-    if (!jogo.alternativas?.length) continue;
-
     const confAtual = jogo.confianca || 'media';
+    const isComplementar = (jogo.pri || 99) >= 60; // pri >= 60 = complementar
 
-    // Aposta alta → nunca pivota, fica onde está
-    if (confAtual === 'alta') continue;
+    // Sem alternativas — manter se prioritário, descartar se complementar sem confiança
+    if (!jogo.alternativas?.length) {
+      if (isComplementar && ['nao_recomendado', 'baixa'].includes(confAtual)) {
+        console.log(`  🗑️  Descartando complementar sem alternativas: ${jogo.time_casa} x ${jogo.time_fora} [${confAtual}]`);
+        continue;
+      }
+      jogosFinais.push(jogo);
+      continue;
+    }
 
-    // Buscar melhor alternativa disponível:
-    // - Se baixa: aceita alta ou media
-    // - Se media: só pivota se encontrar alta
-    const confAlvo = confAtual === 'baixa' ? ['alta', 'media'] : ['alta'];
+    // Aposta alta → nunca pivota, mantém
+    if (confAtual === 'alta') { jogosFinais.push(jogo); continue; }
 
-    const melhor = jogo.alternativas.find(a =>
-      confAlvo.includes(a.confianca) && a.aposta
-    );
+    // Buscar melhor alternativa
+    const confAlvo = ['nao_recomendado', 'baixa'].includes(confAtual) ? ['alta', 'media'] : ['alta'];
+    const melhor = jogo.alternativas.find(a => confAlvo.includes(a.confianca) && a.aposta);
 
     if (melhor) {
-      const motivo = confAtual === 'baixa' ? 'baixa confiança' : 'existe alta confiança disponível';
+      // Tem alternativa melhor — pivotar
+      const motivo = ['nao_recomendado','baixa'].includes(confAtual) ? `${confAtual} → pivotando` : 'buscando alta confiança';
       console.log(`  ⚡ Pivotando (${motivo}): ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} [${confAtual}] → ${melhor.aposta} [${melhor.mercado}] (${melhor.confianca})`);
       jogo.aposta_original = jogo.aposta_original || jogo.aposta;
       jogo.mercado_original = jogo.mercado_original || jogo.mercado;
@@ -1518,18 +1524,26 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       jogo.mercado = melhor.mercado;
       jogo.confianca = melhor.confianca;
       jogo.razao_escolha = `Pivotado (${motivo}): ${melhor.razao}`;
+      jogosFinais.push(jogo);
+    } else if (isComplementar && ['nao_recomendado', 'baixa'].includes(confAtual)) {
+      // Complementar sem nenhuma alternativa média ou alta → descartar
+      console.log(`  🗑️  Descartando complementar sem opção boa: ${jogo.time_casa} x ${jogo.time_fora} — todas as alternativas são baixa/nao_recomendado`);
     } else {
-      if (confAtual === 'media') {
-        console.log(`  ℹ️  Mantendo média: ${jogo.time_casa} x ${jogo.time_fora} — sem alternativa alta disponível`);
-      }
+      // Prioritário ou media sem alta disponível → mantém
+      if (confAtual === 'media') console.log(`  ℹ️  Mantendo média: ${jogo.time_casa} x ${jogo.time_fora} — sem alternativa alta disponível`);
+      jogosFinais.push(jogo);
     }
   }
 
-  // Log distribuição final por confiança
-  const distConf = resultado.jogos.reduce((acc, j) => {
-    acc[j.confianca] = (acc[j.confianca] || 0) + 1; return acc;
+  resultado.jogos = jogosFinais;
+  const descartados = resultado.jogos.length - jogosFinais.length;
+
+  // Log distribuição final
+  const distConf = jogosFinais.reduce((acc, j) => {
+    const c = j.confianca || 'media';
+    acc[c] = (acc[c] || 0) + 1; return acc;
   }, {});
-  console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}`);
+  console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}${descartados > 0 ? ` | descartados: ${descartados}` : ''}`);
 
   return resultado;
 }
