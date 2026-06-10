@@ -1424,7 +1424,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
   if (resultado.jogos) {
     resultado.jogos = resultado.jogos.map((j) => {
       const key = `${norm(j.time_casa)}|${norm(j.time_fora)}`;
-      const fixtureId = fixtureMap.get(key) || null;
+      let fixtureId = fixtureMap.get(key) || null;
       const meta = metaMap.get(key) || {};
       if (!fixtureId) {
     console.log(`⚠️ Sem fixtureId: ${j.time_casa} x ${j.time_fora} | key buscada: ${key}`);
