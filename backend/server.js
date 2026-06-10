@@ -1337,7 +1337,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
 
   const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
   console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
-  const txt1 = await chamarIAComBusca(prompt1, 5000);
+  const txt1 = await chamarIAComBusca(prompt1, 8000);
   
   if (txt1) {
     try {
@@ -1381,7 +1381,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     for (const [si, sublote] of sublotes.entries()) {
       if (si > 0) await sleep(15000);
       const ptS = montarPrompt(montarListaJogos(sublote, offsetAtual), blocoMem, df);
-      const txS = await chamarIA(ptS, 4000);
+      const txS = await chamarIA(ptS, 6000);
       const jogosS = parseJogos(txS);
       if (jogosS === null) {
         // Parse falhou — tentar jogo a jogo com prompt completo
@@ -1389,7 +1389,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
         for (const [ji, jogoUnico] of sublote.entries()) {
           await sleep(5000);
           const ptU = montarPrompt(montarListaJogos([jogoUnico], offsetAtual + ji), blocoMem, df);
-          const txU = await chamarIA(ptU, 1500);
+          const txU = await chamarIA(ptU, 3000);
           const jogosU = parseJogos(txU);
           if (jogosU?.length) {
             jogosResultado = [...jogosResultado, ...jogosU];
