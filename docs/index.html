@@ -589,7 +589,7 @@ function render(jogos,data){
 }
 
 function switchTab(event, tab) {
-  const card = event.target.closest('.jogo-det');
+  const card = event.target.closest('.jogo-expand');
   card.querySelectorAll('.card-tab').forEach(t => t.classList.remove('active'));
   card.querySelectorAll('.card-panel').forEach(p => p.classList.remove('active'));
   event.target.classList.add('active');
