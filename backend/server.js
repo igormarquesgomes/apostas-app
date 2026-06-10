@@ -1531,9 +1531,10 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       jogo.razao_escolha = `Pivotado (${motivo}): ${melhor.razao}`;
       jogosFinais.push(jogo);
     } else if (isComplementar && ['nao_recomendado', 'baixa'].includes(confAtual)) {
-      // Complementar sem opção boa → descartar
-      // O substituto vem dos jogos reserva que já foram analisados pela IA (margem de 3)
-      console.log(`  🗑️  Descartando complementar: ${jogo.time_casa} x ${jogo.time_fora} — sem opção boa`);
+      // Complementar sem opção boa → guardar como candidato de baixa confiança (último recurso)
+      console.log(`  ⚠️  Complementar sem opção boa: ${jogo.time_casa} x ${jogo.time_fora} — guardando como reserva baixa`);
+      jogo._reservaBaixa = true;
+      jogosFinais.push(jogo); // mantém mas marcado
     } else {
       // Prioritário ou media sem alta disponível → mantém
       if (confAtual === 'media') console.log(`  ℹ️  Mantendo média: ${jogo.time_casa} x ${jogo.time_fora} — sem alternativa alta disponível`);
@@ -1541,11 +1542,24 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     }
   }
 
-  // Cortar para metaJogos após pós-processamento (reservas extras são descartadas se não necessárias)
+  // Ordenar: alta e média primeiro, baixa (reserva) por último
+  jogosFinais.sort((a, b) => {
+    const ordem = { alta: 0, media: 1, baixa: 2, nao_recomendado: 3 };
+    const oa = ordem[a.confianca] ?? 2;
+    const ob = ordem[b.confianca] ?? 2;
+    if (oa !== ob) return oa - ob;
+    return (a.pri || 99) - (b.pri || 99); // dentro do mesmo nível, melhor pri primeiro
+  });
+
+  // Cortar para metaJogos — baixa confiança só entra se necessário para completar
   resultado.jogos = jogosFinais.slice(0, metaJogos);
+  const usouBaixa = resultado.jogos.filter(j => j._reservaBaixa).length;
+  if (usouBaixa > 0) {
+    console.log(`  ⚠️  ${usouBaixa} jogo(s) de baixa confiança incluídos por falta de opção melhor`);
+  }
   const descartados = jogosFinais.length - resultado.jogos.length;
-  if (resultado.jogos.length < jogosFinais.length) {
-    console.log(`  ✂️  Cortando reservas extras: ${jogosFinais.length} → ${resultado.jogos.length} jogos`);
+  if (descartados > 0) {
+    console.log(`  ✂️  Cortando ${descartados} reservas extras`);
   }
 
   // Log distribuição final
