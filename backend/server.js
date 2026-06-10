@@ -1327,11 +1327,14 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
   }
 
   // Lote 1: prioritários (Série A, B, Copa, ligas europeias principais) → Sonnet
-  // Lote 2: resto (ligas menores) → Haiku com só dados da API
-  // Dividir em 2 lotes para não ultrapassar rate limit de tokens
+  // Limitar ao necessário antes de dividir — evitar processar jogos desnecessários
+  jogos = jogos.slice(0, metaJogos);
+
+  // Lote 1: primeiros 8 (Sonnet + web_search) | Lote 2: resto (Haiku)
   const LOTE = 8;
   const lote1 = jogos.slice(0, LOTE);
   const lote2 = jogos.slice(LOTE);
+  console.log(`  Lotes: ${lote1.length} (Sonnet) + ${lote2.length} (Haiku) = ${jogos.length} jogos`);
 
   let jogosResultado = [];
 
