@@ -477,6 +477,8 @@ function render(jogos,data){
   if(data) dataAtual=data;
   if(!jogos.length){document.getElementById('tw').innerHTML='<div class="empty-state"><p>Nenhum jogo encontrado.</p></div>';return;}
   const alta=jogos.filter(j=>j.confianca==='alta').length;
+  // Normalizar nao_recomendado para baixa antes de renderizar
+  jogos.forEach(j=>{ if(j.confianca==='nao_recomendado') j.confianca='baixa'; });
   const odds=jogos.map(j=>parseFloat(j.odd_mercado||j.odd_sugerida)).filter(Boolean);
   const om=odds.length?(odds.reduce((a,b)=>a+b,0)/odds.length).toFixed(2):'-';
   document.getElementById('sj').textContent=jogos.length;
@@ -495,9 +497,10 @@ function render(jogos,data){
     if(!grupos[g]?.length) return;
     html+=`<div class="liga-header">${gN[g]||g}</div>`;
     grupos[g].forEach(j=>{
-      const dc=j.confianca==='alta'?'d-a':j.confianca==='media'?'d-m':'d-b';
-      const cc=j.confianca==='alta'?'c-a':j.confianca==='media'?'c-m':'c-b';
-      const cl=j.confianca?(j.confianca[0].toUpperCase()+j.confianca.slice(1)):'-';
+      const confNorm = j.confianca === 'nao_recomendado' ? 'baixa' : (j.confianca || 'baixa');
+      const dc=confNorm==='alta'?'d-a':confNorm==='media'?'d-m':'d-b';
+      const cc=confNorm==='alta'?'c-a':confNorm==='media'?'c-m':'c-b';
+      const cl=confNorm[0].toUpperCase()+confNorm.slice(1);
       const resBadge=j.resultado==='green'
         ?`<div style="display:flex;align-items:center;gap:4px"><span style="background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600">✓ GREEN</span><button onclick="editarResultado(event,${i},dataAtual,${j.id},'${j.resultado}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 4px" title="Corrigir resultado">✏️</button></div>`
         :j.resultado==='red'
