@@ -1326,15 +1326,17 @@ razao_escolha: frase curta explicando por que esse mercado e não outro.
 alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais ao menos confiável.`;
   }
 
-  // Lote 1: prioritários (Série A, B, Copa, ligas europeias principais) → Sonnet
-  // Limitar ao necessário antes de dividir — evitar processar jogos desnecessários
-  jogos = jogos.slice(0, metaJogos);
+  // Adicionar margem de 3 jogos reservas — analisados pela IA junto com os principais
+  // Se algum for descartado no pós-processamento, o substituto já vem com análise completa
+  const MARGEM_RESERVA = 3;
+  const totalComMargem = Math.min(metaJogos + MARGEM_RESERVA, jogos.length);
+  jogos = jogos.slice(0, totalComMargem);
 
   // Lote 1: primeiros 8 (Sonnet + web_search) | Lote 2: resto (Haiku)
   const LOTE = 8;
   const lote1 = jogos.slice(0, LOTE);
   const lote2 = jogos.slice(LOTE);
-  console.log(`  Lotes: ${lote1.length} (Sonnet) + ${lote2.length} (Haiku) = ${jogos.length} jogos`);
+  console.log(`  Lotes: ${lote1.length} (Sonnet) + ${lote2.length} (Haiku) = ${jogos.length} jogos (meta: ${metaJogos} + ${MARGEM_RESERVA} reservas)`);
 
   let jogosResultado = [];
 
@@ -1529,8 +1531,9 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       jogo.razao_escolha = `Pivotado (${motivo}): ${melhor.razao}`;
       jogosFinais.push(jogo);
     } else if (isComplementar && ['nao_recomendado', 'baixa'].includes(confAtual)) {
-      // Complementar sem nenhuma alternativa média ou alta → descartar
-      console.log(`  🗑️  Descartando complementar sem opção boa: ${jogo.time_casa} x ${jogo.time_fora} — todas as alternativas são baixa/nao_recomendado`);
+      // Complementar sem opção boa → descartar
+      // O substituto vem dos jogos reserva que já foram analisados pela IA (margem de 3)
+      console.log(`  🗑️  Descartando complementar: ${jogo.time_casa} x ${jogo.time_fora} — sem opção boa`);
     } else {
       // Prioritário ou media sem alta disponível → mantém
       if (confAtual === 'media') console.log(`  ℹ️  Mantendo média: ${jogo.time_casa} x ${jogo.time_fora} — sem alternativa alta disponível`);
@@ -1538,8 +1541,12 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     }
   }
 
-  resultado.jogos = jogosFinais;
-  const descartados = resultado.jogos.length - jogosFinais.length;
+  // Cortar para metaJogos após pós-processamento (reservas extras são descartadas se não necessárias)
+  resultado.jogos = jogosFinais.slice(0, metaJogos);
+  const descartados = jogosFinais.length - resultado.jogos.length;
+  if (resultado.jogos.length < jogosFinais.length) {
+    console.log(`  ✂️  Cortando reservas extras: ${jogosFinais.length} → ${resultado.jogos.length} jogos`);
+  }
 
   // Log distribuição final
   const distConf = jogosFinais.reduce((acc, j) => {
