@@ -1342,6 +1342,15 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
 
   let jogosResultado = [];
 
+  // Validar se o jogo tem os campos essenciais preenchidos pela IA
+  function validarCamposEssenciais(j) {
+    if (!j) return false;
+    if (!j.aposta || j.aposta === 'undefined' || j.aposta.trim() === '') return false;
+    if (!j.mercado || j.mercado === 'undefined') return false;
+    if (!j.justificativa || j.justificativa === '-' || j.justificativa.trim() === '') return false;
+    return true;
+  }
+
   const prompt1 = montarPrompt(montarListaJogos(lote1, 0), blocoMem, df);
   console.log(`\n🤖 Lote 1: ${lote1.length} jogos...`);
   const txt1 = await chamarIAComBusca(prompt1, 8000);
@@ -1351,7 +1360,10 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
       if (s1 !== -1) {
         const r1 = JSON.parse(txt1.slice(s1, e1+1));
-        jogosResultado = [...(r1.jogos || [])];
+        const jogos1Validos = (r1.jogos || []).filter(validarCamposEssenciais);
+        const inv1 = (r1.jogos?.length || 0) - jogos1Validos.length;
+        if (inv1 > 0) console.log(`  🗑️  ${inv1} jogo(s) do lote 1 descartado(s) — campos essenciais ausentes`);
+        jogosResultado = [...jogos1Validos];
         console.log(`✅ Lote 1: ${jogosResultado.length} apostas geradas`);
       }
     } catch(e) { console.error('❌ Erro parse lote 1:', e.message); }
@@ -1377,7 +1389,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     }
 
     // Sublotes fixos de 5 jogos — prompt completo, tamanho controlado
-    const TAMANHO_SUBLOTE = 5;
+    const TAMANHO_SUBLOTE = 3;
     const sublotes = [];
     for (let i = 0; i < lote2.length; i += TAMANHO_SUBLOTE) {
       sublotes.push(lote2.slice(i, i + TAMANHO_SUBLOTE));
@@ -1397,15 +1409,20 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
           await sleep(5000);
           const ptU = montarPrompt(montarListaJogos([jogoUnico], offsetAtual + ji), blocoMem, df);
           const txU = await chamarIA(ptU, 3000);
-          const jogosU = parseJogos(txU);
+          const jogosU = parseJogos(txU)?.filter(validarCamposEssenciais);
           if (jogosU?.length) {
             jogosResultado = [...jogosResultado, ...jogosU];
             console.log(`  ✅ Jogo ${offsetAtual + ji + 1}: ${jogoUnico.timeCasa} x ${jogoUnico.timeFora}`);
+          } else {
+            console.log(`  🗑️  Jogo ${offsetAtual + ji + 1} descartado: ${jogoUnico.timeCasa} x ${jogoUnico.timeFora} — resposta inválida/incompleta`);
           }
         }
       } else if (jogosS.length > 0) {
-        jogosResultado = [...jogosResultado, ...jogosS];
-        console.log(`  ✅ Sublote ${si+1}: ${jogosS.length} apostas`);
+        const jogosValidos = jogosS.filter(validarCamposEssenciais);
+        const invalidos = jogosS.length - jogosValidos.length;
+        if (invalidos > 0) console.log(`  🗑️  ${invalidos} jogo(s) descartado(s) do sublote ${si+1} — campos essenciais ausentes`);
+        jogosResultado = [...jogosResultado, ...jogosValidos];
+        console.log(`  ✅ Sublote ${si+1}: ${jogosValidos.length} apostas`);
       }
       offsetAtual += sublote.length;
     }
@@ -1498,6 +1515,32 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     console.log(`✅ Odds reais aplicadas`);
   }
 
+  // Calcular "score" de probabilidade para apostas de Over/Under baseado nas médias do jogo
+  // Usado para comparar alternativas quando todas têm a mesma confiança (ex: baixa vs baixa)
+  function calcularScoreProbabilidade(aposta, mercado, jogo) {
+    if (!aposta) return 0;
+    const ap = aposta.toLowerCase();
+    const mediaGols = (parseFloat(jogo.media_gols_casa) || 0) + (parseFloat(jogo.media_gols_fora) || 0);
+    const mediaEsc = parseFloat(jogo.media_escanteios) || 0;
+    const mediaCart = parseFloat(jogo.media_cartoes) || 0;
+
+    const m = ap.match(/([\d.]+)/);
+    const linha = m ? parseFloat(m[1]) : null;
+    if (linha === null) return 0;
+
+    let media = mercado === 'gols' ? mediaGols : mercado === 'escanteios' ? mediaEsc : mercado === 'cartoes' ? mediaCart : 0;
+    if (!media) return 0;
+
+    // Distância da média até a linha — quanto maior a folga, maior a probabilidade
+    if (ap.includes('over') || ap.includes('mais')) {
+      return media - linha; // positivo = média acima da linha = mais provável
+    }
+    if (ap.includes('under') || ap.includes('menos')) {
+      return linha - media; // positivo = linha acima da média = mais provável
+    }
+    return 0;
+  }
+
   // ── Pós-processamento: pivotar para confiança alta, descartar complementares sem opção ──────────
   const jogosFinais = [];
   for (const jogo of resultado.jogos) {
@@ -1533,7 +1576,23 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       jogo.razao_escolha = `Pivotado (${motivo}): ${melhor.razao}`;
       jogosFinais.push(jogo);
     } else if (isComplementar && ['nao_recomendado', 'baixa'].includes(confAtual)) {
-      // Complementar sem opção boa → guardar como candidato de baixa confiança (último recurso)
+      // Sem alta/media disponível — comparar entre as opções baixa/nao_recomendado por probabilidade matemática
+      const candidatosBaixa = jogo.alternativas.filter(a => ['baixa','nao_recomendado'].includes(a.confianca) && a.aposta);
+      const atualScore = calcularScoreProbabilidade(jogo.aposta, jogo.mercado, jogo);
+      let melhorBaixa = null, melhorScore = atualScore;
+      for (const a of candidatosBaixa) {
+        if (a.mercado === jogo.mercado && a.aposta === jogo.aposta) continue;
+        const score = calcularScoreProbabilidade(a.aposta, a.mercado, jogo);
+        if (score > melhorScore) { melhorScore = score; melhorBaixa = a; }
+      }
+      if (melhorBaixa) {
+        console.log(`  📐 Pivotando por probabilidade matemática: ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} (score ${atualScore.toFixed(2)}) → ${melhorBaixa.aposta} (score ${melhorScore.toFixed(2)})`);
+        jogo.aposta_original = jogo.aposta_original || jogo.aposta;
+        jogo.mercado_original = jogo.mercado_original || jogo.mercado;
+        jogo.aposta = melhorBaixa.aposta;
+        jogo.mercado = melhorBaixa.mercado;
+        jogo.razao_escolha = `Pivotado por probabilidade (${melhorBaixa.razao})`;
+      }
       console.log(`  ⚠️  Complementar sem opção boa: ${jogo.time_casa} x ${jogo.time_fora} — guardando como reserva baixa`);
       jogo._reservaBaixa = true;
       jogosFinais.push(jogo); // mantém mas marcado
