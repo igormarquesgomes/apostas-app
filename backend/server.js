@@ -1095,6 +1095,10 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     } catch(e) { /* silencioso */ }
   }
 
+  // Memória de calibração — declarada antes para poder ser enriquecida com assertividade por liga
+  const memoria = await buscarMemoria();
+  let blocoMem = memoria ? `\nHISTÓRICO DE CALIBRAÇÃO (use para melhorar as apostas):\n${memoria.substring(0,3000)}\n` : '';
+
   // Montar bloco de assertividade por liga para injetar no prompt
   if (ligaStatsMap.size > 0) {
     let blocoLigas = '\nASSERTIVIDADE HISTÓRICA POR LIGA (use para escolher mercado):\n';
@@ -1215,8 +1219,6 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   const df = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano}`;
 
   // Montar lista de jogos com estatísticas para o prompt
-  const memoria = await buscarMemoria();
-  const blocoMem = memoria ? `\nHISTÓRICO DE CALIBRAÇÃO (use para melhorar as apostas):\n${memoria.substring(0,3000)}\n` : '';
   if (memoria) {
     const nDiarios = (memoria.match(/\[DIÁRIO/g) || []).length;
     const temSemanal = memoria.includes('[SEMANAL');
