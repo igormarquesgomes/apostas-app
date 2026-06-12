@@ -3526,7 +3526,7 @@ app.get('/calibracao', async (req, res) => {
 // Endpoint para buscar TODOS os relatórios de calibração (para aba Relatórios)
 // Informar stats manualmente (escanteios/cartões) para apostas pendentes
 app.post('/informar-stats', async (req, res) => {
-  const { data, jogo_id, escanteios, cartoes } = req.body;
+  const { data, jogo_id, escanteios, cartoes, cartoes_amarelos, cartoes_vermelhos } = req.body;
   if (!data || !jogo_id) return res.status(400).json({ error: 'data e jogo_id obrigatórios' });
   try {
     const row = await dbGet(data);
@@ -3574,7 +3574,7 @@ app.post('/informar-stats', async (req, res) => {
 
     const novosResultados = resultadosExistentes.map(r =>
       r.jogo_id === jogo_id
-        ? { ...r, resultado_aposta: resultado, motivo: `Stats informadas manualmente: esc=${escanteios||0} cart=${cartoes||0}`, corrigido_manualmente: true, mercados_resultado: mercadosResultExtra, escanteios_total: escanteios || r.escanteios_total || null, cartoes_total: cartoes || r.cartoes_total || null }
+        ? { ...r, resultado_aposta: resultado, motivo: `Stats informadas manualmente: esc=${escanteios||0} cart=${cartoes||0}`, corrigido_manualmente: true, mercados_resultado: mercadosResultExtra, escanteios_total: escanteios || r.escanteios_total || null, cartoes_total: cartoes || r.cartoes_total || null, cartoes_amarelos: cartoes_amarelos ?? r.cartoes_amarelos ?? null, cartoes_vermelhos: cartoes_vermelhos ?? r.cartoes_vermelhos ?? null }
         : r
     );
 
