@@ -274,7 +274,7 @@ async function carregarDia(data,label){
       const resultados=j.resultados?.apostas||[];
       const jogosComRes=j.apostas.jogos.map(jg=>{
         const res=resultados.find(x=>x.jogo_id===jg.id);
-        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
+        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
       });
       render(jogosComRes,data);
     }else{
@@ -304,7 +304,7 @@ async function buscar(){
       const resultados=j.resultados?.apostas||[];
       const jogosComRes=j.apostas.jogos.map(jg=>{
         const res=resultados.find(x=>x.jogo_id===jg.id);
-        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
+        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
       });
       render(jogosComRes,dv);
       document.getElementById('btn-b').disabled=false;
@@ -328,7 +328,7 @@ async function buscar(){
         const resultados=jv.resultados.apostas;
         const jogosComRes=(p.jogos||[]).map(jg=>{
           const res=resultados.find(x=>x.jogo_id===jg.id);
-          return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null};
+          return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
         });
         render(jogosComRes,dv);
         return;
@@ -563,11 +563,13 @@ function render(jogos,data){
             ${j.razao_escolha ? `
             <div class="razao-l">🎯 Razão da escolha</div>
             <div class="razao-t" style="font-size:11px;padding:8px 12px;background:var(--s1);border-left:2px solid rgba(0,230,118,.3);color:var(--text2);line-height:1.6;margin-bottom:10px">${j.razao_escolha}</div>` : ''}
+            ${j.placar && j.alternativas?.some(a => ['escanteios','cartoes'].includes(a.mercado)) ? `
+            <button onclick="informarAnalise(event,'${dataAtual}',${j.id})" style="background:rgba(74,222,128,.08);color:var(--green);border:1px solid rgba(74,222,128,.2);font-family:var(--mono);font-size:10px;padding:5px 10px;border-radius:20px;cursor:pointer;font-weight:600;margin-bottom:10px">📐 Informar análise (escanteios/cartões)</button>` : ''}
             ${j.alternativas?.length ? `
             <div class="alts-l">📊 Todos os mercados</div>
             ${j.alternativas.map(alt => {
               const nomes = {gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
-              const resAlt = j.placar ? calcularResultadoAlt(alt, j.placar) : null;
+              const resAlt = calcularResultadoAlt(alt, j.placar, j.mercados_resultado);
               const resHtml = resAlt ? `<span class="alt-res ${resAlt}">${resAlt.toUpperCase()}</span>` : '<span class="alt-res na">—</span>';
               const razaoHtml = alt.razao ? `<span style="font-size:10px;color:var(--text3);display:block;margin-top:2px">${alt.razao}</span>` : '';
               const isPrincipal = alt.mercado === j.mercado && alt.aposta === j.aposta;
@@ -599,14 +601,26 @@ function switchTab(event, tab) {
   event.stopPropagation();
 }
 
-function calcularResultadoAlt(alt, placar) {
-  if (!placar || !alt?.aposta) return null;
+function calcularResultadoAlt(alt, placar, mercadosResult) {
+  if (!alt?.aposta) return null;
+  const merc = alt.mercado || 'gols';
+
+  // Escanteios/cartões dependem de mercados_resultado (stats reais ou informadas manualmente)
+  if (merc === 'escanteios' || merc === 'cartoes') {
+    if (!mercadosResult?.[merc]) return null;
+    const apNorm = (alt.aposta || '').trim().toLowerCase();
+    for (const [chave, res] of Object.entries(mercadosResult[merc])) {
+      if (apNorm.includes(chave.toLowerCase()) || chave.toLowerCase().includes(apNorm)) return res;
+    }
+    return null;
+  }
+
+  if (!placar) return null;
   const m = placar.match(/(\d+)-(\d+)/);
   if (!m) return null;
   const gc = parseInt(m[1]), gf = parseInt(m[2]);
   const total = gc + gf;
   const ap = (alt.aposta || '').toLowerCase();
-  const merc = alt.mercado || 'gols';
   if (merc === 'gols') {
     const n = parseFloat(ap.match(/[\d.]+/)?.[0]);
     if (ap.includes('over') || ap.includes('mais')) return total > n ? 'green' : 'red';
@@ -645,7 +659,7 @@ Deixe em branco para manter o placar atual.`, placarAtual.trim() || '');
         const resultados = d2.resultados?.apostas || [];
         const jogosComRes = d2.apostas.jogos.map(jg => {
           const res = resultados.find(x => x.jogo_id === jg.id);
-          return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null};
+          return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null, mercados_resultado: res?.mercados_resultado || null};
         });
         render(jogosComRes, data);
       }
@@ -695,7 +709,42 @@ async function informarStats(event, data, jogoId, aposta, mercado) {
         const resultados = d2.resultados?.apostas || [];
         const jogosComRes = d2.apostas.jogos.map(jg => {
           const res = resultados.find(x => x.jogo_id === jg.id);
-          return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null};
+          return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null, mercados_resultado: res?.mercados_resultado || null};
+        });
+        render(jogosComRes, data);
+      }
+    } else { alert('Erro: ' + (j.error||'desconhecido')); }
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function informarAnalise(event, data, jogoId) {
+  event.stopPropagation();
+  const vEsc = prompt(`Total de ESCANTEIOS no jogo (deixe vazio se não souber):`);
+  if (vEsc === null) return;
+  const vCart = prompt(`Total de CARTÕES no jogo (vermelho = 2):\n(deixe vazio se não souber)`);
+  if (vCart === null) return;
+
+  const escanteios = vEsc.trim() ? parseInt(vEsc) : null;
+  const cartoes = vCart.trim() ? parseInt(vCart) : null;
+  if ((vEsc.trim() && isNaN(escanteios)) || (vCart.trim() && isNaN(cartoes))) return alert('Número inválido');
+  if (escanteios === null && cartoes === null) return;
+
+  try {
+    const r = await fetch(`${BACKEND_URL}/informar-stats`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ data, jogo_id: jogoId, escanteios, cartoes })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      alert(`✅ Análise atualizada!`);
+      const r2 = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const d2 = await r2.json();
+      if (d2.apostas?.jogos?.length > 0) {
+        const resultados = d2.resultados?.apostas || [];
+        const jogosComRes = d2.apostas.jogos.map(jg => {
+          const res = resultados.find(x => x.jogo_id === jg.id);
+          return {...jg, resultado: res?.resultado_aposta || null, placar: res?.placar || null, mercados_resultado: res?.mercados_resultado || null};
         });
         render(jogosComRes, data);
       }
