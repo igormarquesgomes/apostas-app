@@ -636,6 +636,11 @@ function calcularResultadoAlt(alt, placar, mercadosResult, timeCasa, timeFora) {
     }
     if (apN.includes('x2') || apN.includes('dupla fora')) return (foraVence || empate) ? 'green' : 'red';
     if (apN.includes('1x') || apN.includes('dupla casa')) return (casaVence || empate) ? 'green' : 'red';
+    // Dupla chance genérica: "dupla chance (casa ou empate)" / "dupla chance (fora ou empate)"
+    if (apN.includes('dupla') && apN.includes('ou empat')) {
+      if (apN.includes('casa') || apN.includes('home')) return (casaVence || empate) ? 'green' : 'red';
+      if (apN.includes('fora') || apN.includes('away')) return (foraVence || empate) ? 'green' : 'red';
+    }
     const nomeCasa = normAcc((timeCasa||'').toLowerCase()), nomeFora = normAcc((timeFora||'').toLowerCase());
     const primCasa = nomeCasa.split(' ')[0], primFora = nomeFora.split(' ')[0];
     if (apN.includes('ou empat') || apN.includes('nao perde')) {
