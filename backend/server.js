@@ -2829,12 +2829,19 @@ Seja direto e acionável. Máx 400 palavras. A IA que ler este relatório amanh�
     if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].mercados[mercado].green++;
     else if (res.resultado_aposta === 'red') statsPorLiga[aposta.ligaId].mercados[mercado].red++;
 
-    // Acumular mercados ALTERNATIVOS — calcular o que teria dado green com o placar real
-    if (res.placar && aposta.alternativas?.length) {
+    // Acumular mercados ALTERNATIVOS — calcular o que teria dado green com placar real e/ou stats reais
+    if (aposta.alternativas?.length) {
+      const statsAlt = (res.escanteios_total || res.cartoes_total) ? { escanteiosTotal: res.escanteios_total || 0, cartoesTotal: res.cartoes_total || 0 } : null;
       for (const alt of aposta.alternativas) {
         if (alt.mercado === mercado) continue; // já contou acima
-        const jogoAlt = { ...aposta, mercado: alt.mercado, aposta: alt.aposta };
-        const resultadoAlt = verificarAposta(jogoAlt, ...res.placar.split('-').map(Number), null);
+        let resultadoAlt;
+        if (['escanteios','cartoes'].includes(alt.mercado)) {
+          // Usa mercados_resultado já calculado (cobre stats da API ou informadas manualmente)
+          resultadoAlt = calcularResultadoAlternativaTexto(alt.aposta, res.mercados_resultado?.[alt.mercado]);
+        } else if (res.placar) {
+          const jogoAlt = { ...aposta, mercado: alt.mercado, aposta: alt.aposta };
+          resultadoAlt = verificarAposta(jogoAlt, ...res.placar.split('-').map(Number), statsAlt);
+        }
         if (!['green','red'].includes(resultadoAlt)) continue;
         if (!statsPorLiga[aposta.ligaId].mercados[alt.mercado]) statsPorLiga[aposta.ligaId].mercados[alt.mercado] = { green: 0, red: 0 };
         if (resultadoAlt === 'green') statsPorLiga[aposta.ligaId].mercados[alt.mercado].green++;
@@ -3345,11 +3352,30 @@ app.post('/sincronizar-ligas', async (req, res) => {
         if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
         else statsPorLiga[aposta.ligaId].red++;
         statsPorLiga[aposta.ligaId].total++;
-        // Acumular por mercado
+        // Acumular por mercado (aposta principal)
         const mercado = aposta.mercado || 'gols';
         if (!statsPorLiga[aposta.ligaId].mercados[mercado]) statsPorLiga[aposta.ligaId].mercados[mercado] = { green: 0, red: 0 };
         if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].mercados[mercado].green++;
         else statsPorLiga[aposta.ligaId].mercados[mercado].red++;
+
+        // Acumular mercados ALTERNATIVOS — aproveitar TODO dado já coletado, sem custo extra
+        if (aposta.alternativas?.length) {
+          const statsAlt = (res.escanteios_total || res.cartoes_total) ? { escanteiosTotal: res.escanteios_total || 0, cartoesTotal: res.cartoes_total || 0 } : null;
+          for (const alt of aposta.alternativas) {
+            if (alt.mercado === mercado) continue;
+            let resultadoAlt;
+            if (['escanteios','cartoes'].includes(alt.mercado)) {
+              resultadoAlt = calcularResultadoAlternativaTexto(alt.aposta, res.mercados_resultado?.[alt.mercado]);
+            } else if (res.placar) {
+              const jogoAlt = { ...aposta, mercado: alt.mercado, aposta: alt.aposta };
+              resultadoAlt = verificarAposta(jogoAlt, ...res.placar.split('-').map(Number), statsAlt);
+            }
+            if (!['green','red'].includes(resultadoAlt)) continue;
+            if (!statsPorLiga[aposta.ligaId].mercados[alt.mercado]) statsPorLiga[aposta.ligaId].mercados[alt.mercado] = { green: 0, red: 0 };
+            if (resultadoAlt === 'green') statsPorLiga[aposta.ligaId].mercados[alt.mercado].green++;
+            else statsPorLiga[aposta.ligaId].mercados[alt.mercado].red++;
+          }
+        }
       }
     }
 
