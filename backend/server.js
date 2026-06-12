@@ -1341,6 +1341,13 @@ PASSO 2 — Avalie CADA mercado separadamente com os dados disponíveis:
 - CARTÕES: some média cartões casa + fora. Se ≥ 4.5 → Over 3.5 é confiável. Se ≥ 6.0 → Over 4.5 é alta confiança. Rivalidades, jogos diretos e ligas físicas aumentam cartões.
 - Use web_search para lesões, escalações e contexto atual
 
+CALIBRAÇÃO DE LINHA COM LigaMedia (se disponível para a liga do jogo):
+- LigaMedia mostra a média REAL de escanteios/cartões observada em jogos dessa liga que já validamos — mesmo com poucas amostras, é um dado real e vale mais que a projeção genérica da API
+- Compare a linha que você ia escolher (baseada na média do jogo) com o LigaMedia da liga
+- Se a média do jogo aponta para uma linha (ex: Over 9.5) mas o LigaMedia é menor (ex: 7.8), PREFIRA a linha mais conservadora (ex: Over 7.5) — a amostra real da liga é mais confiável que a projeção do jogo específico
+- Exemplo: jogo sugere escanteios combinados 9.2 → Over 8.5. Mas LigaMedia = 7.0 (3 jogos). Prefira Over 6.5, mais alinhado com o que a liga realmente entrega
+- Se não houver LigaMedia para a liga, use normalmente a média do jogo
+
 PASSO 3 — Classifique os mercados por confiança (alta/media/baixa/nao_recomendado)
 CRITÉRIO OBJETIVO para alta confiança em escanteios/cartões:
 - Escanteios alta: média combinada ≥ 10.0 OU histórico H2H consistente com muitos escanteios
