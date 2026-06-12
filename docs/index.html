@@ -569,7 +569,7 @@ function render(jogos,data){
             <div class="alts-l">📊 Todos os mercados</div>
             ${j.alternativas.map(alt => {
               const nomes = {gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
-              const resAlt = calcularResultadoAlt(alt, j.placar, j.mercados_resultado);
+              const resAlt = calcularResultadoAlt(alt, j.placar, j.mercados_resultado, j.time_casa, j.time_fora);
               const resHtml = resAlt ? `<span class="alt-res ${resAlt}">${resAlt.toUpperCase()}</span>` : '<span class="alt-res na">—</span>';
               const razaoHtml = alt.razao ? `<span style="font-size:10px;color:var(--text3);display:block;margin-top:2px">${alt.razao}</span>` : '';
               const isPrincipal = alt.mercado === j.mercado && alt.aposta === j.aposta;
@@ -601,7 +601,7 @@ function switchTab(event, tab) {
   event.stopPropagation();
 }
 
-function calcularResultadoAlt(alt, placar, mercadosResult) {
+function calcularResultadoAlt(alt, placar, mercadosResult, timeCasa, timeFora) {
   if (!alt?.aposta) return null;
   const merc = alt.mercado || 'gols';
 
@@ -628,12 +628,24 @@ function calcularResultadoAlt(alt, placar, mercadosResult) {
     if (ap.includes('ambas') || ap.includes('btts')) return (gc > 0 && gf > 0) ? 'green' : 'red';
   }
   if (merc === 'resultado') {
-    if (ap.includes('empate') || ap === 'x') return gc === gf ? 'green' : 'red';
-    const casaVence = gc > gf, foraVence = gf > gc;
-    if (ap.includes('casa') || ap.includes('home') || ap.match(/^1/)) return casaVence ? 'green' : 'red';
-    if (ap.includes('fora') || ap.includes('away') || ap.match(/^2/)) return foraVence ? 'green' : 'red';
-    if (ap.includes('x2') || ap.includes('dupla fora')) return (gc <= gf) ? 'green' : 'red';
-    if (ap.includes('1x') || ap.includes('dupla casa')) return (gc >= gf) ? 'green' : 'red';
+    const casaVence = gc > gf, foraVence = gf > gc, empate = gc === gf;
+    if ((ap.includes('empate') || ap === 'x') && !ap.includes('dupla') && !ap.includes('ou empat') && !ap.includes('1x') && !ap.includes('x2')) {
+      return empate ? 'green' : 'red';
+    }
+    if (ap.includes('x2') || ap.includes('dupla fora')) return (foraVence || empate) ? 'green' : 'red';
+    if (ap.includes('1x') || ap.includes('dupla casa')) return (casaVence || empate) ? 'green' : 'red';
+    const nomeCasa = (timeCasa||'').toLowerCase(), nomeFora = (timeFora||'').toLowerCase();
+    const primCasa = nomeCasa.split(' ')[0], primFora = nomeFora.split(' ')[0];
+    if (ap.includes('ou empat') || ap.includes('nao perde') || ap.includes('não perde')) {
+      if (primCasa && ap.includes(primCasa)) return (casaVence || empate) ? 'green' : 'red';
+      if (primFora && ap.includes(primFora)) return (foraVence || empate) ? 'green' : 'red';
+    }
+    if (ap.includes('vence') || ap.includes('vitória') || ap.includes('vitoria')) {
+      if (primCasa && ap.includes(primCasa)) return casaVence ? 'green' : 'red';
+      if (primFora && ap.includes(primFora)) return foraVence ? 'green' : 'red';
+      if (ap.includes('casa') || ap.includes('home')) return casaVence ? 'green' : 'red';
+      if (ap.includes('fora') || ap.includes('away')) return foraVence ? 'green' : 'red';
+    }
   }
   return null;
 }
@@ -721,19 +733,25 @@ async function informarAnalise(event, data, jogoId) {
   event.stopPropagation();
   const vEsc = prompt(`Total de ESCANTEIOS no jogo (deixe vazio se não souber):`);
   if (vEsc === null) return;
-  const vCart = prompt(`Total de CARTÕES no jogo (vermelho = 2):\n(deixe vazio se não souber)`);
-  if (vCart === null) return;
+  const vAmarelos = prompt(`Total de CARTÕES AMARELOS no jogo (deixe vazio se não souber):`);
+  if (vAmarelos === null) return;
+  const vVermelhos = prompt(`Total de CARTÕES VERMELHOS no jogo (deixe vazio se não souber):`);
+  if (vVermelhos === null) return;
 
   const escanteios = vEsc.trim() ? parseInt(vEsc) : null;
-  const cartoes = vCart.trim() ? parseInt(vCart) : null;
-  if ((vEsc.trim() && isNaN(escanteios)) || (vCart.trim() && isNaN(cartoes))) return alert('Número inválido');
-  if (escanteios === null && cartoes === null) return;
+  const amarelos = vAmarelos.trim() ? parseInt(vAmarelos) : null;
+  const vermelhos = vVermelhos.trim() ? parseInt(vVermelhos) : null;
+  if ((vEsc.trim() && isNaN(escanteios)) || (vAmarelos.trim() && isNaN(amarelos)) || (vVermelhos.trim() && isNaN(vermelhos))) return alert('Número inválido');
+  if (escanteios === null && amarelos === null && vermelhos === null) return;
+
+  // Cartões totais para fins de mercado "Over X.X cartões" = amarelos + vermelhos
+  const cartoes = (amarelos !== null || vermelhos !== null) ? (amarelos||0) + (vermelhos||0) : null;
 
   try {
     const r = await fetch(`${BACKEND_URL}/informar-stats`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ data, jogo_id: jogoId, escanteios, cartoes })
+      body: JSON.stringify({ data, jogo_id: jogoId, escanteios, cartoes, cartoes_amarelos: amarelos, cartoes_vermelhos: vermelhos })
     });
     const j = await r.json();
     if (j.ok) {
