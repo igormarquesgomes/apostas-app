@@ -2204,6 +2204,9 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
       if (aposta.includes('x2') || apostaMencFora) return (foraVence || empate) ? 'green' : 'red';
       if (aposta.includes('1x') || apostaMencCasa) return (casaVence || empate) ? 'green' : 'red';
       if (aposta.includes('12')) return (casaVence || foraVence) ? 'green' : 'red';
+      // Dupla chance genérica por posição: "dupla chance (casa ou empate)" / "(fora ou empate)"
+      if (aposta.includes('casa') || aposta.includes('home')) return (casaVence || empate) ? 'green' : 'red';
+      if (aposta.includes('fora') || aposta.includes('away')) return (foraVence || empate) ? 'green' : 'red';
     }
     if (aposta.includes('vence') || aposta.includes('vitória') || aposta.includes('vitoria')) {
       if (apostaMencCasa) return casaVence ? 'green' : 'red';
