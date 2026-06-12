@@ -629,22 +629,24 @@ function calcularResultadoAlt(alt, placar, mercadosResult, timeCasa, timeFora) {
   }
   if (merc === 'resultado') {
     const casaVence = gc > gf, foraVence = gf > gc, empate = gc === gf;
-    if ((ap.includes('empate') || ap === 'x') && !ap.includes('dupla') && !ap.includes('ou empat') && !ap.includes('1x') && !ap.includes('x2')) {
+    const normAcc = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const apN = normAcc(ap);
+    if ((apN.includes('empate') || apN === 'x') && !apN.includes('dupla') && !apN.includes('ou empat') && !apN.includes('1x') && !apN.includes('x2')) {
       return empate ? 'green' : 'red';
     }
-    if (ap.includes('x2') || ap.includes('dupla fora')) return (foraVence || empate) ? 'green' : 'red';
-    if (ap.includes('1x') || ap.includes('dupla casa')) return (casaVence || empate) ? 'green' : 'red';
-    const nomeCasa = (timeCasa||'').toLowerCase(), nomeFora = (timeFora||'').toLowerCase();
+    if (apN.includes('x2') || apN.includes('dupla fora')) return (foraVence || empate) ? 'green' : 'red';
+    if (apN.includes('1x') || apN.includes('dupla casa')) return (casaVence || empate) ? 'green' : 'red';
+    const nomeCasa = normAcc((timeCasa||'').toLowerCase()), nomeFora = normAcc((timeFora||'').toLowerCase());
     const primCasa = nomeCasa.split(' ')[0], primFora = nomeFora.split(' ')[0];
-    if (ap.includes('ou empat') || ap.includes('nao perde') || ap.includes('não perde')) {
-      if (primCasa && ap.includes(primCasa)) return (casaVence || empate) ? 'green' : 'red';
-      if (primFora && ap.includes(primFora)) return (foraVence || empate) ? 'green' : 'red';
+    if (apN.includes('ou empat') || apN.includes('nao perde')) {
+      if (primCasa && apN.includes(primCasa)) return (casaVence || empate) ? 'green' : 'red';
+      if (primFora && apN.includes(primFora)) return (foraVence || empate) ? 'green' : 'red';
     }
-    if (ap.includes('vence') || ap.includes('vitória') || ap.includes('vitoria')) {
-      if (primCasa && ap.includes(primCasa)) return casaVence ? 'green' : 'red';
-      if (primFora && ap.includes(primFora)) return foraVence ? 'green' : 'red';
-      if (ap.includes('casa') || ap.includes('home')) return casaVence ? 'green' : 'red';
-      if (ap.includes('fora') || ap.includes('away')) return foraVence ? 'green' : 'red';
+    if (apN.includes('vence') || apN.includes('vitoria')) {
+      if (primCasa && apN.includes(primCasa)) return casaVence ? 'green' : 'red';
+      if (primFora && apN.includes(primFora)) return foraVence ? 'green' : 'red';
+      if (apN.includes('casa') || apN.includes('home')) return casaVence ? 'green' : 'red';
+      if (apN.includes('fora') || apN.includes('away')) return foraVence ? 'green' : 'red';
     }
   }
   return null;
