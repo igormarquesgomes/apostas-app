@@ -1699,6 +1699,10 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
   }, {});
   console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}${descartados > 0 ? ` | descartados: ${descartados}` : ''}`);
 
+  // Reatribuir id sequencial — a IA reinicia a numeração em cada chamada/sublote,
+  // causando ids duplicados (ex: vários jogos com id:1). Garante id único 1..N.
+  resultado.jogos.forEach((j, idx) => { j.id = idx + 1; });
+
   return resultado;
 }
 
