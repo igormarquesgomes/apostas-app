@@ -488,11 +488,21 @@ async function dbSaveLiga(nomeLiga, ligaId, pais) {
 }
 
 // ─── Atualizar stats de liga ─────────────────────────────────
-async function dbUpdateLigaStats(ligaId, green, red, mercado) {
+// Encontra o resultado (green/red) de uma alternativa de texto dentro do dicionário mercadosResult
+function calcularResultadoAlternativaTexto(apostaTexto, mercadoResultDict) {
+  if (!apostaTexto || !mercadoResultDict) return null;
+  const apNorm = apostaTexto.trim().toLowerCase();
+  for (const [chave, res] of Object.entries(mercadoResultDict)) {
+    if (apNorm.includes(chave.toLowerCase()) || chave.toLowerCase().includes(apNorm)) return res;
+  }
+  return null;
+}
+
+async function dbUpdateLigaStats(ligaId, green, red, mercado, valorEscanteios = null, valorCartoes = null) {
   if (!ligaId) return;
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}&select=green,red,total,mercados`,
+      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}&select=green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     );
     const rows = await res.json();
@@ -508,10 +518,30 @@ async function dbUpdateLigaStats(ligaId, green, red, mercado) {
       mercados[mercado].green += green;
       mercados[mercado].red   += red;
     }
+
+    const body = { green: novoGreen, red: novoRed, total: novoTotal, mercados };
+
+    // Atualizar média incremental de escanteios (média móvel ponderada por amostras)
+    if (valorEscanteios !== null && valorEscanteios >= 0) {
+      const amostrasAnt = atual.amostras_escanteios || 0;
+      const mediaAnt = atual.media_escanteios || 0;
+      const novaAmostra = amostrasAnt + 1;
+      body.media_escanteios = ((mediaAnt * amostrasAnt) + valorEscanteios) / novaAmostra;
+      body.amostras_escanteios = novaAmostra;
+    }
+    // Atualizar média incremental de cartões
+    if (valorCartoes !== null && valorCartoes >= 0) {
+      const amostrasAnt = atual.amostras_cartoes || 0;
+      const mediaAnt = atual.media_cartoes || 0;
+      const novaAmostra = amostrasAnt + 1;
+      body.media_cartoes = ((mediaAnt * amostrasAnt) + valorCartoes) / novaAmostra;
+      body.amostras_cartoes = novaAmostra;
+    }
+
     await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}`, {
       method: 'PATCH',
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ green: novoGreen, red: novoRed, total: novoTotal, mercados })
+      body: JSON.stringify(body)
     });
   } catch(e) { console.error('Erro dbUpdateLigaStats:', e.message); }
 }
@@ -1082,7 +1112,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     try {
       const ids = todasLigaIds.join(',');
       const resL = await fetch(
-        `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=in.(${ids})&select=liga_id,nome,green,red,total,mercados`,
+        `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=in.(${ids})&select=liga_id,nome,green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes`,
         { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
       );
       const rowsL = await resL.json();
@@ -1245,6 +1275,13 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
               return `${mercado}:${pct}%(${m.green}G/${m.red}R)`;
             }).join(' ');
           if (mercPerf) ligaPerf = `\n   LigaPerf: ${mercPerf}`;
+        }
+        // Médias reais de escanteios/cartões da liga (calibração de linha)
+        if (st?.media_escanteios || st?.media_cartoes) {
+          const partes = [];
+          if (st.media_escanteios) partes.push(`escanteios média real ${st.media_escanteios.toFixed(1)} (${st.amostras_escanteios||0} jogos)`);
+          if (st.media_cartoes) partes.push(`cartões média real ${st.media_cartoes.toFixed(1)} (${st.amostras_cartoes||0} jogos)`);
+          ligaPerf += `\n   LigaMedia: ${partes.join(' | ')}`;
         }
       }
       if (reduzido) {
@@ -2429,7 +2466,26 @@ async function agentValidar(data, opcoes = {}) {
               'Dupla fora (X2)': golsFora >= golsCasa ? 'green' : 'red'
             };
           }
-          resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercados_resultado: mercadosResult });
+          // Escanteios e cartões — só se a API trouxe stats reais (não zeradas)
+          if (stats?.escanteiosTotal > 0) {
+            const esc = stats.escanteiosTotal;
+            mercadosResult.escanteios = {};
+            for (const linha of ['7.5','8.5','9.5','10.5','11.5','12.5']) {
+              const l = parseFloat(linha);
+              mercadosResult.escanteios[`Over ${linha}`] = esc > l ? 'green' : 'red';
+              mercadosResult.escanteios[`Under ${linha}`] = esc < l ? 'green' : 'red';
+            }
+          }
+          if (stats?.cartoesTotal > 0) {
+            const cart = stats.cartoesTotal;
+            mercadosResult.cartoes = {};
+            for (const linha of ['2.5','3.5','4.5','5.5']) {
+              const l = parseFloat(linha);
+              mercadosResult.cartoes[`Over ${linha}`] = cart > l ? 'green' : 'red';
+              mercadosResult.cartoes[`Under ${linha}`] = cart < l ? 'green' : 'red';
+            }
+          }
+          resultados.push({ encontrado: true, placar, resultado_aposta: resultado, motivo: `${jogo.time_casa} ${golsCasa} x ${golsFora} ${jogo.time_fora}`, jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercados_resultado: mercadosResult, escanteios_total: stats?.escanteiosTotal || null, cartoes_total: stats?.cartoesTotal || null });
         }
       } else {
         console.log(`    ⏳ Resultado não encontrado`);
@@ -2749,7 +2805,10 @@ Seja direto e acionável. Máx 400 palavras. A IA que ler este relatório amanh�
   for (const res of resultadosValidados) {
     const aposta = apostas.find(x => x.id === res.jogo_id);
     if (!aposta?.ligaId) continue;
-    if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, mercados: {} };
+    if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, mercados: {}, escanteios: null, cartoes: null };
+    // Capturar valores absolutos para média da liga
+    if (typeof res.escanteios_total === 'number' && res.escanteios_total > 0) statsPorLiga[aposta.ligaId].escanteios = res.escanteios_total;
+    if (typeof res.cartoes_total === 'number' && res.cartoes_total > 0) statsPorLiga[aposta.ligaId].cartoes = res.cartoes_total;
     if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
     else if (res.resultado_aposta === 'red') statsPorLiga[aposta.ligaId].red++;
 
@@ -2772,11 +2831,22 @@ Seja direto e acionável. Máx 400 palavras. A IA que ler este relatório amanh�
       }
     }
   }
-  const updatePromises = Object.entries(statsPorLiga).map(([ligaId, s]) =>
-    Promise.all(Object.entries(s.mercados || {}).map(([mercado, ms]) =>
-      dbUpdateLigaStats(parseInt(ligaId), ms.green, ms.red, mercado)
-    ))
-  );
+  const updatePromises = Object.entries(statsPorLiga).map(([ligaId, s]) => {
+    const entradas = Object.entries(s.mercados || {});
+    if (entradas.length === 0) {
+      // Sem mercados, mas pode ter médias para salvar
+      if (s.escanteios !== null || s.cartoes !== null) {
+        return dbUpdateLigaStats(parseInt(ligaId), 0, 0, null, s.escanteios, s.cartoes);
+      }
+      return Promise.resolve();
+    }
+    return Promise.all(entradas.map(([mercado, ms], idx) => {
+      // Salvar a média junto com a primeira chamada apenas (evita duplicar amostra)
+      const esc = idx === 0 ? s.escanteios : null;
+      const cart = idx === 0 ? s.cartoes : null;
+      return dbUpdateLigaStats(parseInt(ligaId), ms.green, ms.red, mercado, esc, cart);
+    }));
+  });
   await Promise.all(updatePromises);
   console.log(`📊 Stats de ligas atualizadas: ${Object.keys(statsPorLiga).length} liga(s)`);
 }
@@ -3246,16 +3316,21 @@ app.post('/sincronizar-ligas', async (req, res) => {
     }
     const dias = (await Promise.all(promises)).filter(d => d?.apostas?.jogos?.length && d?.resultados?.apostas?.length);
 
-    // Consolidar green/red por ligaId e por mercado
+    // Consolidar green/red por ligaId e por mercado, + médias de escanteios/cartoes
     const statsPorLiga = {};
     for (const dia of dias) {
       const apostas = dia.apostas.jogos;
       const resultados = dia.resultados.apostas;
       for (const res of resultados) {
-        if (!['green','red'].includes(res.resultado_aposta)) continue;
         const aposta = apostas.find(x => x.id === res.jogo_id);
         if (!aposta?.ligaId) continue;
-        if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, total: 0, mercados: {} };
+        if (!statsPorLiga[aposta.ligaId]) statsPorLiga[aposta.ligaId] = { green: 0, red: 0, total: 0, mercados: {}, escanteios: [], cartoes: [] };
+
+        // Acumular amostras de escanteios/cartoes totais (independente do mercado apostado)
+        if (typeof res.escanteios_total === 'number' && res.escanteios_total > 0) statsPorLiga[aposta.ligaId].escanteios.push(res.escanteios_total);
+        if (typeof res.cartoes_total === 'number' && res.cartoes_total > 0) statsPorLiga[aposta.ligaId].cartoes.push(res.cartoes_total);
+
+        if (!['green','red'].includes(res.resultado_aposta)) continue;
         if (res.resultado_aposta === 'green') statsPorLiga[aposta.ligaId].green++;
         else statsPorLiga[aposta.ligaId].red++;
         statsPorLiga[aposta.ligaId].total++;
@@ -3267,14 +3342,23 @@ app.post('/sincronizar-ligas', async (req, res) => {
       }
     }
 
-    // Atualizar cada liga no banco com green/red/total/mercados
+    // Atualizar cada liga no banco com green/red/total/mercados + médias
     let atualizadas = 0;
     for (const [ligaId, s] of Object.entries(statsPorLiga)) {
       try {
+        const body = { green: s.green, red: s.red, total: s.total, mercados: s.mercados };
+        if (s.escanteios.length > 0) {
+          body.media_escanteios = s.escanteios.reduce((a,b)=>a+b,0) / s.escanteios.length;
+          body.amostras_escanteios = s.escanteios.length;
+        }
+        if (s.cartoes.length > 0) {
+          body.media_cartoes = s.cartoes.reduce((a,b)=>a+b,0) / s.cartoes.length;
+          body.amostras_cartoes = s.cartoes.length;
+        }
         await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaId}`, {
           method: 'PATCH',
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ green: s.green, red: s.red, total: s.total, mercados: s.mercados })
+          body: JSON.stringify(body)
         });
         atualizadas++;
       } catch(e) { console.error(`Erro atualizando liga ${ligaId}:`, e.message); }
@@ -3464,14 +3548,68 @@ app.post('/informar-stats', async (req, res) => {
     };
 
     const resultado = verificarAposta(jogo, gC, gF, statsInformadas);
+
+    // Montar mercados_resultado para escanteios/cartões com os dados informados
+    const mercadosResultExtra = { ...(resExistente.mercados_resultado || {}) };
+    if (escanteios) {
+      mercadosResultExtra.escanteios = {};
+      for (const linha of ['7.5','8.5','9.5','10.5','11.5','12.5']) {
+        const l = parseFloat(linha);
+        mercadosResultExtra.escanteios[`Over ${linha}`] = escanteios > l ? 'green' : 'red';
+        mercadosResultExtra.escanteios[`Under ${linha}`] = escanteios < l ? 'green' : 'red';
+      }
+    }
+    if (cartoes) {
+      mercadosResultExtra.cartoes = {};
+      for (const linha of ['2.5','3.5','4.5','5.5']) {
+        const l = parseFloat(linha);
+        mercadosResultExtra.cartoes[`Over ${linha}`] = cartoes > l ? 'green' : 'red';
+        mercadosResultExtra.cartoes[`Under ${linha}`] = cartoes < l ? 'green' : 'red';
+      }
+    }
+
+    // Verificar se já tinha mercados_resultado.escanteios/cartoes ANTES (evitar contar 2x na liga)
+    const jaTinhaEsc = !!resExistente.mercados_resultado?.escanteios;
+    const jaTinhaCart = !!resExistente.mercados_resultado?.cartoes;
+
     const novosResultados = resultadosExistentes.map(r =>
       r.jogo_id === jogo_id
-        ? { ...r, resultado_aposta: resultado, motivo: `Stats informadas manualmente: esc=${escanteios||0} cart=${cartoes||0}`, corrigido_manualmente: true }
+        ? { ...r, resultado_aposta: resultado, motivo: `Stats informadas manualmente: esc=${escanteios||0} cart=${cartoes||0}`, corrigido_manualmente: true, mercados_resultado: mercadosResultExtra, escanteios_total: escanteios || r.escanteios_total || null, cartoes_total: cartoes || r.cartoes_total || null }
         : r
     );
 
     await dbSaveResultados(data, { validado_em: new Date().toISOString(), apostas: novosResultados });
     console.log(`📊 Stats informadas: ${jogo.time_casa} x ${jogo.time_fora} | esc=${escanteios} cart=${cartoes} → ${resultado}`);
+
+    // Propagar para ligas_conhecidas — alimentar o histórico de assertividade por mercado
+    // Usa as alternativas do jogo (geradas pela IA) para saber qual aposta específica considerar
+    if (jogo.ligaId) {
+      // Sempre atualizar médias se valor informado (mesmo sem alternativas no mercado)
+      let mediaEscParaSalvar = null, mediaCartParaSalvar = null;
+      if (escanteios !== null && !jaTinhaEsc) mediaEscParaSalvar = escanteios;
+      if (cartoes !== null && !jaTinhaCart) mediaCartParaSalvar = cartoes;
+
+      if (jogo.alternativas?.length) {
+        for (const alt of jogo.alternativas) {
+          if (alt.mercado === 'escanteios' && escanteios !== null && !jaTinhaEsc) {
+            const r = calcularResultadoAlternativaTexto(alt.aposta, mercadosResultExtra.escanteios);
+            if (r) await dbUpdateLigaStats(jogo.ligaId, r === 'green' ? 1 : 0, r === 'red' ? 1 : 0, 'escanteios', mediaEscParaSalvar, null);
+            mediaEscParaSalvar = null; // já salvou a média junto com o green/red
+          }
+          if (alt.mercado === 'cartoes' && cartoes !== null && !jaTinhaCart) {
+            const r = calcularResultadoAlternativaTexto(alt.aposta, mercadosResultExtra.cartoes);
+            if (r) await dbUpdateLigaStats(jogo.ligaId, r === 'green' ? 1 : 0, r === 'red' ? 1 : 0, 'cartoes', null, mediaCartParaSalvar);
+            mediaCartParaSalvar = null;
+          }
+        }
+      }
+      // Se não entrou em nenhum mercado de alternativas, salvar só a média (sem green/red)
+      if (mediaEscParaSalvar !== null || mediaCartParaSalvar !== null) {
+        await dbUpdateLigaStats(jogo.ligaId, 0, 0, null, mediaEscParaSalvar, mediaCartParaSalvar);
+      }
+      console.log(`  📊 ligas_conhecidas atualizado para liga ${jogo.ligaId}`);
+    }
+
     res.json({ ok: true, resultado });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
