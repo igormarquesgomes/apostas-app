@@ -2,111 +2,168 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Relatórios · OddLab</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F0EDEA;--s1:#FFFFFF;--s2:#F8FAFC;
+  --bg:#F0EDEA;--surface:#FFFFFF;--surface2:#F8FAFC;--surface3:#F1F5F9;
   --border:#E2E8F0;--border2:#CBD5E1;
   --text:#1E293B;--text2:#475569;--text3:#94A3B8;
-  --green:#0F766E;--red:#DC2626;--amber:#D97706;
+  --green:#0F766E;--green-lt:#F0FDF9;--green-bd:#99F6E4;
+  --red:#DC2626;--red-lt:#FEF2F2;--red-bd:#FECACA;
+  --amber:#D97706;--amber-lt:#FFFBEB;--amber-bd:#FDE68A;
+  --blue:#2563EB;--blue-lt:#EFF6FF;--blue-bd:#BFDBFE;
+  --purple:#7C3AED;--purple-lt:#F5F3FF;--purple-bd:#DDD6FE;
   --nav-h:52px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;}
-.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;min-height:100vh;}
+
+.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
 .nav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;}
 .nav-brand-icon{width:30px;height:30px;background:var(--green);border-radius:7px;display:flex;align-items:center;justify-content:center;}
 .nav-brand-icon svg{width:14px;height:14px;color:#fff;}
 .nav-brand-name{font-size:15px;font-weight:700;color:var(--text);}
 .nav-brand-name span{color:var(--green);}
 .nav-links{display:flex;align-items:center;gap:2px;flex:1;}
-.nav-link{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .15s;white-space:nowrap;}
-.nav-link:hover{background:var(--s2);color:var(--text);}
-.nav-link.active{background:#F0FDF9;color:var(--green);}
+.nl{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .15s;white-space:nowrap;}
+.nl:hover{background:var(--surface2);color:var(--text);}
+.nl.active{background:var(--green-lt);color:var(--green);}
+
 .page{padding:1.25rem;max-width:900px;}
-.page-title{font-size:22px;font-weight:700;color:var(--text);margin-bottom:2px;}
-.page-sub{font-size:12px;color:var(--text3);margin-bottom:1.5rem;}
 
+.page-hd{margin-bottom:1.5rem;}
+.page-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px;}
+.page-sub{font-size:12px;color:var(--text3);}
+
+/* TYPE BADGE */
+.tipo-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:20px;}
+.tipo-d{background:var(--blue-lt);color:var(--blue);border:1px solid var(--blue-bd);}
+.tipo-w{background:var(--green-lt);color:var(--green);border:1px solid var(--green-bd);}
+.tipo-m{background:var(--purple-lt);color:var(--purple);border:1px solid var(--purple-bd);}
+.tipo-s{background:var(--amber-lt);color:var(--amber);border:1px solid var(--amber-bd);}
+
+/* ASSERTIVIDADE BADGE */
+.assert-badge{font-size:18px;font-weight:800;padding:4px 10px;border-radius:8px;}
+.assert-good{color:var(--green);background:var(--green-lt);}
+.assert-ok{color:var(--amber);background:var(--amber-lt);}
+.assert-bad{color:var(--red);background:var(--red-lt);}
+
+/* SECTION HEADER */
 .grupo{margin-bottom:1.5rem;}
-.grupo-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
-.grupo-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.grupo-hd{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.grupo-hd-line{flex:1;height:1px;background:var(--border);}
+.grupo-hd-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);white-space:nowrap;}
+.grupo-count{font-size:10px;font-weight:600;color:var(--text3);background:var(--surface3);border:1px solid var(--border);border-radius:20px;padding:1px 7px;}
 
-.rel-item{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;}
-.rel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;transition:background .12s;}
-.rel-header:hover{background:var(--s2);}
-.rel-info{display:flex;align-items:center;gap:10px;}
-.rel-icon{font-size:18px;}
-.rel-title{font-size:13px;font-weight:600;}
-.rel-periodo{font-size:11px;color:var(--text2);margin-top:1px;}
-.rel-assert{font-size:22px;font-weight:700;}
-.rel-chev{color:var(--text3);font-size:10px;transition:transform .2s;margin-left:8px;}
+/* REPORT CARD */
+.rel-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px;transition:border-color .15s;}
+.rel-card:hover{border-color:var(--border2);}
+.rel-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;gap:12px;}
+.rel-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0;}
+.rel-icon-wrap{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.rel-icon-d{background:var(--blue-lt);}
+.rel-icon-w{background:var(--green-lt);}
+.rel-icon-m{background:var(--purple-lt);}
+.rel-icon-s{background:var(--amber-lt);}
+.rel-meta{flex:1;min-width:0;}
+.rel-titulo{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.rel-periodo{font-size:11px;color:var(--text3);}
+.rel-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.rel-chev{width:16px;height:16px;color:var(--text3);transition:transform .2s;flex-shrink:0;}
 .rel-chev.open{transform:rotate(180deg);}
-.rel-body{display:none;padding:14px;border-top:1px solid var(--border);font-size:13px;color:var(--text2);line-height:1.8;white-space:pre-wrap;background:var(--s2);}
-.rel-body.open{display:block;}
 
-.empty{text-align:center;padding:3rem;color:var(--text3);font-size:12px;}
+/* REPORT BODY */
+.rel-body{display:none;padding:16px;border-top:1px solid var(--border);background:var(--surface2);}
+.rel-body.open{display:block;}
+.rel-body-text{font-size:13px;color:var(--text2);line-height:1.9;white-space:pre-wrap;font-family:'Inter',sans-serif;}
+
+/* STATES */
 .loading{text-align:center;padding:3rem;}
 .spin{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
+.empty{text-align:center;padding:3rem;color:var(--text3);font-size:12px;line-height:1.8;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
+
 <nav class="nav">
   <a class="nav-brand" href="index.html">
     <div class="nav-brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
     <span class="nav-brand-name">Odd<span>Lab</span></span>
   </a>
   <div class="nav-links">
-    <a class="nav-link" href="index.html">Apostas</a>
-    <a class="nav-link" href="dashboard.html">Dashboard</a>
-    <a class="nav-link" href="ligas.html">Ligas</a>
-    <a class="nav-link" href="mercados.html">Mercados</a>
-    <a class="nav-link active" href="relatorios.html">Relatórios</a>
-    <a class="nav-link" href="experimental.html">Experimental</a>
-    <a class="nav-link" href="aluno.html">Aluno</a>
+    <a class="nl" href="index.html">Apostas</a>
+    <a class="nl" href="dashboard.html">Dashboard</a>
+    <a class="nl" href="ligas.html">Ligas</a>
+    <a class="nl" href="mercados.html">Mercados</a>
+    <a class="nl active" href="relatorios.html">Relatórios</a>
+    <a class="nl" href="experimental.html">Experimental</a>
+    <a class="nl" href="aluno.html">Aluno</a>
   </div>
 </nav>
 
 <div class="page">
-  <div class="page-title">Relatórios</div>
-  <div class="page-sub">Memória de calibração da IA · Atualiza após cada ciclo</div>
-  <div id="conteudo"><div class="loading"><div class="spin"></div></div></div>
+  <div class="page-hd">
+    <div class="page-title">Relatórios de calibração</div>
+    <div class="page-sub">Memória de aprendizado da IA · Atualiza automaticamente após cada ciclo noturno</div>
+  </div>
+  <div id="conteudo"><div class="loading"><div class="spin"></div><div style="font-size:12px;color:var(--text3);margin-top:4px">Carregando relatórios...</div></div></div>
 </div>
-
 
 <script>
 const B='https://apostas-app.onrender.com';
-function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
-function fmtD(iso){if(!iso)return '-';const[a,m,d]=iso.split('-');return `${d}/${m}/${a}`;}
+
+function corP(p){return p>=80?'good':p>=60?'ok':'bad';}
+function fmtD(iso){if(!iso)return '-';const[a,m,d]=iso.split('-');return`${d}/${m}/${a}`;}
 
 function tog(id){
   document.getElementById('b'+id).classList.toggle('open');
   document.getElementById('c'+id).classList.toggle('open');
 }
 
-function renderGrupo(titulo,icone,items,tipo){
+const tipoMeta={
+  s:{label:'Semestral',icon:'🗓️',iconClass:'rel-icon-s',badgeClass:'tipo-s'},
+  m:{label:'Mensal',icon:'📆',iconClass:'rel-icon-m',badgeClass:'tipo-m'},
+  w:{label:'Semanal',icon:'📅',iconClass:'rel-icon-w',badgeClass:'tipo-w'},
+  d:{label:'Diário',icon:'📊',iconClass:'rel-icon-d',badgeClass:'tipo-d'},
+};
+
+function renderGrupo(items,tipo){
   if(!items?.length) return '';
-  return `<div class="grupo">
-    <div class="grupo-title">${icone} ${titulo} <span style="color:var(--text2)">(${items.length})</span></div>
+  const meta=tipoMeta[tipo];
+  return`<div class="grupo">
+    <div class="grupo-hd">
+      <div class="grupo-hd-line"></div>
+      <span class="grupo-hd-label">${meta.label}</span>
+      <span class="grupo-count">${items.length}</span>
+      <div class="grupo-hd-line"></div>
+    </div>
     ${items.map((r,i)=>{
-      const id=tipo+i, pct=r.assertividade;
-      return `<div class="rel-item">
-        <div class="rel-header" onclick="tog('${id}')">
-          <div class="rel-info">
-            <span class="rel-icon">${icone}</span>
-            <div>
-              <div class="rel-title">${titulo} · ${fmtD(r.periodo_inicio)}${r.periodo_fim!==r.periodo_inicio?' → '+fmtD(r.periodo_fim):''}</div>
-              <div class="rel-periodo">${r.periodo_inicio}${r.periodo_fim!==r.periodo_inicio?' → '+r.periodo_fim:''}</div>
+      const id=tipo+i,pct=r.assertividade;
+      const periodoPrincipal=fmtD(r.periodo_inicio)+(r.periodo_fim!==r.periodo_inicio?' → '+fmtD(r.periodo_fim):'');
+      const assertHtml=pct!=null?`<div class="assert-badge assert-${corP(pct)}">${pct}%</div>`:'';
+      return`<div class="rel-card">
+        <div class="rel-hd" onclick="tog('${id}')">
+          <div class="rel-left">
+            <div class="rel-icon-wrap ${meta.iconClass}">${meta.icon}</div>
+            <div class="rel-meta">
+              <div class="rel-titulo">${meta.label} · ${periodoPrincipal}</div>
+              <div class="rel-periodo">
+                <span class="tipo-badge ${meta.badgeClass}">${meta.icon} ${meta.label}</span>
+                <span style="color:var(--text3);margin-left:6px;font-size:11px">${r.periodo_inicio}${r.periodo_fim!==r.periodo_inicio?' → '+r.periodo_fim:''}</span>
+              </div>
             </div>
           </div>
-          <div style="display:flex;align-items:center">
-            ${pct!=null?`<span class="rel-assert" style="color:${corP(pct)}">${pct}%</span>`:''}
-            <span class="rel-chev" id="c${id}">▾</span>
+          <div class="rel-right">
+            ${assertHtml}
+            <svg class="rel-chev" id="c${id}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
         </div>
-        <div class="rel-body" id="b${id}">${r.relatorio||'Sem conteúdo.'}</div>
+        <div class="rel-body" id="b${id}">
+          <div class="rel-body-text">${r.relatorio||'Sem conteúdo.'}</div>
+        </div>
       </div>`;
     }).join('')}
   </div>`;
@@ -115,15 +172,22 @@ function renderGrupo(titulo,icone,items,tipo){
 async function init(){
   try{
     const r=await fetch(`${B}/calibracao-todos`);
+    if(!r.ok)throw new Error('Erro '+r.status);
     const d=await r.json();
     const html=[
-      renderGrupo('Semestral','🗓️',d.semestrais,'s'),
-      renderGrupo('Mensal','📆',d.mensais,'m'),
-      renderGrupo('Semanal','📅',d.semanais,'w'),
-      renderGrupo('Diário','📊',d.diarios,'d'),
+      renderGrupo(d.semestrais,'s'),
+      renderGrupo(d.mensais,'m'),
+      renderGrupo(d.semanais,'w'),
+      renderGrupo(d.diarios,'d'),
     ].join('');
-    document.getElementById('conteudo').innerHTML=html||'<div class="empty">Nenhum relatório disponível ainda.<br>A IA aprende após a primeira rotina noturna.</div>';
-  }catch(e){document.getElementById('conteudo').innerHTML='<div class="empty">Erro ao carregar relatórios.</div>';}
+    document.getElementById('conteudo').innerHTML=html||`<div class="empty">
+      <div style="font-size:32px;margin-bottom:8px">📭</div>
+      <div style="font-weight:600;color:var(--text2);margin-bottom:4px">Nenhum relatório ainda</div>
+      <div>A IA gera relatórios após a primeira rotina noturna.<br>Volte amanhã cedo.</div>
+    </div>`;
+  }catch(e){
+    document.getElementById('conteudo').innerHTML=`<div class="empty" style="color:var(--red)">Erro ao carregar relatórios.<br><small>${e.message}</small></div>`;
+  }
 }
 init();
 </script>

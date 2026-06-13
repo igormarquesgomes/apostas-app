@@ -2,94 +2,123 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ligas · OddLab</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F0EDEA;--s1:#FFFFFF;--s2:#F8FAFC;--s3:#F1F5F9;
+  --bg:#F0EDEA;--surface:#FFFFFF;--surface2:#F8FAFC;--surface3:#F1F5F9;
   --border:#E2E8F0;--border2:#CBD5E1;
   --text:#1E293B;--text2:#475569;--text3:#94A3B8;
-  --green:#0F766E;--red:#DC2626;--amber:#D97706;
+  --green:#0F766E;--green-lt:#F0FDF9;--green-bd:#99F6E4;
+  --red:#DC2626;--red-lt:#FEF2F2;--red-bd:#FECACA;
+  --amber:#D97706;--amber-lt:#FFFBEB;--amber-bd:#FDE68A;
   --nav-h:52px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;}
-.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;min-height:100vh;}
+
+.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
 .nav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;}
 .nav-brand-icon{width:30px;height:30px;background:var(--green);border-radius:7px;display:flex;align-items:center;justify-content:center;}
 .nav-brand-icon svg{width:14px;height:14px;color:#fff;}
 .nav-brand-name{font-size:15px;font-weight:700;color:var(--text);}
 .nav-brand-name span{color:var(--green);}
 .nav-links{display:flex;align-items:center;gap:2px;flex:1;}
-.nav-link{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .15s;white-space:nowrap;}
-.nav-link:hover{background:var(--s2);color:var(--text);}
-.nav-link.active{background:#F0FDF9;color:var(--green);}
+.nl{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .15s;white-space:nowrap;}
+.nl:hover{background:var(--surface2);color:var(--text);}
+.nl.active{background:var(--green-lt);color:var(--green);}
+
 .page{padding:1.25rem;max-width:900px;}
 
-.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;}
-.page-title{font-size:22px;font-weight:700;color:var(--text);}
-.toggle-wrap{display:flex;gap:3px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;padding:3px;}
-.tog-btn{font-size:12px;font-weight:500;padding:6px 14px;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;}
-.tog-btn.active{background:#F0FDF9;color:var(--green);}
+/* PAGE HEADER */
+.page-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;}
+.page-title{font-size:22px;font-weight:800;color:var(--text);}
+.toggle-wrap{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:3px;}
+.tog-btn{font-size:12px;font-weight:600;padding:6px 16px;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;}
+.tog-btn.active{background:var(--green-lt);color:var(--green);}
 
-.row{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
-.row-rank{font-size:18px;font-weight:700;color:var(--text3);width:26px;flex-shrink:0;}
+/* SUMMARY BAR */
+.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.summary-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px;}
+.summary-val{font-size:22px;font-weight:700;line-height:1;}
+
+/* ROW CARD */
+.row-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;transition:border-color .12s;}
+.row-card:hover{border-color:var(--border2);}
+.row-rank{font-size:14px;font-weight:700;color:var(--text3);width:24px;text-align:center;flex-shrink:0;}
+.row-rank.top1{color:var(--amber);font-size:16px;}
+.row-rank.top2{color:var(--text2);}
+.row-rank.top3{color:var(--text2);}
 .row-info{flex:1;min-width:0;}
-.row-nome{font-size:13px;font-weight:500;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.row-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-bottom:4px;}
-.row-bar-fill{height:100%;border-radius:2px;}
-.row-stats{display:flex;gap:10px;}
-.row-stat{font-size:12px;color:var(--text2);}
-.row-stat strong{font-size:13px;}
-.row-pct{font-size:24px;font-weight:700;flex-shrink:0;width:56px;text-align:right;}
+.row-nome{font-size:13px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row-bar{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+.row-bar-fill{height:100%;border-radius:2px;transition:width .4s;}
+.row-stats{display:flex;gap:12px;}
+.row-stat{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:3px;}
+.row-stat strong{font-size:12px;font-weight:700;}
+.row-right{flex-shrink:0;text-align:right;}
+.row-pct{font-size:26px;font-weight:800;line-height:1;margin-bottom:2px;}
+.row-total{font-size:10px;color:var(--text3);}
 
-.empty{text-align:center;padding:3rem;color:var(--text3);font-size:12px;}
+/* STATES */
+.empty{text-align:center;padding:3rem;color:var(--text3);font-size:12px;line-height:1.8;}
 .loading{text-align:center;padding:3rem;}
 .spin{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
 @keyframes sp{to{transform:rotate(360deg);}}
+
+@media(max-width:600px){
+  .summary-bar{grid-template-columns:1fr 1fr;}
+}
 </style>
 </head>
 <body>
+
 <nav class="nav">
   <a class="nav-brand" href="index.html">
     <div class="nav-brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
     <span class="nav-brand-name">Odd<span>Lab</span></span>
   </a>
   <div class="nav-links">
-    <a class="nav-link" href="index.html">Apostas</a>
-    <a class="nav-link" href="dashboard.html">Dashboard</a>
-    <a class="nav-link active" href="ligas.html">Ligas</a>
-    <a class="nav-link" href="mercados.html">Mercados</a>
-    <a class="nav-link" href="relatorios.html">Relatórios</a>
-    <a class="nav-link" href="experimental.html">Experimental</a>
-    <a class="nav-link" href="aluno.html">Aluno</a>
+    <a class="nl" href="index.html">Apostas</a>
+    <a class="nl" href="dashboard.html">Dashboard</a>
+    <a class="nl active" href="ligas.html">Ligas</a>
+    <a class="nl" href="mercados.html">Mercados</a>
+    <a class="nl" href="relatorios.html">Relatórios</a>
+    <a class="nl" href="experimental.html">Experimental</a>
+    <a class="nl" href="aluno.html">Aluno</a>
   </div>
 </nav>
 
 <div class="page">
-  <div class="page-header">
+  <div class="page-hd">
     <div class="page-title">Ligas & Times</div>
     <div class="toggle-wrap">
-      <button class="tog-btn active" id="bl" onclick="vista('ligas')">Ligas</button>
-      <button class="tog-btn" id="bt" onclick="vista('times')">Times</button>
+      <button class="tog-btn active" id="bl" onclick="vista('ligas')">🏆 Ligas</button>
+      <button class="tog-btn" id="bt" onclick="vista('times')">👕 Times</button>
     </div>
   </div>
-  <div id="vl"><div class="loading"><div class="spin"></div></div></div>
+
+  <div id="summary-bar" class="summary-bar" style="display:none"></div>
+
+  <div id="vl"><div class="loading"><div class="spin"></div><div style="font-size:12px;color:var(--text3);margin-top:4px">Carregando 60 dias de dados...</div></div></div>
   <div id="vt" style="display:none"></div>
 </div>
-
 
 <script>
 const B='https://apostas-app.onrender.com';
 let dL=[],dT=[];
+let vistaAtual='ligas';
+
 function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
-function hoje(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function off(b,n){const d=new Date(b+'T12:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function classP(p){return p>=80?'good':p>=60?'ok':'bad';}
+function hoje(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function off(b,n){const d=new Date(b+'T12:00:00');d.setDate(d.getDate()+n);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 
 async function load(){
   const h=hoje(),ps=[];
-  for(let i=0;i<60;i++) ps.push(fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null));
+  for(let i=1;i<60;i++) ps.push(fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null));
   const dias=(await Promise.all(ps)).filter(d=>d&&d.apostas);
   const lM={},tM={};
   for(const dia of dias){
@@ -97,7 +126,7 @@ async function load(){
     for(const a of ap){
       const r=res.find(x=>x.jogo_id===a.id);
       const rv=r?.resultado_aposta||'pendente';
-      if(rv==='pendente') continue;
+      if(rv==='pendente'||rv==='cancelado') continue;
       const lg=a.liga||'Outras';
       if(!lM[lg])lM[lg]={nome:lg,green:0,red:0,total:0};
       if(rv==='green')lM[lg].green++;else lM[lg].red++;
@@ -112,37 +141,63 @@ async function load(){
   }
   dL=Object.values(lM).map(l=>({...l,pct:Math.round(l.green/l.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
   dT=Object.values(tM).filter(t=>t.total>=2).map(t=>({...t,pct:Math.round(t.green/t.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
-  renderL();renderT();
+  renderSummary();renderL();renderT();
+}
+
+function renderSummary(){
+  const dados=vistaAtual==='ligas'?dL:dT;
+  if(!dados.length){document.getElementById('summary-bar').style.display='none';return;}
+  const totalG=dados.reduce((s,d)=>s+d.green,0);
+  const totalR=dados.reduce((s,d)=>s+d.red,0);
+  const totalT=dados.reduce((s,d)=>s+d.total,0);
+  const pctGeral=totalT>0?Math.round(totalG/totalT*100):0;
+  document.getElementById('summary-bar').style.display='grid';
+  document.getElementById('summary-bar').innerHTML=`
+    <div class="summary-card"><div class="summary-label">${vistaAtual==='ligas'?'Ligas':'Times'}</div><div class="summary-val" style="color:var(--blue)">${dados.length}</div></div>
+    <div class="summary-card"><div class="summary-label">Assertividade</div><div class="summary-val" style="color:${corP(pctGeral)}">${pctGeral}%</div></div>
+    <div class="summary-card"><div class="summary-label">Green total</div><div class="summary-val" style="color:var(--green)">${totalG}</div></div>
+    <div class="summary-card"><div class="summary-label">Red total</div><div class="summary-val" style="color:var(--red)">${totalR}</div></div>`;
 }
 
 function rowHtml(item,i){
-  return `<div class="row">
-    <span class="row-rank">${i+1}</span>
+  const rankClass=i===0?'top1':i===1?'top2':i===2?'top3':'';
+  const rankIcon=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+  return`<div class="row-card">
+    <span class="row-rank ${rankClass}">${rankIcon}</span>
     <div class="row-info">
       <div class="row-nome">${item.nome}</div>
       <div class="row-bar"><div class="row-bar-fill" style="width:${item.pct}%;background:${corP(item.pct)}"></div></div>
       <div class="row-stats">
-        <div class="row-stat"><strong style="color:var(--green)">${item.green}</strong> G</div>
-        <div class="row-stat"><strong style="color:var(--red)">${item.red}</strong> R</div>
-        <div class="row-stat"><strong style="color:var(--text2)">${item.total}</strong> Total</div>
+        <div class="row-stat"><strong style="color:var(--green)">${item.green}</strong> green</div>
+        <div class="row-stat"><strong style="color:var(--red)">${item.red}</strong> red</div>
+        <div class="row-stat"><strong style="color:var(--text2)">${item.total}</strong> total</div>
       </div>
     </div>
-    <span class="row-pct" style="color:${corP(item.pct)}">${item.pct}%</span>
+    <div class="row-right">
+      <div class="row-pct" style="color:${corP(item.pct)}">${item.pct}%</div>
+      <div class="row-total">${item.total} ap.</div>
+    </div>
   </div>`;
 }
 
 function renderL(){
-  document.getElementById('vl').innerHTML=dL.length?dL.map(rowHtml).join(''):'<div class="empty">Nenhuma liga com dados ainda.</div>';
+  document.getElementById('vl').innerHTML=dL.length
+    ?dL.map(rowHtml).join('')
+    :`<div class="empty"><div style="font-size:32px;margin-bottom:8px">🏆</div><div>Nenhuma liga com dados ainda.</div></div>`;
 }
 function renderT(){
-  document.getElementById('vt').innerHTML=dT.length?dT.map(rowHtml).join(''):'<div class="empty">Nenhum time com dados suficientes.<br>Mínimo 2 apostas por time.</div>';
+  document.getElementById('vt').innerHTML=dT.length
+    ?dT.map(rowHtml).join('')
+    :`<div class="empty"><div style="font-size:32px;margin-bottom:8px">👕</div><div>Nenhum time com dados suficientes.<br><small>Mínimo 2 apostas por time.</small></div></div>`;
 }
 
 function vista(v){
+  vistaAtual=v;
   document.getElementById('vl').style.display=v==='ligas'?'block':'none';
   document.getElementById('vt').style.display=v==='times'?'block':'none';
   document.getElementById('bl').classList.toggle('active',v==='ligas');
   document.getElementById('bt').classList.toggle('active',v==='times');
+  renderSummary();
 }
 
 load();

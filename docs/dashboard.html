@@ -2,246 +2,332 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard · OddLab</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F0EDEA;--s1:#FFFFFF;--s2:#F8FAFC;--s3:#F1F5F9;--card2:#EFF2F7;
+  --bg:#F0EDEA;--surface:#FFFFFF;--surface2:#F8FAFC;--surface3:#F1F5F9;
   --border:#E2E8F0;--border2:#CBD5E1;
   --text:#1E293B;--text2:#475569;--text3:#94A3B8;
-  --green:#0F766E;--red:#DC2626;--amber:#D97706;--blue:#2563EB;--purple:#7C3AED;
-  --mono:'Inter',monospace;--sans:'Inter',sans-serif;--display:'Inter',sans-serif;
+  --green:#0F766E;--green-lt:#F0FDF9;--green-bd:#99F6E4;
+  --red:#DC2626;--red-lt:#FEF2F2;--red-bd:#FECACA;
+  --amber:#D97706;--amber-lt:#FFFBEB;--amber-bd:#FDE68A;
+  --blue:#2563EB;--blue-lt:#EFF6FF;--blue-bd:#BFDBFE;
+  --purple:#7C3AED;--purple-lt:#F5F3FF;--purple-bd:#DDD6FE;
   --nav-h:52px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;}
-.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;min-height:100vh;}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
 .nav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;}
 .nav-brand-icon{width:30px;height:30px;background:var(--green);border-radius:7px;display:flex;align-items:center;justify-content:center;}
 .nav-brand-icon svg{width:14px;height:14px;color:#fff;}
 .nav-brand-name{font-size:15px;font-weight:700;color:var(--text);}
 .nav-brand-name span{color:var(--green);}
 .nav-links{display:flex;align-items:center;gap:2px;flex:1;}
-.nav-link{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .15s;white-space:nowrap;}
-.nav-link:hover{background:var(--s2);color:var(--text);}
-.nav-link.active{background:#F0FDF9;color:var(--green);}
-.page{padding:1.25rem;max-width:1200px;}
+.nl{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .15s;white-space:nowrap;}
+.nl:hover{background:var(--surface2);color:var(--text);}
+.nl.active{background:var(--green-lt);color:var(--green);}
 
-/* SAÚDE PERÍODOS */
-.saude-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem;}
-.saude-card{background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;position:relative;overflow:hidden;}
-.saude-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
-.sc-ontem::before{background:linear-gradient(90deg,var(--blue),transparent);}
-.sc-semana::before{background:linear-gradient(90deg,var(--green),transparent);}
-.sc-mes::before{background:linear-gradient(90deg,var(--purple),transparent);}
-.s-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:6px;}
-.s-pct{font-family:var(--display);font-size:36px;letter-spacing:1px;line-height:1;margin-bottom:4px;}
-.s-pct.good{color:var(--green);}
-.s-pct.ok{color:var(--amber);}
-.s-pct.bad{color:var(--red);}
-.s-pct.empty{color:var(--text3);}
-.s-detail{display:flex;gap:8px;}
-.s-d{font-family:var(--mono);font-size:10px;color:var(--text2);}
-.s-d strong{display:block;font-size:13px;}
+/* PAGE */
+.page{padding:1.25rem;max-width:1100px;}
 
-/* BANNER GERAL */
-.health-banner{background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:1rem;position:relative;overflow:hidden;}
-.health-banner::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),transparent);}
-.h-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px;}
-.h-pct{font-family:var(--display);font-size:56px;letter-spacing:2px;line-height:1;}
-.h-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:4px;}
-.h-sub{font-size:11px;color:var(--text2);font-family:var(--mono);}
-.top3-title{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:8px;margin-top:12px;}
+/* PERIOD CARDS */
+.period-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem;}
+.period-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;border-top:3px solid var(--border);}
+.period-card.blue-top{border-top-color:var(--blue);}
+.period-card.green-top{border-top-color:var(--green);}
+.period-card.purple-top{border-top-color:var(--purple);}
+.period-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;}
+.period-pct{font-size:40px;font-weight:800;line-height:1;margin-bottom:6px;}
+.period-pct.good{color:var(--green);}
+.period-pct.ok{color:var(--amber);}
+.period-pct.bad{color:var(--red);}
+.period-pct.empty{color:var(--text3);}
+.period-detail{display:flex;gap:10px;}
+.period-d{font-size:12px;color:var(--text2);}
+.period-d strong{font-size:13px;font-weight:600;}
+
+/* HEALTH BANNER */
+.health-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:1rem;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start;}
+.health-left{}
+.health-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;}
+.health-pct{font-size:52px;font-weight:800;line-height:1;margin-bottom:4px;}
+.health-sub{font-size:12px;color:var(--text2);}
+.health-right{}
+.top3-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px;}
 .top3-item{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.top3-rank{font-family:var(--display);font-size:16px;color:var(--text3);width:16px;}
+.top3-rank{font-size:13px;font-weight:700;color:var(--text3);width:16px;flex-shrink:0;}
 .top3-info{flex:1;}
 .top3-name{font-size:12px;font-weight:500;display:flex;justify-content:space-between;margin-bottom:3px;}
-.top3-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
+.top3-bar{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;}
 .top3-fill{height:100%;border-radius:2px;}
 
-/* STATS */
-.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem;}
-.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
-.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:4px;}
-.stat-val{font-family:var(--display);font-size:32px;letter-spacing:1px;}
+/* STATS GRID */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;}
+.stat-val{font-size:32px;font-weight:800;line-height:1;}
+
+/* MÚLTIPLAS STATS */
+.mult-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
+.mult-mini{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.mult-mini-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px;}
+.mult-mini-val{font-size:22px;font-weight:700;line-height:1;margin-bottom:2px;}
+.mult-mini-sub{font-size:11px;color:var(--text3);}
 
 /* SECTION */
-.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.sec-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);}
-.btn-manual{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,171,0,.3);background:rgba(255,171,0,.06);color:var(--amber);cursor:pointer;}
-.btn-manual:disabled{opacity:.4;}
+.section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:1.25rem;}
+.section-title{font-size:13px;font-weight:700;color:var(--text);}
+.hist-tabs{display:flex;gap:4px;}
+.hist-tab{font-size:12px;font-weight:500;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;transition:all .15s;}
+.hist-tab.active{background:var(--green);color:#fff;border-color:var(--green);}
 
-/* DAILY */
-.daily-item{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;}
-.daily-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;}
-.daily-date{font-family:var(--mono);font-size:11px;color:var(--text2);width:70px;flex-shrink:0;}
+/* ADMIN BUTTONS */
+.admin-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
+.admin-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;text-align:left;}
+.admin-btn:hover{border-color:var(--border2);background:var(--surface2);}
+.admin-btn:disabled{opacity:.5;cursor:not-allowed;}
+.admin-btn-icon{font-size:18px;}
+.admin-btn-label{font-size:12px;font-weight:600;color:var(--text);}
+.admin-btn-desc{font-size:11px;color:var(--text3);}
+
+/* HOJE EM TEMPO REAL */
+.hoje-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:1rem;}
+.hoje-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.hoje-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;}
+.hoje-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hoje-actions{display:flex;gap:6px;}
+.hoje-btn{font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;}
+.hoje-btn:hover{border-color:var(--border2);color:var(--text);}
+.hoje-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* DAILY ITEMS */
+.daily-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:6px;}
+.daily-hd{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .1s;}
+.daily-hd:hover{background:var(--surface2);}
+.daily-date{font-size:12px;font-weight:500;color:var(--text2);width:70px;flex-shrink:0;}
 .daily-bar-wrap{flex:1;}
-.daily-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
+.daily-bar{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;}
 .daily-bar-fill{height:100%;border-radius:2px;}
-.daily-pct{font-family:var(--display);font-size:20px;width:50px;text-align:right;flex-shrink:0;}
+.daily-pct{font-size:16px;font-weight:700;width:48px;text-align:right;flex-shrink:0;}
 .daily-gr{display:flex;gap:8px;flex-shrink:0;}
-.daily-g{font-family:var(--mono);font-size:11px;color:var(--green);}
-.daily-r{font-family:var(--mono);font-size:11px;color:var(--red);}
-.daily-chev{color:var(--text3);font-size:10px;flex-shrink:0;transition:transform .2s;}
+.daily-g{font-size:12px;font-weight:600;color:var(--green);}
+.daily-r{font-size:12px;font-weight:600;color:var(--red);}
+.daily-chev{width:16px;height:16px;color:var(--text3);transition:transform .2s;flex-shrink:0;}
 .daily-chev.open{transform:rotate(180deg);}
 .daily-apostas{display:none;border-top:1px solid var(--border);}
 .daily-apostas.open{display:block;}
-.ap-row{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ap-row{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .ap-row:last-child{border-bottom:none;}
-.ap-left{flex:1;}
-.ap-jogo{font-size:12px;font-weight:500;}
-.ap-meta{font-size:10px;color:var(--text2);font-family:var(--mono);margin-top:2px;}
+.ap-left{flex:1;min-width:0;}
+.ap-jogo{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ap-meta{font-size:11px;color:var(--text2);margin-top:1px;}
 .ap-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.ap-odd{font-family:var(--mono);font-size:11px;color:var(--amber);}
-.rbadge{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:20px;}
-.r-green{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.2);}
-.r-red{background:rgba(255,23,68,.1);color:var(--red);border:1px solid rgba(255,23,68,.2);}
-.r-pend{background:rgba(255,171,0,.08);color:var(--amber);border:1px solid rgba(255,171,0,.18);}
+.ap-odd{font-size:12px;font-weight:600;color:var(--amber);}
+.rbadge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.r-green{background:var(--green-lt);color:var(--green);border:1px solid var(--green-bd);}
+.r-red{background:var(--red-lt);color:var(--red);border:1px solid var(--red-bd);}
+.r-pend{background:var(--amber-lt);color:var(--amber);border:1px solid var(--amber-bd);}
 
-.loading{text-align:center;padding:3rem;}
-.spin{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
-.empty{text-align:center;padding:2rem;color:var(--text3);font-family:var(--mono);font-size:11px;}
+/* BANCA */
+.banca-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:1rem;}
+.banca-hd{font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;}
+.banca-input-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;}
+.banca-field{flex:1;}
+.banca-field label{display:block;font-size:11px;font-weight:500;color:var(--text3);margin-bottom:4px;}
+.banca-field input{width:100%;border:1px solid var(--border2);border-radius:7px;padding:7px 10px;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:var(--surface2);outline:none;}
+.banca-field input:focus{border-color:var(--green);}
+.banca-calc-btn{padding:8px 16px;background:var(--green-lt);color:var(--green);border:1px solid var(--green-bd);border-radius:7px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;}
+.banca-calc-btn:hover{background:var(--green);color:#fff;}
+.banca-results{display:none;}
+.banca-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+.banca-mini{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;}
+.banca-mini-l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px;}
+.banca-mini-v{font-size:15px;font-weight:600;}
+
+/* PERÍODO ACCORDION */
+.periodo-item{margin-bottom:6px;}
+.periodo-hd{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);transition:background .1s;}
+.periodo-hd:hover{background:var(--surface3);}
+.periodo-label{font-size:12px;font-weight:600;color:var(--text2);}
+.periodo-right{display:flex;gap:10px;align-items:center;}
+.periodo-gr{font-size:11px;color:var(--text3);}
+.periodo-pct{font-size:14px;font-weight:700;}
+.periodo-chev{font-size:10px;color:var(--text3);}
+.periodo-body{display:none;padding:4px 0 0;}
+
+/* MULT HISTORICO */
+.mult-hist-item{margin-bottom:4px;}
+.mult-hist-hd{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);}
+.mult-hist-hd:hover{background:var(--surface3);}
+.mult-hist-label{font-size:11px;font-weight:600;}
+.mult-hist-right{display:flex;gap:12px;font-size:10px;}
+.mult-hist-body{display:none;padding:4px 0 0;}
+.mult-dia-row{display:flex;align-items:center;justify-content:space-between;padding:3px 8px;border-radius:4px;background:var(--surface3);margin-bottom:2px;}
+.mult-dia-label{font-size:11px;color:var(--text2);}
+.mult-dia-badges{display:flex;gap:6px;}
+
+/* STATES */
+.loading{text-align:center;padding:2.5rem;}
+.spin{width:22px;height:22px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
+.empty{text-align:center;padding:2rem;color:var(--text3);font-size:12px;}
 @keyframes sp{to{transform:rotate(360deg);}}
+
+@media(max-width:768px){
+  .period-grid{grid-template-columns:1fr 1fr;}
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  .admin-grid{grid-template-columns:1fr 1fr;}
+  .health-card{grid-template-columns:1fr;}
+  .mult-grid{grid-template-columns:1fr 1fr;}
+}
 </style>
 </head>
 <body>
+
 <nav class="nav">
   <a class="nav-brand" href="index.html">
     <div class="nav-brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
     <span class="nav-brand-name">Odd<span>Lab</span></span>
   </a>
   <div class="nav-links">
-    <a class="nav-link" href="index.html">Apostas</a>
-    <a class="nav-link active" href="dashboard.html">Dashboard</a>
-    <a class="nav-link" href="ligas.html">Ligas</a>
-    <a class="nav-link" href="mercados.html">Mercados</a>
-    <a class="nav-link" href="relatorios.html">Relatórios</a>
-    <a class="nav-link" href="experimental.html">Experimental</a>
-    <a class="nav-link" href="aluno.html">Aluno</a>
+    <a class="nl" href="index.html">Apostas</a>
+    <a class="nl active" href="dashboard.html">Dashboard</a>
+    <a class="nl" href="ligas.html">Ligas</a>
+    <a class="nl" href="mercados.html">Mercados</a>
+    <a class="nl" href="relatorios.html">Relatórios</a>
+    <a class="nl" href="experimental.html">Experimental</a>
+    <a class="nl" href="aluno.html">Aluno</a>
   </div>
 </nav>
 
 <div class="page">
-  <div class="saude-grid" id="saude-grid">
-    <div class="saude-card sc-ontem"><div class="s-lbl">Ontem</div><div class="s-pct empty">--</div></div>
-    <div class="saude-card sc-semana"><div class="s-lbl">Semana</div><div class="s-pct empty">--</div></div>
-    <div class="saude-card sc-mes"><div class="s-lbl">Mês</div><div class="s-pct empty">--</div></div>
+
+  <!-- Período cards -->
+  <div class="period-grid" id="saude-grid">
+    <div class="period-card blue-top"><div class="period-label">Ontem</div><div class="period-pct empty">--</div></div>
+    <div class="period-card green-top"><div class="period-label">Semana</div><div class="period-pct empty">--</div></div>
+    <div class="period-card purple-top"><div class="period-label">Mês</div><div class="period-pct empty">--</div></div>
   </div>
 
-  <div class="health-banner" id="health-banner"><div class="loading"><div class="spin"></div></div></div>
+  <!-- Health + Top3 -->
+  <div class="health-card" id="health-banner"><div class="loading"><div class="spin"></div></div></div>
 
-  <div class="stats-grid" id="stats-grid">
-    <div class="stat-card"><div class="stat-lbl">Carregando</div></div>
-  </div>
+  <!-- Stats + Múltiplas -->
+  <div id="stats-grid"></div>
 
-  <!-- GESTÃO DE BANCA -->
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:1rem;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--amber),transparent)"></div>
-    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:12px">💰 Gestão de banca</div>
-    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:120px;">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Valor por aposta (R$)</div>
-        <input type="number" id="banca-valor" value="50" min="1" step="10"
-          style="background:var(--s2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:14px;padding:8px 10px;border-radius:7px;width:100%;outline:none;"
-          oninput="calcularBanca()">
+  <!-- Hoje em tempo real -->
+  <div class="hoje-card">
+    <div class="hoje-hd">
+      <div class="hoje-title">
+        <span class="hoje-dot"></span>
+        Hoje em tempo real
       </div>
-      <button onclick="calcularBanca()" style="background:rgba(255,171,0,.1);border:1px solid rgba(255,171,0,.3);color:var(--amber);font-family:var(--mono);font-size:11px;padding:9px 16px;border-radius:7px;cursor:pointer;white-space:nowrap;">
-        Calcular
-      </button>
-    </div>
-    <div id="banca-resultado" style="display:none;">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
-        <div style="background:var(--s2);border-radius:8px;padding:10px;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Investido</div>
-          <div style="font-family:var(--mono);font-size:15px;font-weight:600;" id="b-investido">-</div>
-        </div>
-        <div style="background:var(--s2);border-radius:8px;padding:10px;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Retorno</div>
-          <div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--green)" id="b-retorno">-</div>
-        </div>
-        <div style="background:var(--s2);border-radius:8px;padding:10px;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Resultado</div>
-          <div style="font-family:var(--mono);font-size:15px;font-weight:600;" id="b-resultado">-</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-        <div style="background:var(--s2);border-radius:8px;padding:10px;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Ontem</div>
-          <div style="font-family:var(--mono);font-size:13px;font-weight:600;" id="b-ontem">-</div>
-        </div>
-        <div style="background:var(--s2);border-radius:8px;padding:10px;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Semana</div>
-          <div style="font-family:var(--mono);font-size:13px;font-weight:600;" id="b-semana">-</div>
-        </div>
-        <div style="background:var(--s2);border-radius:8px;padding:10px;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Mês</div>
-          <div style="font-family:var(--mono);font-size:13px;font-weight:600;" id="b-mes">-</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ACOMPANHAMENTO DO DIA -->
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:1rem;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);">📡 Hoje em tempo real</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button id="btn-hoje" onclick="validarHoje(false)" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(68,138,255,.3);background:rgba(68,138,255,.08);color:var(--blue);cursor:pointer;">
-          🔄 Atualizar
-        </button>
-        <button onclick="validarHoje(true)" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,171,0,.3);background:rgba(255,171,0,.08);color:var(--amber);cursor:pointer;" title="Revalida todos os jogos do zero">
-          ⚡ Forçar
-        </button>
-        <button onclick="validarDataEspecifica()" style="font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid rgba(110,231,183,.3);background:rgba(110,231,183,.08);color:var(--green);cursor:pointer;" title="Validar uma data específica">
-          📅 Data específica
-        </button>
+      <div class="hoje-actions">
+        <button id="btn-hoje" class="hoje-btn" onclick="validarHoje(false)">🔄 Atualizar</button>
+        <button class="hoje-btn" onclick="validarHoje(true)" title="Revalida do zero">⚡ Forçar</button>
+        <button class="hoje-btn" onclick="validarDataEspecifica()">📅 Data específica</button>
       </div>
     </div>
     <div id="hoje-conteudo">
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:center;padding:1rem;">
-        Clique em "Atualizar resultados" para ver os jogos de hoje
+      <div class="empty" style="padding:1rem">Clique em Atualizar para ver os resultados de hoje</div>
+    </div>
+  </div>
+
+  <!-- Admin actions -->
+  <div class="section-hd">
+    <span class="section-title">Ações administrativas</span>
+  </div>
+  <div class="admin-grid">
+    <button class="admin-btn" id="btn-r" onclick="rotina()">
+      <span class="admin-btn-icon">⚡</span>
+      <span class="admin-btn-label">Rotina noturna</span>
+      <span class="admin-btn-desc">Forçar execução manual</span>
+    </button>
+    <button class="admin-btn" onclick="validarDataEspecifica()">
+      <span class="admin-btn-icon">📅</span>
+      <span class="admin-btn-label">Validar data</span>
+      <span class="admin-btn-desc">Buscar resultados de um dia</span>
+    </button>
+    <button class="admin-btn" onclick="validarHoje(true)">
+      <span class="admin-btn-icon">🔄</span>
+      <span class="admin-btn-label">Revalidar hoje</span>
+      <span class="admin-btn-desc">Forçar validação completa</span>
+    </button>
+    <button class="admin-btn" id="btn-sinc" onclick="sincronizarLigas()">
+      <span class="admin-btn-icon">🏆</span>
+      <span class="admin-btn-label">Sincronizar ligas</span>
+      <span class="admin-btn-desc">Atualizar histórico 60 dias</span>
+    </button>
+  </div>
+
+  <!-- Gestão de banca -->
+  <div class="banca-card">
+    <div class="banca-hd">💰 Simulação de banca</div>
+    <div class="banca-input-row">
+      <div class="banca-field">
+        <label>Valor por aposta (R$)</label>
+        <input type="number" id="banca-valor" value="50" min="1" step="10" oninput="calcularBanca()">
+      </div>
+      <button class="banca-calc-btn" onclick="calcularBanca()">Calcular</button>
+    </div>
+    <div class="banca-results" id="banca-resultado">
+      <div class="banca-grid">
+        <div class="banca-mini"><div class="banca-mini-l">Investido</div><div class="banca-mini-v" id="b-investido">-</div></div>
+        <div class="banca-mini"><div class="banca-mini-l">Retorno</div><div class="banca-mini-v" id="b-retorno" style="color:var(--green)">-</div></div>
+        <div class="banca-mini"><div class="banca-mini-l">Resultado</div><div class="banca-mini-v" id="b-resultado">-</div></div>
+      </div>
+      <div class="banca-grid">
+        <div class="banca-mini"><div class="banca-mini-l">Ontem</div><div class="banca-mini-v" id="b-ontem">-</div></div>
+        <div class="banca-mini"><div class="banca-mini-l">Semana</div><div class="banca-mini-v" id="b-semana">-</div></div>
+        <div class="banca-mini"><div class="banca-mini-l">Mês</div><div class="banca-mini-v" id="b-mes">-</div></div>
       </div>
     </div>
   </div>
 
-  <div class="sec-header">
-    <span class="sec-title">Histórico</span>
-    <button class="btn-manual" id="btn-r" onclick="rotina()">⚡ Rotina manual</button>
-  </div>
-  <div style="display:flex;gap:8px;margin-bottom:12px">
-    <button onclick="switchHist('dias')" id="hist-btn-dias" style="font-family:var(--mono);font-size:11px;padding:4px 14px;border-radius:20px;cursor:pointer;background:var(--green);color:#000;border:none;font-weight:600">dias</button>
-    <button onclick="switchHist('semanas')" id="hist-btn-semanas" style="font-family:var(--mono);font-size:11px;padding:4px 14px;border-radius:20px;cursor:pointer;background:transparent;color:var(--text3);border:1px solid var(--border)">semanas</button>
-    <button onclick="switchHist('meses')" id="hist-btn-meses" style="font-family:var(--mono);font-size:11px;padding:4px 14px;border-radius:20px;cursor:pointer;background:transparent;color:var(--text3);border:1px solid var(--border)">meses</button>
+  <!-- Histórico -->
+  <div class="section-hd">
+    <span class="section-title">Histórico</span>
+    <div class="hist-tabs">
+      <button class="hist-tab active" id="hist-btn-dias" onclick="switchHist('dias')">Dias</button>
+      <button class="hist-tab" id="hist-btn-semanas" onclick="switchHist('semanas')">Semanas</button>
+      <button class="hist-tab" id="hist-btn-meses" onclick="switchHist('meses')">Meses</button>
+    </div>
   </div>
   <div id="hist-dias"><div id="daily-list"><div class="loading"><div class="spin"></div></div></div></div>
-  <div id="hist-semanas" style="display:none"><div id="periodos-semanas"><div class="loading"><div class="spin"></div></div></div></div>
-  <div id="hist-meses" style="display:none"><div id="periodos-meses"><div class="loading"><div class="spin"></div></div></div></div>
-</div>
+  <div id="hist-semanas" style="display:none"><div id="periodos-semanas"></div></div>
+  <div id="hist-meses" style="display:none"><div id="periodos-meses"></div></div>
 
+</div>
 
 <script>
 const B='https://apostas-app.onrender.com';
 let dadosGlobais=[];
+let dadosMultiplasDias=[];
 
 function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
 function cP(p){return p>=80?'good':p>=60?'ok':'bad';}
-function hoje(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function off(b,n){const d=new Date(b+'T12:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function fmtDL(iso){const[a,m,d]=iso.split('-');return `${d}/${m}/${a}`;}
+function hoje(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function off(b,n){const d=new Date(b+'T12:00:00');d.setDate(d.getDate()+n);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function fmtD(s){const[y,m,d]=s.split('-');return`${d}/${m}`;}
+function fmtDL(iso){const[a,m,d]=iso.split('-');return`${d}/${m}/${a}`;}
+
+// Badge HTML para tema claro
+function badgeG(label){return`<span class="rbadge r-green">${label}</span>`;}
+function badgeR(label){return`<span class="rbadge r-red">${label}</span>`;}
+function badgeP(label){return`<span class="rbadge r-pend">${label}</span>`;}
 
 async function load(){
   const h=hoje(),ps=[];
   for(let i=0;i<30;i++) ps.push(
     fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null)
-    .then(async d => {
+    .then(async d=>{
       if(!d?.apostas) return null;
-      // Buscar múltiplas do dia
-      try {
-        const m=await fetch(`${B}/multiplas/${off(h,-i)}`).then(r=>r.ok?r.json():null);
-        if(m) { d.multiplas=m.multiplas; d.resultados_multiplas=m.resultados_multiplas; }
-      } catch(e){}
+      try{const m=await fetch(`${B}/multiplas/${off(h,-i)}`).then(r=>r.ok?r.json():null);if(m){d.multiplas=m.multiplas;d.resultados_multiplas=m.resultados_multiplas;}}catch(e){}
       return d;
     })
   );
@@ -253,13 +339,11 @@ function processar(dias,h){
   let tG=0,tR=0,tT=0;
   const ligasMap={};
   const ontem=off(h,-1),sm=h.substring(0,8)+'01';
-  // Semana: de segunda a domingo
-  const hoje_d = new Date(h+'T12:00:00');
-  const diaSem = hoje_d.getDay(); // 0=dom,1=seg,...,6=sab
-  const diasDesdeSegunda = diaSem === 0 ? 6 : diaSem - 1; // domingo = 6 dias desde segunda
-  const sw = off(h, -diasDesdeSegunda); // início da semana atual (segunda)
+  const hoje_d=new Date(h+'T12:00:00');
+  const diaSem=hoje_d.getDay();
+  const diasDesdeSegunda=diaSem===0?6:diaSem-1;
+  const sw=off(h,-diasDesdeSegunda);
   let oG=0,oR=0,sG=0,sR=0,mG=0,mR=0;
-  // Múltiplas
   let mAG=0,mAR=0,mBG=0,mBR=0,mAP=0,mBP=0;
   dadosMultiplasDias=[];
   const diasP=[];
@@ -270,7 +354,7 @@ function processar(dias,h){
     const apR=ap.map(a=>{
       const r=res.find(x=>x.jogo_id===a.id);
       const rv=r?.resultado_aposta||'pendente';
-      if(rv==='green'){dG++;tG++;}else if(rv==='red'){dR++;tR++;}else if(rv==='cancelado'){/* reembolso — não conta */}else dP++;
+      if(rv==='green'){dG++;tG++;}else if(rv==='red'){dR++;tR++;}else if(rv!=='cancelado')dP++;
       const lg=a.liga||'Outras';
       if(!ligasMap[lg])ligasMap[lg]={green:0,red:0,total:0};
       if(rv==='green')ligasMap[lg].green++;else if(rv==='red')ligasMap[lg].red++;
@@ -282,18 +366,14 @@ function processar(dias,h){
     if(dia.data===ontem){oG+=dG;oR+=dR;}
     if(dia.data>=sw){sG+=dG;sR+=dR;}
     if(dia.data>=sm){mG+=dG;mR+=dR;}
-
-    // Contar múltiplas — só conta no mês atual para os totais
     const rM=dia.resultados_multiplas;
-    const rA = rM?.multipla_a?.resultado || (dia.multiplas?.multipla_a ? 'pendente' : null);
-    const rB = rM?.multipla_b?.resultado || (dia.multiplas?.multipla_b ? 'pendente' : null);
+    const rA=rM?.multipla_a?.resultado||(dia.multiplas?.multipla_a?'pendente':null);
+    const rB=rM?.multipla_b?.resultado||(dia.multiplas?.multipla_b?'pendente':null);
     if(dia.data>=sm){
-      if(rA==='green') mAG++; else if(rA==='red') mAR++; else if(rA) mAP++;
-      if(rB==='green') mBG++; else if(rB==='red') mBR++; else if(rB) mBP++;
+      if(rA==='green')mAG++;else if(rA==='red')mAR++;else if(rA)mAP++;
+      if(rB==='green')mBG++;else if(rB==='red')mBR++;else if(rB)mBP++;
     }
-    // Guardar TODOS os dias para histórico (separado por mês no render)
-    if(rA || rB) dadosMultiplasDias.push({ data: dia.data, rA, rB });
-
+    if(rA||rB)dadosMultiplasDias.push({data:dia.data,rA,rB});
     diasP.push({data:dia.data,apostas:apR,green:dG,red:dR,pendente:dP,total:ap.length,assert:da,multiplas:dia.multiplas,resultados_multiplas:rM});
   }
 
@@ -301,54 +381,36 @@ function processar(dias,h){
   const ligas=Object.entries(ligasMap).filter(([,v])=>v.total>=1).map(([n,v])=>({nome:n,...v,pct:Math.round(v.green/v.total*100)})).sort((a,b)=>b.pct-a.pct);
   const saude={ontem:{g:oG,r:oR,pct:oG+oR>0?Math.round(oG/(oG+oR)*100):null},semana:{g:sG,r:sR,pct:sG+sR>0?Math.round(sG/(sG+sR)*100):null},mes:{g:mG,r:mR,pct:mG+mR>0?Math.round(mG/(mG+mR)*100):null}};
   const multiplas={a:{green:mAG,red:mAR,pendente:mAP,total:mAG+mAR},b:{green:mBG,red:mBR,pendente:mBP,total:mBG+mBR}};
-
-  // Agrupar por semana (segunda a domingo)
-  const semanasMap = {};
-  const mesesMap = {};
-  for(const dia of diasP) {
-    // Calcular início da semana (segunda)
-    const d = new Date(dia.data+'T12:00:00');
-    const ds = d.getDay();
-    const diasSeg = ds === 0 ? 6 : ds - 1;
-    const segData = new Date(d); segData.setDate(d.getDate() - diasSeg);
-    const swKey = segData.toISOString().substring(0,10);
-    // Fim da semana (domingo)
-    const domData = new Date(segData); domData.setDate(segData.getDate() + 6);
-    const domKey = domData.toISOString().substring(0,10);
-    const swLabel = `${fmtD(swKey)} – ${fmtD(domKey)}`;
-
-    if(!semanasMap[swKey]) semanasMap[swKey] = {label:swLabel,g:0,r:0,c:0,dias:[]};
-    semanasMap[swKey].g += dia.green;
-    semanasMap[swKey].r += dia.red;
-    semanasMap[swKey].dias.push(dia);
-
-    // Agrupar por mês
-    const mesKey = dia.data.substring(0,7);
-    const [my,mm] = mesKey.split('-');
-    const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const mesLabel = `${meses[parseInt(mm)-1]} ${my}`;
-    if(!mesesMap[mesKey]) mesesMap[mesKey] = {label:mesLabel,g:0,r:0,c:0,dias:[]};
-    mesesMap[mesKey].g += dia.green;
-    mesesMap[mesKey].r += dia.red;
-    mesesMap[mesKey].dias.push(dia);
+  const semanasMap={},mesesMap={};
+  for(const dia of diasP){
+    const d=new Date(dia.data+'T12:00:00'),ds=d.getDay(),diasSeg=ds===0?6:ds-1;
+    const segData=new Date(d);segData.setDate(d.getDate()-diasSeg);
+    const swKey=segData.toISOString().substring(0,10);
+    const domData=new Date(segData);domData.setDate(segData.getDate()+6);
+    const swLabel=`${fmtD(swKey)} – ${fmtD(domData.toISOString().substring(0,10))}`;
+    if(!semanasMap[swKey])semanasMap[swKey]={label:swLabel,g:0,r:0,dias:[]};
+    semanasMap[swKey].g+=dia.green;semanasMap[swKey].r+=dia.red;semanasMap[swKey].dias.push(dia);
+    const mesKey=dia.data.substring(0,7);
+    const[my,mm]=mesKey.split('-');
+    const nomesMes=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    if(!mesesMap[mesKey])mesesMap[mesKey]={label:`${nomesMes[parseInt(mm)-1]} ${my}`,g:0,r:0,dias:[]};
+    mesesMap[mesKey].g+=dia.green;mesesMap[mesKey].r+=dia.red;mesesMap[mesKey].dias.push(dia);
   }
 
-  dadosGlobais=diasP;
-  window._diasCache=diasP;
-  renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR,multiplas);renderDiario(diasP);
-  renderPeriodos(semanasMap, mesesMap);
+  dadosGlobais=diasP;window._diasCache=diasP;
+  renderSaude(saude);renderHealth(ag,ligas,tG,tR);renderStats(ag,tT,tG,tR,multiplas);renderDiario(diasP);renderPeriodos(semanasMap,mesesMap);
 }
 
 function renderSaude(s){
-  const ps=[{k:'ontem',l:'Ontem',c:'sc-ontem'},{k:'semana',l:'Semana',c:'sc-semana'},{k:'mes',l:'Mês',c:'sc-mes'}];
+  const ps=[{k:'ontem',l:'Ontem',c:'blue-top'},{k:'semana',l:'Semana',c:'green-top'},{k:'mes',l:'Mês',c:'purple-top'}];
   document.getElementById('saude-grid').innerHTML=ps.map(p=>{
     const d=s[p.k],pct=d.pct;
-    return `<div class="saude-card ${p.c}">
-      <div class="s-lbl">${p.l}</div>
-      <div class="s-pct ${pct!==null?cP(pct):'empty'}">${pct!==null?pct+'%':'--'}</div>
-      <div class="s-detail">
-        <div class="s-d"><strong style="color:var(--green)">${d.g}</strong>G</div>
-        <div class="s-d"><strong style="color:var(--red)">${d.r}</strong>R</div>
+    return`<div class="period-card ${p.c}">
+      <div class="period-label">${p.l}</div>
+      <div class="period-pct ${pct!==null?cP(pct):'empty'}">${pct!==null?pct+'%':'--'}</div>
+      <div class="period-detail">
+        <div class="period-d"><strong style="color:var(--green)">${d.g}</strong> G</div>
+        <div class="period-d"><strong style="color:var(--red)">${d.r}</strong> R</div>
       </div>
     </div>`;
   }).join('');
@@ -357,215 +419,78 @@ function renderSaude(s){
 function renderHealth(ag,ligas,tG,tR){
   const pct=ag??0;
   document.getElementById('health-banner').innerHTML=`
-    <div class="h-lbl">Saúde geral · 30 dias</div>
-    <div class="h-row">
-      <div class="h-pct ${ag!==null?cP(pct):'empty'}">${ag!==null?pct+'%':'--'}</div>
+    <div class="health-left">
+      <div class="health-label">Saúde geral · 30 dias</div>
+      <div class="health-pct ${ag!==null?cP(pct):'empty'}">${ag!==null?pct+'%':'--'}</div>
+      <div class="health-sub">${tG+tR} validadas · <span style="color:var(--green);font-weight:600">${tG} green</span> · <span style="color:var(--red);font-weight:600">${tR} red</span></div>
     </div>
-    <div class="h-sub">${tG+tR} validadas · ${tG} green · ${tR} red</div>
-    <div class="top3-title">Top 3 ligas</div>
-    ${ligas.slice(0,3).map((l,i)=>`
-      <div class="top3-item">
-        <span class="top3-rank">${i+1}</span>
-        <div class="top3-info">
-          <div class="top3-name"><span>${l.nome}</span><span style="color:${corP(l.pct)}">${l.pct}%</span></div>
-          <div class="top3-bar"><div class="top3-fill" style="width:${l.pct}%;background:${corP(l.pct)}"></div></div>
-        </div>
-      </div>`).join('')||'<div class="empty" style="padding:.5rem 0">Aguardando dados...</div>'}`;
+    <div class="health-right">
+      <div class="top3-label">Top 3 ligas</div>
+      ${ligas.slice(0,3).map((l,i)=>`
+        <div class="top3-item">
+          <span class="top3-rank">${i+1}</span>
+          <div class="top3-info">
+            <div class="top3-name"><span>${l.nome}</span><span style="color:${corP(l.pct)};font-weight:700">${l.pct}%</span></div>
+            <div class="top3-bar"><div class="top3-fill" style="width:${l.pct}%;background:${corP(l.pct)}"></div></div>
+          </div>
+        </div>`).join('')||'<div class="empty" style="padding:.5rem 0;text-align:left">Aguardando dados...</div>'}
+    </div>`;
 }
 
-// Dados globais de múltiplas por dia para o histórico mensal
-let dadosMultiplasDias = [];
-
 function renderStats(ag,t,g,r,multiplas){
-  const mA=multiplas?.a, mB=multiplas?.b;
+  const mA=multiplas?.a,mB=multiplas?.b;
   const pctA=mA?.total>0?Math.round(mA.green/mA.total*100):null;
   const pctB=mB?.total>0?Math.round(mB.green/mB.total*100):null;
-  const metaA=mA?.green||0, metaB=mB?.green||0;
+  const metaA=mA?.green||0,metaB=mB?.green||0;
   document.getElementById('stats-grid').innerHTML=`
-    <div class="stat-card"><div class="stat-lbl">Assertividade</div><div class="stat-val" style="color:${corP(ag??0)}">${ag!==null?ag+'%':'--'}</div></div>
-    <div class="stat-card"><div class="stat-lbl">Total apostas</div><div class="stat-val" style="color:var(--blue)">${t}</div></div>
-    <div class="stat-card"><div class="stat-lbl">Green</div><div class="stat-val" style="color:var(--green)">${g}</div></div>
-    <div class="stat-card"><div class="stat-lbl">Red</div><div class="stat-val" style="color:var(--red)">${r}</div></div>
-    <div class="stat-card" style="border-top:1px solid var(--border);padding-top:8px;grid-column:1/-1">
-      <div class="stat-lbl" style="margin-bottom:8px">🎯 Múltiplas do mês</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-        <div><div class="stat-lbl">Múltipla A</div><div class="stat-val" style="font-size:18px;color:${corP(pctA??0)}">${pctA!==null?pctA+'%':'--'}</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${mA?.green||0}G · ${mA?.red||0}R</div></div>
-        <div><div class="stat-lbl">Múltipla B</div><div class="stat-val" style="font-size:18px;color:${corP(pctB??0)}">${pctB!==null?pctB+'%':'--'}</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${mB?.green||0}G · ${mB?.red||0}R</div></div>
-        <div><div class="stat-lbl">Meta A (10 greens)</div><div class="stat-val" style="font-size:18px;color:${metaA>=10?'var(--green)':'var(--amber)'}">${metaA}/10</div></div>
-        <div><div class="stat-lbl">Meta B (15 greens)</div><div class="stat-val" style="font-size:18px;color:${metaB>=15?'var(--green)':'var(--amber)'}">${metaB}/15</div></div>
-      </div>
-      <div id="mult-historico"></div>
-    </div>`;
+    <div class="stats-grid" style="margin-bottom:1rem">
+      <div class="stat-card"><div class="stat-label">Assertividade</div><div class="stat-val" style="color:${corP(ag??0)}">${ag!==null?ag+'%':'--'}</div></div>
+      <div class="stat-card"><div class="stat-label">Total apostas</div><div class="stat-val" style="color:var(--blue)">${t}</div></div>
+      <div class="stat-card"><div class="stat-label">Green</div><div class="stat-val" style="color:var(--green)">${g}</div></div>
+      <div class="stat-card"><div class="stat-label">Red</div><div class="stat-val" style="color:var(--red)">${r}</div></div>
+    </div>
+    <div class="section-hd"><span class="section-title">Múltiplas do mês</span></div>
+    <div class="mult-grid" style="margin-bottom:1rem">
+      <div class="mult-mini"><div class="mult-mini-label">Múltipla A</div><div class="mult-mini-val" style="color:${corP(pctA??0)}">${pctA!==null?pctA+'%':'--'}</div><div class="mult-mini-sub">${mA?.green||0}G · ${mA?.red||0}R</div></div>
+      <div class="mult-mini"><div class="mult-mini-label">Múltipla B</div><div class="mult-mini-val" style="color:${corP(pctB??0)}">${pctB!==null?pctB+'%':'--'}</div><div class="mult-mini-sub">${mB?.green||0}G · ${mB?.red||0}R</div></div>
+      <div class="mult-mini"><div class="mult-mini-label">Meta A (10 green)</div><div class="mult-mini-val" style="color:${metaA>=10?'var(--green)':'var(--amber)'}">${metaA}/10</div></div>
+      <div class="mult-mini"><div class="mult-mini-label">Meta B (15 green)</div><div class="mult-mini-val" style="color:${metaB>=15?'var(--green)':'var(--amber)'}">${metaB}/15</div></div>
+    </div>
+    <div id="mult-historico"></div>`;
   renderHistoricoMultiplas();
 }
 
 function renderHistoricoMultiplas(){
-  const el = document.getElementById('mult-historico');
-  if(!el || !dadosMultiplasDias.length) return;
-
-  // Agrupar por mês
-  const meses = {};
-  for(const d of dadosMultiplasDias){
-    const mes = d.data.substring(0,7); // YYYY-MM
-    if(!meses[mes]) meses[mes] = [];
-    meses[mes].push(d);
-  }
-
-  const fmtMes = m => {
-    const [y,mo] = m.split('-');
-    const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    return `${nomes[parseInt(mo)-1]} ${y}`;
-  };
-
-  el.innerHTML = Object.entries(meses).sort((a,b)=>b[0].localeCompare(a[0])).map(([mes, dias]) => {
-    const aGs = dias.filter(d=>d.rA==='green').length;
-    const aRs = dias.filter(d=>d.rA==='red').length;
-    const bGs = dias.filter(d=>d.rB==='green').length;
-    const bRs = dias.filter(d=>d.rB==='red').length;
-    const id = 'mult-mes-'+mes.replace('-','');
-
-    const diasHtml = dias.sort((a,b)=>a.data.localeCompare(b.data)).map(d => {
-      const badgeA = d.rA==='green'?'<span style="color:var(--green);font-size:10px">✓A</span>':d.rA==='red'?'<span style="color:var(--red);font-size:10px">✗A</span>':'<span style="color:var(--text3);font-size:10px">?A</span>';
-      const badgeB = d.rB==='green'?'<span style="color:var(--green);font-size:10px">✓B</span>':d.rB==='red'?'<span style="color:var(--red);font-size:10px">✗B</span>':'<span style="color:var(--text3);font-size:10px">?B</span>';
-      const dia = d.data.substring(8,10);
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-radius:4px;background:var(--card2);margin-bottom:2px">
-        <span style="font-family:var(--mono);font-size:11px;color:var(--text2)">Dia ${dia}</span>
-        <div style="display:flex;gap:8px">${badgeA} ${badgeB}</div>
-      </div>`;
+  const el=document.getElementById('mult-historico');
+  if(!el||!dadosMultiplasDias.length) return;
+  const meses={};
+  for(const d of dadosMultiplasDias){const mes=d.data.substring(0,7);if(!meses[mes])meses[mes]=[];meses[mes].push(d);}
+  const fmtMes=m=>{const[y,mo]=m.split('-');const n=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];return`${n[parseInt(mo)-1]} ${y}`;};
+  el.innerHTML=Object.entries(meses).sort((a,b)=>b[0].localeCompare(a[0])).map(([mes,dias])=>{
+    const aGs=dias.filter(d=>d.rA==='green').length,aRs=dias.filter(d=>d.rA==='red').length;
+    const bGs=dias.filter(d=>d.rB==='green').length,bRs=dias.filter(d=>d.rB==='red').length;
+    const id='mult-mes-'+mes.replace('-','');
+    const diasHtml=dias.sort((a,b)=>a.data.localeCompare(b.data)).map(d=>{
+      const bA=d.rA==='green'?`<span style="color:var(--green);font-size:10px;font-weight:700">✓A</span>`:d.rA==='red'?`<span style="color:var(--red);font-size:10px;font-weight:700">✗A</span>`:`<span style="color:var(--text3);font-size:10px">?A</span>`;
+      const bB=d.rB==='green'?`<span style="color:var(--green);font-size:10px;font-weight:700">✓B</span>`:d.rB==='red'?`<span style="color:var(--red);font-size:10px;font-weight:700">✗B</span>`:`<span style="color:var(--text3);font-size:10px">?B</span>`;
+      return`<div class="mult-dia-row"><span class="mult-dia-label">Dia ${d.data.substring(8,10)}</span><div class="mult-dia-badges">${bA}${bB}</div></div>`;
     }).join('');
-
-    return `<div style="margin-bottom:8px">
-      <div onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'"
-           style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 8px;border-radius:6px;background:var(--card2);margin-bottom:4px">
-        <span style="font-family:var(--mono);font-size:11px;font-weight:600">${fmtMes(mes)}</span>
-        <div style="display:flex;gap:12px;font-family:var(--mono);font-size:10px">
-          <span>A: <span style="color:var(--green)">${aGs}G</span> <span style="color:var(--red)">${aRs}R</span></span>
-          <span>B: <span style="color:var(--green)">${bGs}G</span> <span style="color:var(--red)">${bRs}R</span></span>
+    return`<div class="mult-hist-item">
+      <div class="mult-hist-hd" onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'">
+        <span class="mult-hist-label">${fmtMes(mes)}</span>
+        <div class="mult-hist-right">
+          <span>A: <span style="color:var(--green);font-weight:600">${aGs}G</span> <span style="color:var(--red);font-weight:600">${aRs}R</span></span>
+          <span>B: <span style="color:var(--green);font-weight:600">${bGs}G</span> <span style="color:var(--red);font-weight:600">${bRs}R</span></span>
           <span style="color:var(--text3)">▼</span>
         </div>
       </div>
-      <div id="${id}" style="display:none;padding:0 4px">${diasHtml}</div>
+      <div class="mult-hist-body" id="${id}" style="display:none">${diasHtml}</div>
     </div>`;
   }).join('');
 }
 
-function fmtD(s){ const[y,m,d]=s.split('-'); return `${d}/${m}`; }
-
-function switchHist(modo) {
-  ['dias','semanas','meses'].forEach(m => {
-    document.getElementById('hist-'+m).style.display = m===modo ? 'block' : 'none';
-    const btn = document.getElementById('hist-btn-'+m);
-    if(btn) {
-      btn.style.background = m===modo ? 'var(--green)' : 'transparent';
-      btn.style.color = m===modo ? '#000' : 'var(--text3)';
-      btn.style.border = m===modo ? 'none' : '1px solid var(--border)';
-      btn.style.fontWeight = m===modo ? '600' : '400';
-    }
-  });
-}
-
-function renderPeriodos(semanas, meses) {
-  window._semanas = semanas;
-  window._meses = meses;
-
-  // Renderizar itens filhos (dias dentro de semana, ou semanas dentro de mês)
-  const renderFilhos = (v, tipo) => {
-    if (tipo === 'semanas') {
-      // Dentro de semana: mostrar dias
-      return v.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(dia => {
-        const dt = dia.data.substring(8,10)+'/'+dia.data.substring(5,7);
-        const dTotal = dia.green+dia.red;
-        const dPct = dTotal>0?Math.round(dia.green/dTotal*100):null;
-        const dCor = dPct===null?'var(--text3)':dPct>=65?'var(--green)':dPct>=50?'var(--amber)':'var(--red)';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;border-radius:4px;background:var(--card2);margin-bottom:2px">
-          <span style="font-family:var(--mono);font-size:11px;color:var(--text2)">${dt}</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${dia.green}G ${dia.red}R</span>
-            <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${dCor}">${dPct!==null?dPct+'%':'--'}</span>
-          </div>
-        </div>`;
-      }).join('');
-    } else {
-      // Dentro de mês: mostrar semanas
-      // Agrupar dias do mês por semana
-      const semsDoMes = {};
-      v.dias.forEach(dia => {
-        const d = new Date(dia.data+'T12:00:00');
-        const ds = d.getDay();
-        const diasSeg = ds===0?6:ds-1;
-        const seg = new Date(d); seg.setDate(d.getDate()-diasSeg);
-        const segKey = seg.toISOString().substring(0,10);
-        const dom = new Date(seg); dom.setDate(seg.getDate()+6);
-        const domKey = dom.toISOString().substring(0,10);
-        if(!semsDoMes[segKey]) semsDoMes[segKey]={label:`${fmtD(segKey)} – ${fmtD(domKey)}`,g:0,r:0,dias:[]};
-        semsDoMes[segKey].g+=dia.green; semsDoMes[segKey].r+=dia.red;
-        semsDoMes[segKey].dias.push(dia);
-      });
-      return Object.entries(semsDoMes).sort((a,b)=>b[0].localeCompare(a[0])).map(([sk,sv]) => {
-        const sTotal=sv.g+sv.r;
-        const sPct=sTotal>0?Math.round(sv.g/sTotal*100):null;
-        const sCor=sPct===null?'var(--text3)':sPct>=65?'var(--green)':sPct>=50?'var(--amber)':'var(--red)';
-        const sid='mesw-'+sk.replace(/[^a-z0-9]/gi,'');
-        const diasHtml=sv.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(dia=>{
-          const dt=dia.data.substring(8,10)+'/'+dia.data.substring(5,7);
-          const dTotal=dia.green+dia.red;
-          const dPct=dTotal>0?Math.round(dia.green/dTotal*100):null;
-          const dCor=dPct===null?'var(--text3)':dPct>=65?'var(--green)':dPct>=50?'var(--amber)':'var(--red)';
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border-radius:4px;background:var(--bg);margin-bottom:2px">
-            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">${dt}</span>
-            <div style="display:flex;gap:6px;align-items:center">
-              <span style="font-family:var(--mono);font-size:9px;color:var(--text3)">${dia.green}G ${dia.red}R</span>
-              <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${dCor}">${dPct!==null?dPct+'%':'--'}</span>
-            </div>
-          </div>`;
-        }).join('');
-        return `<div style="margin-bottom:4px">
-          <div onclick="document.getElementById('${sid}').style.display=document.getElementById('${sid}').style.display==='none'?'block':'none'"
-               style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:5px 8px;border-radius:6px;background:var(--bg);margin-bottom:2px">
-            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">${sv.label}</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <span style="font-family:var(--mono);font-size:9px;color:var(--text3)">${sv.g}G ${sv.r}R</span>
-              <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${sCor}">${sPct!==null?sPct+'%':'--'}</span>
-              <span style="color:var(--text3);font-size:9px">▾</span>
-            </div>
-          </div>
-          <div id="${sid}" style="display:none;padding:0 4px">${diasHtml}</div>
-        </div>`;
-      }).join('');
-    }
-  };
-
-  const renderLista = (mapa, containerId, tipo) => {
-    const el = document.getElementById(containerId);
-    if (!el) return;
-    const entries = Object.entries(mapa).sort((a,b)=>b[0].localeCompare(a[0]));
-    el.innerHTML = entries.map(([key, v]) => {
-      const total = v.g + v.r;
-      const pct = total > 0 ? Math.round(v.g/total*100) : null;
-      const cor = pct === null ? 'var(--text3)' : pct >= 65 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
-      const id = 'periodo-'+key.replace(/[^a-z0-9]/gi,'');
-      const filhosHtml = renderFilhos(v, tipo);
-      return `<div style="margin-bottom:8px">
-        <div onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'"
-             style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 10px;border-radius:8px;background:var(--card2);margin-bottom:4px">
-          <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text2)">${v.label}</span>
-          <div style="display:flex;gap:10px;align-items:center">
-            <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${v.g}G · ${v.r}R</span>
-            <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:${cor}">${pct!==null?pct+'%':'--'}</span>
-            <span style="color:var(--text3);font-size:10px">▼</span>
-          </div>
-        </div>
-        <div id="${id}" style="display:none;padding:0 4px">${filhosHtml}</div>
-      </div>`;
-    }).join('');
-  };
-
-  renderLista(semanas, 'periodos-semanas', 'semanas');
-  renderLista(meses, 'periodos-meses', 'meses');
-}
-
 function renderDiario(dias){
-  if(!dias.length){document.getElementById('daily-list').innerHTML='<div class="empty">Nenhum dado.</div>';return;}
+  if(!dias.length){document.getElementById('daily-list').innerHTML='<div class="empty">Nenhum dado ainda.</div>';return;}
   document.getElementById('daily-list').innerHTML=dias.map((d,i)=>{
     const pct=d.assert;
     const apHtml=d.apostas.map(a=>`
@@ -575,17 +500,17 @@ function renderDiario(dias){
           <div class="ap-meta">${a.liga||''} · ${a.aposta}</div>
         </div>
         <div class="ap-right">
-          <span class="ap-odd">${a.odd_sugerida||''}</span>
-          <span class="rbadge ${a.resultado==='green'?'r-green':a.resultado==='red'?'r-red':'r-pend'}">${a.resultado==='green'?'✓':a.resultado==='red'?'✗':'?'}</span>
+          <span class="ap-odd">${a.odd_mercado||a.odd_sugerida||''}</span>
+          ${a.resultado==='green'?badgeG('✓ G'):a.resultado==='red'?badgeR('✗ R'):badgeP('?')}
         </div>
       </div>`).join('');
-    return `<div class="daily-item">
-      <div class="daily-header" onclick="togD(${i})">
+    return`<div class="daily-item">
+      <div class="daily-hd" onclick="togD(${i})">
         <span class="daily-date">${fmtDL(d.data)}</span>
         <div class="daily-bar-wrap"><div class="daily-bar"><div class="daily-bar-fill" style="width:${pct||0}%;background:${corP(pct||0)}"></div></div></div>
         <span class="daily-pct" style="color:${corP(pct||0)}">${pct!==null?pct+'%':'--'}</span>
         <div class="daily-gr"><span class="daily-g">${d.green}G</span><span class="daily-r">${d.red}R</span></div>
-        <span class="daily-chev" id="dc${i}">▾</span>
+        <svg class="daily-chev" id="dc${i}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="daily-apostas" id="da${i}">${apHtml}</div>
     </div>`;
@@ -597,149 +522,160 @@ function togD(i){
   document.getElementById('dc'+i).classList.toggle('open');
 }
 
-// Auto-refresh do dia atual a cada 3 minutos
-setInterval(async () => {
-  try {
-    const r = await fetch(`${B}/apostas-resultado/${hoje()}`);
-    const d = await r.json();
-    if (!d.apostas?.jogos) return;
-    // Atualizar apenas o card de hoje no histórico sem recarregar tudo
-    const diasP = window._diasCache || [];
-    const idx = diasP.findIndex(x => x.data === hoje());
-    if (idx !== -1) {
-      diasP[idx] = d;
-      window._diasCache = diasP;
-      renderDiario(diasP);
+function switchHist(modo){
+  ['dias','semanas','meses'].forEach(m=>{
+    document.getElementById('hist-'+m).style.display=m===modo?'block':'none';
+    document.getElementById('hist-btn-'+m).classList.toggle('active',m===modo);
+  });
+}
+
+function renderPeriodos(semanas,meses){
+  const renderFilhos=(v,tipo)=>{
+    if(tipo==='semanas'){
+      return v.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(dia=>{
+        const dt=fmtD(dia.data),dT=dia.green+dia.red;
+        const dPct=dT>0?Math.round(dia.green/dT*100):null;
+        const dCor=dPct===null?'var(--text3)':corP(dPct);
+        return`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 10px;border-radius:5px;background:var(--surface3);margin-bottom:2px">
+          <span style="font-size:12px;color:var(--text2)">${dt}</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:11px;color:var(--text3)">${dia.green}G ${dia.red}R</span>
+            <span style="font-size:12px;font-weight:700;color:${dCor}">${dPct!==null?dPct+'%':'--'}</span>
+          </div>
+        </div>`;
+      }).join('');
+    }else{
+      const semsDoMes={};
+      v.dias.forEach(dia=>{
+        const d=new Date(dia.data+'T12:00:00'),ds=d.getDay(),diasSeg=ds===0?6:ds-1;
+        const seg=new Date(d);seg.setDate(d.getDate()-diasSeg);
+        const sk=seg.toISOString().substring(0,10);
+        const dom=new Date(seg);dom.setDate(seg.getDate()+6);
+        if(!semsDoMes[sk])semsDoMes[sk]={label:`${fmtD(sk)} – ${fmtD(dom.toISOString().substring(0,10))}`,g:0,r:0,dias:[]};
+        semsDoMes[sk].g+=dia.green;semsDoMes[sk].r+=dia.red;semsDoMes[sk].dias.push(dia);
+      });
+      return Object.entries(semsDoMes).sort((a,b)=>b[0].localeCompare(a[0])).map(([sk,sv])=>{
+        const sT=sv.g+sv.r,sPct=sT>0?Math.round(sv.g/sT*100):null;
+        const sCor=sPct===null?'var(--text3)':corP(sPct);
+        const sid='mesw-'+sk.replace(/[^a-z0-9]/gi,'');
+        const diasHtml=sv.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(dia=>{
+          const dt=fmtD(dia.data),dT=dia.green+dia.red;
+          const dPct=dT>0?Math.round(dia.green/dT*100):null;
+          return`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;border-radius:4px;background:var(--bg);margin-bottom:2px">
+            <span style="font-size:11px;color:var(--text2)">${dt}</span>
+            <span style="font-size:11px;font-weight:700;color:${dPct===null?'var(--text3)':corP(dPct)}">${dPct!==null?dPct+'%':'--'}</span>
+          </div>`;
+        }).join('');
+        return`<div style="margin-bottom:3px">
+          <div onclick="document.getElementById('${sid}').style.display=document.getElementById('${sid}').style.display==='none'?'block':'none'"
+               style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:5px 10px;border-radius:6px;background:var(--surface3);margin-bottom:2px">
+            <span style="font-size:11px;color:var(--text2)">${sv.label}</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size:10px;color:var(--text3)">${sv.g}G ${sv.r}R</span>
+              <span style="font-size:12px;font-weight:700;color:${sCor}">${sPct!==null?sPct+'%':'--'}</span>
+            </div>
+          </div>
+          <div id="${sid}" style="display:none;padding:0 4px">${diasHtml}</div>
+        </div>`;
+      }).join('');
     }
-  } catch(e) {}
-}, 3 * 60 * 1000);
+  };
+  const renderLista=(mapa,containerId,tipo)=>{
+    const el=document.getElementById(containerId);
+    if(!el)return;
+    el.innerHTML=Object.entries(mapa).sort((a,b)=>b[0].localeCompare(a[0])).map(([key,v])=>{
+      const total=v.g+v.r,pct=total>0?Math.round(v.g/total*100):null;
+      const cor=pct===null?'var(--text3)':corP(pct);
+      const id='periodo-'+key.replace(/[^a-z0-9]/gi,'');
+      return`<div class="periodo-item">
+        <div class="periodo-hd" onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'">
+          <span class="periodo-label">${v.label}</span>
+          <div class="periodo-right">
+            <span class="periodo-gr">${v.g}G · ${v.r}R</span>
+            <span class="periodo-pct" style="color:${cor}">${pct!==null?pct+'%':'--'}</span>
+            <span class="periodo-chev">▼</span>
+          </div>
+        </div>
+        <div class="periodo-body" id="${id}">${renderFilhos(v,tipo)}</div>
+      </div>`;
+    }).join('');
+  };
+  renderLista(semanas,'periodos-semanas','semanas');
+  renderLista(meses,'periodos-meses','meses');
+}
 
 async function validarDataEspecifica(){
-  const data = prompt('Data para validar (YYYY-MM-DD):', hoje());
-  if (!data || !data.match(/^\d{4}-\d{2}-\d{2}$/)) return;
-  const forcar = confirm(`Forçar revalidação completa de ${data}?
-OK = Forçar tudo
-Cancelar = Só pendentes`);
-  try {
-    await fetch(`${B}/validar/${data}${forcar?'?forcar=true':''}`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({forcar})});
+  const data=prompt('Data para validar (YYYY-MM-DD):',hoje());
+  if(!data||!data.match(/^\d{4}-\d{2}-\d{2}$/))return;
+  const forcar=confirm(`Forçar revalidação completa de ${data}?\nOK = Forçar tudo · Cancelar = Só pendentes`);
+  try{
+    await fetch(`${B}/validar/${data}${forcar?'?forcar=true':''}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forcar})});
     alert(`Validação de ${data} iniciada! Aguarde alguns minutos e atualize o dashboard.`);
-  } catch(e) { alert('Erro: ' + e.message); }
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 async function validarHoje(forcar=false){
   const btn=document.getElementById('btn-hoje');
   btn.disabled=true;btn.textContent='⏳ Validando...';
-
-  // Usar horário de Brasília (UTC-3) para determinar o dia correto
-  const agora = new Date();
-  const brasilia = new Date(agora.getTime() - 3*60*60*1000);
-  const dataBrasilia = brasilia.toISOString().substring(0,10);
-
+  const agora=new Date(),brasilia=new Date(agora.getTime()-3*60*60*1000);
+  const dataBrasilia=brasilia.toISOString().substring(0,10);
   try{
-    // Disparar validação com data de Brasília
-    const endpoint = forcar ? `/validar/${dataBrasilia}?forcar=true` : `/validar-agora`;
-    await fetch(`${B}${endpoint}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forcar})});
-
-    // Aguardar 8 segundos e buscar resultado atualizado
+    await fetch(`${B}${forcar?`/validar/${dataBrasilia}?forcar=true`:'/validar-agora'}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forcar})});
     await new Promise(r=>setTimeout(r,8000));
-
     const r=await fetch(`${B}/apostas-resultado/${hoje()}`);
     const d=await r.json();
-
     if(!d.apostas?.jogos?.length){
-      document.getElementById('hoje-conteudo').innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:center;padding:1rem;">Sem apostas geradas para hoje ainda.</div>';
+      document.getElementById('hoje-conteudo').innerHTML='<div class="empty">Sem apostas geradas para hoje ainda.</div>';
       return;
     }
-
-    const ap=d.apostas.jogos, res=d.resultados?.apostas||[];
-    const jogosComRes=ap.map(a=>{
-      const rv=res.find(x=>x.jogo_id===a.id);
-      return{...a,resultado:rv?.resultado_aposta||'pendente',placar:rv?.placar||null};
-    });
-
+    const ap=d.apostas.jogos,res=d.resultados?.apostas||[];
+    const jogosComRes=ap.map(a=>{const rv=res.find(x=>x.jogo_id===a.id);return{...a,resultado:rv?.resultado_aposta||'pendente',placar:rv?.placar||null};});
     const g=jogosComRes.filter(j=>j.resultado==='green').length;
     const r2=jogosComRes.filter(j=>j.resultado==='red').length;
     const p=jogosComRes.filter(j=>j.resultado==='pendente').length;
-    const tot=g+r2;
-    const pct=tot>0?Math.round(g/tot*100):null;
-
-    const resumo=`
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
-        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Total</div>
-          <div style="font-family:var(--mono);font-size:18px;font-weight:600;">${ap.length}</div>
-        </div>
-        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Green</div>
-          <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)">${g}</div>
-        </div>
-        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Red</div>
-          <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--red)">${r2}</div>
-        </div>
-        <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Pendente</div>
-          <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--amber)">${p}</div>
-        </div>
+    const tot=g+r2,pct=tot>0?Math.round(g/tot*100):null;
+    document.getElementById('hoje-conteudo').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Total</div><div style="font-size:20px;font-weight:700">${ap.length}</div></div>
+        <div style="background:var(--green-lt);border:1px solid var(--green-bd);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;margin-bottom:4px">Green</div><div style="font-size:20px;font-weight:700;color:var(--green)">${g}</div></div>
+        <div style="background:var(--red-lt);border:1px solid var(--red-bd);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;margin-bottom:4px">Red</div><div style="font-size:20px;font-weight:700;color:var(--red)">${r2}</div></div>
+        <div style="background:var(--amber-lt);border:1px solid var(--amber-bd);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;font-weight:600;color:var(--amber);text-transform:uppercase;margin-bottom:4px">Pendente</div><div style="font-size:20px;font-weight:700;color:var(--amber)">${p}</div></div>
       </div>
-      ${pct!==null?`<div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px;">Assertividade até agora: <strong style="color:${corP(pct)}">${pct}%</strong></div>`:''}
-      <div style="display:flex;flex-direction:column;gap:6px;">
+      ${pct!==null?`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Assertividade até agora: <strong style="color:${corP(pct)}">${pct}%</strong></div>`:''}
+      <div style="display:flex;flex-direction:column;gap:5px">
         ${jogosComRes.map(j=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--s2);border-radius:8px;gap:8px;${j.resultado==='green'?'border-left:2px solid var(--green)':j.resultado==='red'?'border-left:2px solid var(--red)':'border-left:2px solid var(--s3)'}">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.time_casa} x ${j.time_fora}</div>
-              <div style="font-size:10px;color:var(--text2);font-family:var(--mono);">${j.aposta} · ${j.horario||''}</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-              ${j.placar?`<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">${j.placar}</span>`:''}
-              <span style="font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:20px;${j.resultado==='green'?'background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25)':j.resultado==='red'?'background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.25)':'background:rgba(255,171,0,.08);color:var(--amber);border:1px solid rgba(255,171,0,.2)'}">
-                ${j.resultado==='green'?'✓ GREEN':j.resultado==='red'?'✗ RED':'⏳ Aguardando'}
-              </span>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;gap:8px;border-left:3px solid ${j.resultado==='green'?'var(--green)':j.resultado==='red'?'var(--red)':'var(--border)'}">
+            <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j.time_casa} x ${j.time_fora}</div><div style="font-size:11px;color:var(--text2)">${j.aposta} · ${j.horario||''}</div></div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              ${j.placar?`<span style="font-size:12px;font-weight:600;color:var(--text2)">${j.placar}</span>`:''}
+              ${j.resultado==='green'?badgeG('✓ GREEN'):j.resultado==='red'?badgeR('✗ RED'):badgeP('⏳')}
             </div>
           </div>`).join('')}
       </div>`;
-
-    document.getElementById('hoje-conteudo').innerHTML=resumo;
-    btn.textContent='🔄 Atualizar resultados';
-
+    btn.textContent='🔄 Atualizar';
   }catch(e){
-    document.getElementById('hoje-conteudo').innerHTML=`<div style="font-family:var(--mono);font-size:11px;color:var(--red);text-align:center;padding:1rem;">Erro: ${e.message}</div>`;
-  }finally{
-    btn.disabled=false;
-  }
+    document.getElementById('hoje-conteudo').innerHTML=`<div class="empty" style="color:var(--red)">Erro: ${e.message}</div>`;
+  }finally{btn.disabled=false;}
 }
 
 function calcularBanca(){
   const banca=parseFloat(document.getElementById('banca-valor').value)||50;
-  if(!dadosGlobais.length) return;
-
+  if(!dadosGlobais.length)return;
   const h=hoje(),ontem=off(h,-1),sw=off(h,-6),sm=h.substring(0,8)+'01';
   let tInv=0,tRet=0,oInv=0,oRet=0,sInv=0,sRet=0,mInv=0,mRet=0;
-
   for(const dia of dadosGlobais){
-    const ap=dia.apostas||[];
-    for(const a of ap){
-      const odd=parseFloat(a.odd_mercado||a.odd_sugerida)||0;
-      if(!odd) continue;
-      tInv+=banca;
-      if(a.resultado==='green') tRet+=banca*odd;
-      // Por período
+    for(const a of dia.apostas||[]){
+      const odd=parseFloat(a.odd_mercado||a.odd_sugerida)||0;if(!odd)continue;
+      tInv+=banca;if(a.resultado==='green')tRet+=banca*odd;
       if(dia.data===ontem){oInv+=banca;if(a.resultado==='green')oRet+=banca*odd;}
       if(dia.data>=sw){sInv+=banca;if(a.resultado==='green')sRet+=banca*odd;}
       if(dia.data>=sm){mInv+=banca;if(a.resultado==='green')mRet+=banca*odd;}
     }
   }
-
-  const fmt=(inv,ret)=>{
-    const r=ret-inv;
-    const cor=r>=0?'var(--green)':'var(--red)';
-    return `<span style="color:${cor}">${r>=0?'+':''}R$ ${r.toFixed(2)}</span>`;
-  };
-
+  const fmt=(inv,ret)=>{const r=ret-inv;return`<span style="color:${r>=0?'var(--green)':'var(--red)'};font-weight:600">${r>=0?'+':''}R$ ${r.toFixed(2)}</span>`;};
   document.getElementById('b-investido').textContent='R$ '+tInv.toFixed(2);
   document.getElementById('b-retorno').textContent='R$ '+tRet.toFixed(2);
   document.getElementById('b-resultado').innerHTML=fmt(tInv,tRet);
-  document.getElementById('b-resultado').style.color='';
   document.getElementById('b-ontem').innerHTML=oInv>0?fmt(oInv,oRet):'<span style="color:var(--text3)">sem dados</span>';
   document.getElementById('b-semana').innerHTML=sInv>0?fmt(sInv,sRet):'<span style="color:var(--text3)">sem dados</span>';
   document.getElementById('b-mes').innerHTML=mInv>0?fmt(mInv,mRet):'<span style="color:var(--text3)">sem dados</span>';
@@ -748,11 +684,31 @@ function calcularBanca(){
 
 async function rotina(){
   const btn=document.getElementById('btn-r');
-  btn.disabled=true;btn.textContent='⏳...';
-  try{await fetch(`${B}/rotina-noturna`,{method:'POST'});btn.textContent='✅ Ok!';}
-  catch(e){btn.textContent='❌';}
-  setTimeout(()=>{btn.disabled=false;btn.textContent='⚡ Rotina manual';},3000);
+  btn.disabled=true;btn.querySelector('.admin-btn-label').textContent='⏳ Executando...';
+  try{await fetch(`${B}/rotina-noturna`,{method:'POST'});btn.querySelector('.admin-btn-label').textContent='✅ Concluído!';}
+  catch(e){btn.querySelector('.admin-btn-label').textContent='❌ Erro';}
+  setTimeout(()=>{btn.disabled=false;btn.querySelector('.admin-btn-label').textContent='Rotina noturna';},3000);
 }
+
+async function sincronizarLigas(){
+  const btn=document.getElementById('btn-sinc');
+  btn.disabled=true;btn.querySelector('.admin-btn-label').textContent='⏳ Sincronizando...';
+  try{
+    await fetch(`${B}/sincronizar-ligas`,{method:'POST'});
+    btn.querySelector('.admin-btn-label').textContent='✅ Sincronizado!';
+  }catch(e){btn.querySelector('.admin-btn-label').textContent='❌ Erro';}
+  setTimeout(()=>{btn.disabled=false;btn.querySelector('.admin-btn-label').textContent='Sincronizar ligas';},4000);
+}
+
+setInterval(async()=>{
+  try{
+    const r=await fetch(`${B}/apostas-resultado/${hoje()}`);
+    const d=await r.json();if(!d.apostas?.jogos)return;
+    const diasP=window._diasCache||[];
+    const idx=diasP.findIndex(x=>x.data===hoje());
+    if(idx!==-1){diasP[idx]=d;window._diasCache=diasP;renderDiario(diasP);}
+  }catch(e){}
+},3*60*1000);
 
 load();
 </script>
