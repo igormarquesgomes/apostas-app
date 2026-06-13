@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 
 const app = express();
@@ -3618,134 +3618,171 @@ app.post('/anular-jogo', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Busca jogos disponíveis de um time em uma data — usado pelo modal de add manual
+app.get('/buscar-jogos-time', async (req, res) => {
+  const { time, data } = req.query;
+  if (!time || !data) return res.status(400).json({ error: 'time e data obrigatorios' });
+  try {
+    const fixtures = await buscarFixturesPorData(data);
+    const normS = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nTime = normS(time);
+    const termos = nTime.split(' ').filter(t => t.length >= 3);
+
+    const matches = fixtures
+      .filter(f => {
+        const h = normS(f.teams?.home?.name), a = normS(f.teams?.away?.name);
+        return termos.some(t => h.includes(t) || a.includes(t));
+      })
+      .filter(f => {
+        // Ignorar sub-categorias
+        const h = (f.teams?.home?.name || '').toLowerCase();
+        const a = (f.teams?.away?.name || '').toLowerCase();
+        return !h.match(/u\d{2}|sub-?\d{2}|junior|reserve/) && !a.match(/u\d{2}|sub-?\d{2}|junior|reserve/);
+      })
+      .map(f => ({
+        fixture_id: f.fixture?.id,
+        time_casa: f.teams?.home?.name,
+        time_fora: f.teams?.away?.name,
+        liga: f.league?.name,
+        liga_id: f.league?.id,
+        pais: f.league?.country,
+        horario: new Date(f.fixture?.timestamp * 1000).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }),
+        status: f.fixture?.status?.short,
+      }))
+      .slice(0, 12);
+
+    res.json({ jogos: matches });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── Item 7: Adicionar / Confirmar jogo manual ───────────────
 // Analisa um jogo avulso com IA e retorna o resultado SEM salvar
 app.post('/adicionar-jogo-manual', async (req, res) => {
   const { time_casa, time_fora, data, liga_id } = req.body;
-  if (!time_casa || !time_fora || !data) return res.status(400).json({ error: 'time_casa, time_fora e data obrigatórios' });
+  if (!time_casa || !time_fora || !data) return res.status(400).json({ error: 'time_casa, time_fora e data obrigatorios' });
   try {
-    console.log(`\n🔧 Análise manual: ${time_casa} x ${time_fora} (${data})`);
+    console.log('\n🔧 Analise manual: ' + time_casa + ' x ' + time_fora + ' (' + data + ')');
 
     // 1. Buscar fixture na API
     const fixtures = await buscarFixturesPorData(data);
-    const norm = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
-    const nCasa = norm(time_casa), nFora = norm(time_fora);
+        const normM = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nCasa = normM(time_casa), nFora = normM(time_fora);
+
     let fixture = fixtures.find(f => {
-      const h = norm(f.teams?.home?.name), a = norm(f.teams?.away?.name);
-      const casaMatch = h?.includes(nCasa.split(' ')[0]) || nCasa.includes(h?.split(' ')[0] || '##');
-      const foraMatch = a?.includes(nFora.split(' ')[0]) || nFora.includes(a?.split(' ')[0] || '##');
+      const h = normM(f.teams?.home?.name || ''), a = normM(f.teams?.away?.name || '');
+      const casaMatch = h.includes(nCasa.split(' ')[0]) || nCasa.includes(h.split(' ')[0] || '\x00');
+      const foraMatch = a.includes(nFora.split(' ')[0]) || nFora.includes(a.split(' ')[0] || '\x00');
       return casaMatch && foraMatch;
     });
-    // Se liga_id fornecida, preferir fixture dessa liga
+    // Preferir fixture com liga_id se fornecido
     if (liga_id) {
-      const fixtureComLiga = fixtures.find(f => f.league?.id == liga_id && norm(f.teams?.home?.name)?.includes(nCasa.split(' ')[0]));
-      if (fixtureComLiga) fixture = fixtureComLiga;
+      const f2 = fixtures.find(f => String(f.league?.id) === String(liga_id) && normM(f.teams?.home?.name || '').includes(nCasa.split(' ')[0]));
+      if (f2) fixture = f2;
     }
 
     const ligaNome = fixture?.league?.name || 'Internacional';
-    const ligaIdResolvido = fixture?.league?.id || liga_id || null;
+    const ligaIdResolvido = fixture?.league?.id || (liga_id ? Number(liga_id) : null);
     const tCasaId = fixture?.teams?.home?.id;
     const tForaId = fixture?.teams?.away?.id;
-    const horario = fixture ? new Date(fixture.fixture?.timestamp * 1000).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '00:00';
+    const horario = fixture
+      ? new Date(fixture.fixture?.timestamp * 1000).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
+      : '00:00';
 
-    // 2. Coletar estatísticas se temos IDs
+    // 2. Coletar estatísticas
     let statsCasa = null, statsFora = null;
     if (tCasaId && tForaId) {
       [statsCasa, statsFora] = await Promise.all([
         coletarEstatisticas(tCasaId, time_casa, ligaIdResolvido, tForaId),
         coletarEstatisticas(tForaId, time_fora, ligaIdResolvido, tCasaId)
       ]);
-      console.log(`  ✅ Stats coletadas para ${time_casa} e ${time_fora}`);
+      console.log('  Stats coletadas');
     } else {
-      console.log(`  ⚠️ fixtureId não encontrado para ${time_casa} x ${time_fora} — analisando sem stats`);
+      console.log('  Fixture nao encontrado — analisando sem stats');
     }
 
-    // 3. Buscar assertividade da liga
+    // 3. Buscar assertividade da liga no Supabase
     let ligaPerf = '';
     if (ligaIdResolvido) {
       try {
         const resL = await fetch(
-          `${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=eq.${ligaIdResolvido}&select=verde,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes`,
-          { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+          SUPABASE_URL + '/rest/v1/ligas_conhecidas?liga_id=eq.' + ligaIdResolvido + '&select=green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes',
+          { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } }
         );
-        const [st] = await resL.json() || [];
-        if (st?.mercados) {
+        const rowsL = await resL.json();
+        const st = Array.isArray(rowsL) ? rowsL[0] : null;
+        if (st && st.mercados) {
           const mercPerf = Object.entries(st.mercados)
             .filter(([, m]) => (m.green + m.red) >= 2)
-            .map(([mercado, m]) => `${mercado}:${Math.round(m.green/(m.green+m.red)*100)}%`).join(' ');
-          if (mercPerf) ligaPerf += `\n   LigaPerf: ${mercPerf}`;
+            .map(([merc, m]) => merc + ':' + Math.round(m.green / (m.green + m.red) * 100) + '%')
+            .join(' ');
+          if (mercPerf) ligaPerf += '\n   LigaPerf: ' + mercPerf;
         }
-        if (st?.media_escanteios || st?.media_cartoes) {
+        if (st && (st.media_escanteios || st.media_cartoes)) {
           const partes = [];
-          if (st.media_escanteios) partes.push(`escanteios média real ${st.media_escanteios.toFixed(1)} (${st.amostras_escanteios||0} jogos)`);
-          if (st.media_cartoes) partes.push(`cartões média real ${st.media_cartoes.toFixed(1)} (${st.amostras_cartoes||0} jogos)`);
-          ligaPerf += `\n   LigaMedia: ${partes.join(' | ')}`;
+          if (st.media_escanteios) partes.push('escanteios media real ' + Number(st.media_escanteios).toFixed(1) + ' (' + (st.amostras_escanteios || 0) + ' jogos)');
+          if (st.media_cartoes) partes.push('cartoes media real ' + Number(st.media_cartoes).toFixed(1) + ' (' + (st.amostras_cartoes || 0) + ' jogos)');
+          ligaPerf += '\n   LigaMedia: ' + partes.join(' | ');
         }
-      } catch(e) { /* sem stats de liga — continua */ }
+      } catch(ligaErr) { /* continua sem stats de liga */ }
     }
 
-    // 4. Montar contexto do jogo
+    // 4. Montar contexto
     const sc = statsCasa, sf = statsFora;
-    const listaJogo = `1. ${ligaNome} | ${time_casa} x ${time_fora} | ${horario}
-   Casa: forma=${sc?.forma||'?'} gols/jogo=${sc?.mediaGols||'?'} esc=${sc?.mediaEscanteios||'?'} cart=${sc?.mediaCartoes||'?'}
-   Fora: forma=${sf?.forma||'?'} gols/jogo=${sf?.mediaGols||'?'} esc=${sf?.mediaEscanteios||'?'} cart=${sf?.mediaCartoes||'?'}
-   H2H: ${sc?.h2hTexto||'sem dados'}${ligaPerf}`;
+    const listaJogo = '1. ' + ligaNome + ' | ' + time_casa + ' x ' + time_fora + ' | ' + horario + '\n' +
+      '   Casa: forma=' + (sc?.forma || '?') + ' gols/jogo=' + (sc?.mediaGols || '?') + ' esc=' + (sc?.mediaEscanteios || '?') + ' cart=' + (sc?.mediaCartoes || '?') + '\n' +
+      '   Fora: forma=' + (sf?.forma || '?') + ' gols/jogo=' + (sf?.mediaGols || '?') + ' esc=' + (sf?.mediaEscanteios || '?') + ' cart=' + (sf?.mediaCartoes || '?') + '\n' +
+      '   H2H: ' + (sc?.h2hTexto || 'sem dados') + ligaPerf;
 
-    // 5. Buscar memória de calibração
+    // 5. Memória de calibração
     const memoria = await buscarMemoria();
-    const blocoMem = memoria || null;
-    const [ano, mes, dia] = data.split('-');
-    const df = `${dia}/${mes}/${ano}`;
+    const parts = data.split('-');
+    const df = parts[2] + '/' + parts[1] + '/' + parts[0];
+    const blocoHistorico = memoria ? 'HISTORICO DE CALIBRACAO:\n' + memoria + '\n' : '';
 
-    // 6. Montar prompt e chamar IA (Sonnet + web_search para qualidade máxima)
-    const blocoHistorico = blocoMem ? `HISTÓRICO DE CALIBRAÇÃO:\n${blocoMem}\n` : '';
-    const prompt = `Você é um analista de apostas esportivas experiente. Analise o jogo abaixo e escolha a melhor aposta.
+    // 6. Prompt + IA (Sonnet + web_search)
+    const promptIA = 'Voce e um analista de apostas esportivas experiente. Analise o jogo abaixo e escolha a melhor aposta.\n\n' +
+      'DATA: ' + df + '\n' +
+      blocoHistorico +
+      'JOGO COM ESTATISTICAS REAIS:\n' + listaJogo + '\n\n' +
+      'PROCESSO OBRIGATORIO:\n' +
+      'PASSO 1 - Verifique o historico de calibracao para esse tipo de liga.\n' +
+      'PASSO 2 - Avalie CADA mercado: gols, resultado, escanteios, cartoes.\n' +
+      'PASSO 3 - Use web_search para lesoes, escalacoes e contexto atual do jogo.\n' +
+      'PASSO 4 - Escolha o mercado com MAIOR confianca. Nunca retorne confianca baixa como principal.\n\n' +
+      'CAMPO justificativa: texto para o PUBLICO. Sem termos internos. 2-3 frases em portugues natural sobre fatores esportivos.\n\n' +
+      'Retorne SOMENTE JSON valido com exatamente 1 jogo:\n' +
+      '{"jogos":[{"id":1,"liga":"' + ligaNome + '","tipo_liga":"eu","time_casa":"' + time_casa + '","time_fora":"' + time_fora + '","horario":"' + horario + '","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","razao_escolha":"media combinada alta","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Analise do jogo.","alternativas":[{"mercado":"gols","aposta":"Over 2.5","confianca":"alta","razao":"media alta"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"forma recente"},{"mercado":"escanteios","aposta":"Over 8.5","confianca":"media","razao":"media 9.2"},{"mercado":"cartoes","aposta":"Over 3.5","confianca":"baixa","razao":"media baixa"}]}]}';
 
-DATA: ${df}
-${blocoHistorico}
-JOGO COM ESTATÍSTICAS REAIS:
-${listaJogo}
+    const txt = await chamarIAComBusca(promptIA, 4000);
+    if (!txt) return res.status(502).json({ error: 'IA nao respondeu' });
 
-PROCESSO OBRIGATÓRIO:
-PASSO 1 — Verifique o histórico de calibração para esse tipo de liga.
-PASSO 2 — Avalie CADA mercado: gols, resultado, escanteios, cartões.
-PASSO 3 — Use web_search para lesões, escalações e contexto atual do jogo.
-PASSO 4 — Escolha o mercado com MAIOR confiança. Nunca retorne confiança baixa como principal.
+    // 7. Parsear
+    const idxS = txt.indexOf('{'), idxE = txt.lastIndexOf('}');
+    if (idxS === -1) return res.status(502).json({ error: 'IA retornou formato invalido', raw: txt.substring(0, 200) });
+    const parsed = JSON.parse(txt.slice(idxS, idxE + 1));
+    const jogosIA = (parsed.jogos || []).filter(j => j && j.aposta && j.mercado);
+    if (!jogosIA.length) return res.status(502).json({ error: 'IA nao retornou apostas validas', raw: txt.substring(0, 300) });
 
-CAMPO justificativa: texto para o PÚBLICO. Sem termos internos (calibração, assertividade, LigaMedia, pivotado). 2-3 frases em português natural sobre fatores esportivos observáveis.
-
-Retorne SOMENTE JSON válido com exatamente 1 jogo:
-{"jogos":[{"id":1,"liga":"${ligaNome}","tipo_liga":"eu","time_casa":"${time_casa}","time_fora":"${time_fora}","horario":"${horario}","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","razao_escolha":"média combinada alta","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise do jogo.","alternativas":[{"mercado":"gols","aposta":"Over 2.5","confianca":"alta","razao":"média alta"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"forma recente"},{"mercado":"escanteios","aposta":"Over 8.5","confianca":"media","razao":"média 9.2"},{"mercado":"cartoes","aposta":"Over 3.5","confianca":"baixa","razao":"média baixa"}]}]}`;
-
-    const txt = await chamarIAComBusca(prompt, 4000);
-    if (!txt) return res.status(502).json({ error: 'IA não respondeu' });
-
-    // 7. Parsear resultado
-    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-    if (s === -1) return res.status(502).json({ error: 'IA retornou formato inválido', raw: txt.substring(0, 200) });
-    const parsed = JSON.parse(txt.slice(s, e+1));
-    const jogos = (parsed.jogos || []).map(j => normalizarFormatoAlternativo ? j : j).filter(j => j?.aposta && j?.mercado);
-    if (!jogos.length) return res.status(502).json({ error: 'IA não retornou apostas válidas', raw: txt.substring(0, 300) });
-
-    const jogoFinal = {
-      ...jogos[0],
+    const jogoFinal = Object.assign({}, jogosIA[0], {
       liga: ligaNome,
-      time_casa,
-      time_fora,
-      horario,
+      time_casa: time_casa,
+      time_fora: time_fora,
+      horario: horario,
       fixtureId: fixture?.fixture?.id || null,
       ligaId: ligaIdResolvido,
       teamCasaId: tCasaId || null,
       teamForaId: tForaId || null,
-      tipo_liga: jogos[0].tipo_liga || 'eu',
+      tipo_liga: jogosIA[0].tipo_liga || 'eu',
       adicionado_manualmente: true,
-    };
+    });
 
-    console.log(`  ✅ Análise manual: ${jogoFinal.aposta} [${jogoFinal.confianca}]`);
+    console.log('  Analise manual OK: ' + jogoFinal.aposta + ' [' + jogoFinal.confianca + ']');
     res.json({ ok: true, jogo: jogoFinal });
-  } catch(e) {
-    console.error('❌ /adicionar-jogo-manual:', e.message);
-    res.status(500).json({ error: e.message });
+  } catch(errManual) {
+    console.error('Erro /adicionar-jogo-manual:', errManual.message);
+    res.status(500).json({ error: errManual.message });
   }
 });
 

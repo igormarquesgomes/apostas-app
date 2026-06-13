@@ -192,16 +192,17 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 /* ── Modal (Item 7: Adicionar jogo manual) ──────────── */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:900;display:none;align-items:center;justify-content:center;padding:16px;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);}
 .modal-hd{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border);}
 .modal-title{font-size:15px;font-weight:700;color:var(--text);}
 .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;padding:2px 6px;border-radius:6px;}
 .modal-close:hover{background:var(--surface2);color:var(--text);}
 .modal-body{padding:20px;}
-.modal-field{margin-bottom:14px;}
+.modal-field{margin-bottom:14px;position:relative;}
 .modal-label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
 .modal-input{width:100%;font-family:'Inter',sans-serif;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:9px 12px;background:var(--surface2);color:var(--text);outline:none;transition:border-color .12s;}
 .modal-input:focus{border-color:var(--green);}
+.modal-input:disabled{opacity:.5;cursor:not-allowed;}
 .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
 .modal-btn{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-family:'Inter',sans-serif;transition:all .15s;}
@@ -209,7 +210,29 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .modal-btn.primary{background:var(--green);color:#fff;border-color:var(--green);}
 .modal-btn.primary:hover{background:#0d6b63;}
 .modal-btn:disabled{opacity:.5;cursor:not-allowed;}
-.modal-result{margin-top:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+/* Dropdown de jogos */
+.jogo-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:1000;overflow:hidden;display:none;}
+.jogo-dropdown.open{display:block;}
+.jogo-drop-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;transition:background .1s;gap:10px;border-bottom:1px solid var(--border);}
+.jogo-drop-item:last-child{border-bottom:none;}
+.jogo-drop-item:hover{background:var(--surface2);}
+.jogo-drop-item.selected{background:var(--green-lt);border-left:3px solid var(--green);}
+.jogo-drop-teams{font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;}
+.jogo-drop-sub{font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.jogo-drop-hora{font-size:12px;font-weight:700;color:var(--amber);flex-shrink:0;}
+.jogo-drop-empty{padding:14px;text-align:center;font-size:12px;color:var(--text3);}
+.jogo-drop-loading{padding:14px;text-align:center;font-size:12px;color:var(--text3);}
+/* Jogo selecionado (card) */
+.jogo-selecionado{background:var(--green-lt);border:1px solid var(--green-bd);border-radius:10px;padding:12px 14px;display:none;margin-bottom:14px;}
+.jogo-selecionado.show{display:flex;align-items:center;gap:12px;}
+.jogo-sel-info{flex:1;min-width:0;}
+.jogo-sel-teams{font-size:14px;font-weight:700;color:var(--text);}
+.jogo-sel-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.jogo-sel-hora{font-size:16px;font-weight:700;color:var(--green);flex-shrink:0;}
+.jogo-sel-clear{background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;padding:2px 4px;border-radius:4px;line-height:1;}
+.jogo-sel-clear:hover{color:var(--red);}
+/* Resultado da análise IA */
+.modal-result{margin-top:0;background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .modal-result-hd{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
 .modal-result-teams{font-size:14px;font-weight:700;color:var(--text);}
 .modal-result-liga{font-size:11px;color:var(--text3);}
@@ -336,34 +359,42 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
       <button class="modal-close" onclick="fecharModal()">×</button>
     </div>
     <div class="modal-body">
-      <div class="modal-row">
-        <div class="modal-field">
-          <label class="modal-label">Time Casa</label>
-          <input class="modal-input" id="m-casa" placeholder="ex: Flamengo" autocomplete="off">
+
+      <!-- Etapa 1: busca -->
+      <div id="m-step1">
+        <div class="modal-row" style="margin-bottom:14px">
+          <div class="modal-field" style="margin-bottom:0">
+            <label class="modal-label">Data do jogo</label>
+            <input class="modal-input" id="m-data" type="date" oninput="limparSelecao()">
+          </div>
+          <div class="modal-field" style="margin-bottom:0;position:relative">
+            <label class="modal-label">Buscar time</label>
+            <input class="modal-input" id="m-busca" placeholder="ex: Flamengo, Arsenal…" autocomplete="off" oninput="onBuscaInput()">
+            <div class="jogo-dropdown" id="m-dropdown"></div>
+          </div>
         </div>
-        <div class="modal-field">
-          <label class="modal-label">Time Fora</label>
-          <input class="modal-input" id="m-fora" placeholder="ex: Palmeiras" autocomplete="off">
+
+        <!-- Jogo selecionado -->
+        <div class="jogo-selecionado" id="m-sel">
+          <div class="jogo-sel-info">
+            <div class="jogo-sel-teams" id="m-sel-teams"></div>
+            <div class="jogo-sel-meta" id="m-sel-meta"></div>
+          </div>
+          <div class="jogo-sel-hora" id="m-sel-hora"></div>
+          <button class="jogo-sel-clear" onclick="limparSelecao()" title="Remover">×</button>
+        </div>
+
+        <div class="modal-actions" style="margin-top:4px">
+          <button class="modal-btn" onclick="fecharModal()">Cancelar</button>
+          <button class="modal-btn primary" id="m-btn-analisar" onclick="analisarJogoManual()" disabled>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-1px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Analisar com IA
+          </button>
         </div>
       </div>
-      <div class="modal-row">
-        <div class="modal-field">
-          <label class="modal-label">Data do jogo</label>
-          <input class="modal-input" id="m-data" type="date">
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Liga ID (opcional)</label>
-          <input class="modal-input" id="m-liga-id" placeholder="ex: 71" type="number">
-        </div>
-      </div>
-      <div class="modal-actions" style="margin-top:0">
-        <button class="modal-btn" onclick="fecharModal()">Cancelar</button>
-        <button class="modal-btn primary" id="m-btn-analisar" onclick="analisarJogoManual()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-1px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          Analisar com IA
-        </button>
-      </div>
-      <div id="m-result" style="display:none"></div>
+
+      <!-- Etapa 2: resultado da análise -->
+      <div id="m-result"></div>
     </div>
   </div>
 </div>
@@ -872,63 +903,139 @@ function abrirInformarStats(){
 
 // ─── Item 7: Modal adicionar jogo manual ─────────────────────────────────────
 let jogoAnalisado = null;
+let jogoSelecionado = null;   // fixture escolhido no dropdown
+let buscaTimer = null;
 
 function abrirModalAdicionarJogo(){
   const dt = dataAtual || document.getElementById('d-input').value || offsetData(hojeStr, 1);
   document.getElementById('m-data').value = dt;
-  document.getElementById('m-casa').value = '';
-  document.getElementById('m-fora').value = '';
-  document.getElementById('m-liga-id').value = '';
-  document.getElementById('m-result').style.display = 'none';
+  document.getElementById('m-busca').value = '';
   document.getElementById('m-result').innerHTML = '';
-  document.getElementById('m-btn-analisar').disabled = false;
+  document.getElementById('m-btn-analisar').disabled = true;
+  fecharDropdown();
+  limparSelecao();
   jogoAnalisado = null;
   document.getElementById('modal-add').classList.add('open');
-  setTimeout(() => document.getElementById('m-casa').focus(), 80);
+  setTimeout(() => document.getElementById('m-busca').focus(), 80);
 }
 
 function fecharModal(){
   document.getElementById('modal-add').classList.remove('open');
+  fecharDropdown();
 }
 
 function fecharModalSeOverlay(e){
   if(e.target === document.getElementById('modal-add')) fecharModal();
 }
 
-async function analisarJogoManual(){
-  const casa = document.getElementById('m-casa').value.trim();
-  const fora = document.getElementById('m-fora').value.trim();
+function fecharDropdown(){
+  const dd = document.getElementById('m-dropdown');
+  if(dd){ dd.classList.remove('open'); dd.innerHTML = ''; }
+}
+
+function limparSelecao(){
+  jogoSelecionado = null;
+  document.getElementById('m-sel').classList.remove('show');
+  document.getElementById('m-btn-analisar').disabled = true;
+  document.getElementById('m-result').innerHTML = '';
+  jogoAnalisado = null;
+}
+
+function onBuscaInput(){
+  limparSelecao();
+  clearTimeout(buscaTimer);
+  const q = document.getElementById('m-busca').value.trim();
+  if(q.length < 2){ fecharDropdown(); return; }
+  const dd = document.getElementById('m-dropdown');
+  dd.classList.add('open');
+  dd.innerHTML = '<div class="jogo-drop-loading">Buscando...</div>';
+  buscaTimer = setTimeout(() => buscarJogosTime(q), 400);
+}
+
+async function buscarJogosTime(q){
   const data = document.getElementById('m-data').value;
-  const ligaId = document.getElementById('m-liga-id').value.trim();
-  if(!casa || !fora){ alert('Preencha os dois times.'); return; }
-  if(!data){ alert('Selecione a data do jogo.'); return; }
+  if(!data){ fecharDropdown(); return; }
+  const dd = document.getElementById('m-dropdown');
+  try{
+    const r = await fetch(`${BACKEND_URL}/buscar-jogos-time?time=${encodeURIComponent(q)}&data=${data}`);
+    const j = await r.json();
+    const jogos = j.jogos || [];
+    if(!jogos.length){
+      dd.innerHTML = '<div class="jogo-drop-empty">Nenhum jogo encontrado para esta data</div>';
+      return;
+    }
+    dd.innerHTML = jogos.map((jg, i) =>
+      `<div class="jogo-drop-item" onclick="selecionarJogo(${i})" data-idx="${i}">
+        <div style="flex:1;min-width:0">
+          <div class="jogo-drop-teams">${jg.time_casa} <span style="color:var(--text3);font-weight:400">x</span> ${jg.time_fora}</div>
+          <div class="jogo-drop-sub">${jg.liga || ''} · ${jg.pais || ''}</div>
+        </div>
+        <div class="jogo-drop-hora">${jg.horario}</div>
+      </div>`
+    ).join('');
+    // Guardar jogos no dropdown para referência
+    dd._jogos = jogos;
+  }catch(e){
+    dd.innerHTML = '<div class="jogo-drop-empty">Erro ao buscar jogos</div>';
+  }
+}
+
+function selecionarJogo(idx){
+  const dd = document.getElementById('m-dropdown');
+  const jogos = dd._jogos || [];
+  const jg = jogos[idx];
+  if(!jg) return;
+
+  jogoSelecionado = jg;
+  fecharDropdown();
+  document.getElementById('m-busca').value = jg.time_casa + ' x ' + jg.time_fora;
+  document.getElementById('m-sel-teams').textContent = jg.time_casa + ' × ' + jg.time_fora;
+  document.getElementById('m-sel-meta').textContent = (jg.liga || '') + (jg.pais ? ' · ' + jg.pais : '');
+  document.getElementById('m-sel-hora').textContent = jg.horario;
+  document.getElementById('m-sel').classList.add('show');
+  document.getElementById('m-btn-analisar').disabled = false;
+}
+
+// Fechar dropdown ao clicar fora
+document.addEventListener('click', e => {
+  const dd = document.getElementById('m-dropdown');
+  const campo = document.getElementById('m-busca');
+  if(dd && campo && !dd.contains(e.target) && e.target !== campo) fecharDropdown();
+});
+
+async function analisarJogoManual(){
+  if(!jogoSelecionado){ return; }
+  const data = document.getElementById('m-data').value;
+  if(!data){ return; }
 
   const btn = document.getElementById('m-btn-analisar');
   btn.disabled = true;
-  const res = document.getElementById('m-result');
-  res.style.display = 'block';
-  res.innerHTML = `<div class="loading-state" style="padding:20px 0"><div class="spin"></div><div class="loading-txt">IA analisando ${casa} x ${fora}...</div><div class="loading-step">Buscando estatísticas e escalações...</div></div>`;
+  const resDiv = document.getElementById('m-result');
+  resDiv.innerHTML = `<div class="loading-state" style="padding:24px 0"><div class="spin"></div><div class="loading-txt">IA analisando ${jogoSelecionado.time_casa} x ${jogoSelecionado.time_fora}...</div><div class="loading-step">Buscando estatísticas e escalações com web search...</div></div>`;
 
   try{
     const r = await fetch(`${BACKEND_URL}/adicionar-jogo-manual`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ time_casa: casa, time_fora: fora, data, liga_id: ligaId || undefined })
+      body: JSON.stringify({
+        time_casa: jogoSelecionado.time_casa,
+        time_fora: jogoSelecionado.time_fora,
+        data,
+        liga_id: jogoSelecionado.liga_id
+      })
     });
     const j = await r.json();
     if(!j.ok || !j.jogo) throw new Error(j.error || 'Resposta inválida da IA');
-
-    jogoAnalisado = { ...j.jogo, _dataJogo: data };
+    jogoAnalisado = j.jogo;
     renderResultadoModal(j.jogo, data);
-  } catch(e){
-    res.innerHTML = `<div class="errmsg" style="margin-top:12px">❌ ${e.message}</div>`;
+  }catch(e){
+    resDiv.innerHTML = `<div class="errmsg" style="margin-top:12px">❌ ${e.message}</div>`;
     btn.disabled = false;
   }
 }
 
 function renderResultadoModal(jogo, data){
-  const btn = document.getElementById('m-btn-analisar');
-  btn.disabled = false;
+  document.getElementById('m-btn-analisar').disabled = false;
   const confNorm = jogo.confianca || 'media';
   const mercNomes = {gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
   const altRows = (jogo.alternativas || []).map(a => {
@@ -945,7 +1052,7 @@ function renderResultadoModal(jogo, data){
       <div class="modal-result-hd">
         <div>
           <div class="modal-result-teams">${jogo.time_casa} x ${jogo.time_fora}</div>
-          <div class="modal-result-liga">${jogo.liga || ''} · ${jogo.horario || ''}</div>
+          <div class="modal-result-liga">${jogo.liga||''} · ${jogo.horario||''}</div>
         </div>
         <span class="conf ${confNorm}" style="margin-left:auto">${confNorm.charAt(0).toUpperCase()+confNorm.slice(1)}</span>
       </div>
@@ -964,7 +1071,7 @@ function renderResultadoModal(jogo, data){
           <div class="sm-mini"><div class="sm-mini-l">Forma casa</div><div class="sm-mini-v" style="font-size:11px">${jogo.forma_casa||'-'}</div></div>
           <div class="sm-mini"><div class="sm-mini-l">Forma fora</div><div class="sm-mini-v" style="font-size:11px">${jogo.forma_fora||'-'}</div></div>
         </div>
-        ${altRows ? `<div class="modal-result-alts"><div class="modal-result-alts-title">Todas as alternativas</div>${altRows}</div>` : ''}
+        ${altRows?`<div class="modal-result-alts"><div class="modal-result-alts-title">Alternativas</div>${altRows}</div>`:''}
         <div class="modal-actions" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
           <button class="modal-btn" onclick="fecharModal()">Cancelar</button>
           <button class="modal-btn" style="color:var(--text3)" onclick="analisarJogoManual()">↺ Nova análise</button>
@@ -975,28 +1082,26 @@ function renderResultadoModal(jogo, data){
 }
 
 async function confirmarJogoManual(data){
-  if(!jogoAnalisado){ alert('Nenhum jogo analisado.'); return; }
+  if(!jogoAnalisado){ return; }
   try{
     const r = await fetch(`${BACKEND_URL}/confirmar-jogo-manual`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ data, jogo: jogoAnalisado })
     });
     const j = await r.json();
     if(!j.ok) throw new Error(j.error || 'Erro desconhecido');
     fecharModal();
-    // Recarregar lista
     const rv = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
     const dv = await rv.json();
     if(dv.apostas?.jogos?.length > 0){
       const resultados = dv.resultados?.apostas || [];
       const jogosComRes = dv.apostas.jogos.map(jg => {
         const res = resultados.find(x => x.jogo_id === jg.id);
-        return { ...jg, resultado: res?.resultado_aposta||null, placar: res?.placar||null, mercados_resultado: res?.mercados_resultado||null };
+        return {...jg, resultado:res?.resultado_aposta||null, placar:res?.placar||null, mercados_resultado:res?.mercados_resultado||null};
       });
       render(jogosComRes, data);
     }
-  } catch(e){ alert('Erro ao confirmar: ' + e.message); }
+  }catch(e){ alert('Erro ao confirmar: ' + e.message); }
 }
 </script>
 </body>
