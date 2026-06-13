@@ -952,15 +952,14 @@ function onBuscaInput(){
   buscaTimer = setTimeout(() => buscarJogosTime(q), 400);
 }
 
-async function buscarJogosTime(q){
+async function buscarJogosTime(q, _retry){
   const data = document.getElementById('m-data').value;
   if(!data){ fecharDropdown(); return; }
   const dd = document.getElementById('m-dropdown');
+  let countdown;
   try{
-    // Coletar times já na lista do dia para excluir do dropdown
     const timesExistentes = [];
     document.querySelectorAll('.match').forEach(el => {
-      // ".match" contém "Time Casa x Time Fora" — extrair cada time
       const txt = el.textContent || '';
       const partes = txt.split(' x ');
       if(partes[0]) timesExistentes.push(partes[0].trim());
@@ -971,9 +970,21 @@ async function buscarJogosTime(q){
     let j;
     try { j = await r.json(); }
     catch(parseErr) {
-      dd.innerHTML = `<div class="jogo-drop-empty">Servidor ainda reiniciando — aguarde 1 min e tente novamente</div>`;
+      // Servidor dormindo (Render free tier faz cold-start em ~50s) — retentar automaticamente
+      if(!_retry){
+        let secs = 45;
+        const tick = () => {
+          dd.innerHTML = `<div class="jogo-drop-empty">Servidor acordando... tentando novamente em ${secs}s</div>`;
+          if(secs > 0){ secs--; countdown = setTimeout(tick, 1000); }
+          else buscarJogosTime(q, true);
+        };
+        tick();
+      } else {
+        dd.innerHTML = `<div class="jogo-drop-empty">Servidor demorando para responder — tente novamente em instantes</div>`;
+      }
       return;
     }
+    if(countdown) clearTimeout(countdown);
     if(!r.ok){
       dd.innerHTML = `<div class="jogo-drop-empty">Erro do servidor: ${j.error || r.status}</div>`;
       return;
@@ -995,6 +1006,7 @@ async function buscarJogosTime(q){
     ).join('');
     dd._jogos = jogos;
   }catch(e){
+    if(countdown) clearTimeout(countdown);
     dd.innerHTML = `<div class="jogo-drop-empty">Erro de rede: ${e.message}</div>`;
   }
 }
