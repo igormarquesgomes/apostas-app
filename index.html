@@ -958,25 +958,34 @@ async function buscarJogosTime(q){
   const dd = document.getElementById('m-dropdown');
   try{
     const r = await fetch(`${BACKEND_URL}/buscar-jogos-time?time=${encodeURIComponent(q)}&data=${data}`);
-    const j = await r.json();
+    let j;
+    try { j = await r.json(); }
+    catch(parseErr) {
+      dd.innerHTML = `<div class="jogo-drop-empty">Servidor ainda reiniciando — aguarde 1 min e tente novamente</div>`;
+      return;
+    }
+    if(!r.ok){
+      dd.innerHTML = `<div class="jogo-drop-empty">Erro do servidor: ${j.error || r.status}</div>`;
+      return;
+    }
     const jogos = j.jogos || [];
     if(!jogos.length){
-      dd.innerHTML = '<div class="jogo-drop-empty">Nenhum jogo encontrado para esta data</div>';
+      const msg = j.aviso || 'Nenhum jogo encontrado para este time nesta data';
+      dd.innerHTML = `<div class="jogo-drop-empty">${msg}</div>`;
       return;
     }
     dd.innerHTML = jogos.map((jg, i) =>
       `<div class="jogo-drop-item" onclick="selecionarJogo(${i})" data-idx="${i}">
         <div style="flex:1;min-width:0">
           <div class="jogo-drop-teams">${jg.time_casa} <span style="color:var(--text3);font-weight:400">x</span> ${jg.time_fora}</div>
-          <div class="jogo-drop-sub">${jg.liga || ''} · ${jg.pais || ''}</div>
+          <div class="jogo-drop-sub">${jg.liga||''} · ${jg.pais||''}</div>
         </div>
         <div class="jogo-drop-hora">${jg.horario}</div>
       </div>`
     ).join('');
-    // Guardar jogos no dropdown para referência
     dd._jogos = jogos;
   }catch(e){
-    dd.innerHTML = '<div class="jogo-drop-empty">Erro ao buscar jogos</div>';
+    dd.innerHTML = `<div class="jogo-drop-empty">Erro de rede: ${e.message}</div>`;
   }
 }
 

@@ -3618,15 +3618,33 @@ app.post('/anular-jogo', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Cache de fixtures por data — evita chamar API-Football a cada keystroke do modal
+const fixturesBuscaCache = {};
+
 // Busca jogos disponíveis de um time em uma data — usado pelo modal de add manual
 app.get('/buscar-jogos-time', async (req, res) => {
   const { time, data } = req.query;
   if (!time || !data) return res.status(400).json({ error: 'time e data obrigatorios' });
   try {
-    const fixtures = await buscarFixturesPorData(data);
+    // Usar cache se já buscamos fixtures dessa data nos últimos 30 min
+    let fixtures = fixturesBuscaCache[data];
+    if (!fixtures || (Date.now() - (fixtures._ts || 0)) > 30 * 60 * 1000) {
+      const raw = await buscarFixturesPorData(data);
+      if (!raw || raw.length === 0) {
+        // Verificar se é limite de API ou data sem jogos
+        if (apiSuspensa) return res.status(503).json({ error: 'API de futebol temporariamente indisponivel: ' + apiErrorMsg });
+        return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado na API para esta data (pode ser limite de requisicoes)' });
+      }
+      fixtures = raw;
+      fixtures._ts = Date.now();
+      fixturesBuscaCache[data] = fixtures;
+    }
+
     const normS = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
     const nTime = normS(time);
-    const termos = nTime.split(' ').filter(t => t.length >= 3);
+    // Aceitar termos com 2+ caracteres para nomes curtos (ex: "AC", "FC")
+    const termos = nTime.split(' ').filter(t => t.length >= 2);
+    if (!termos.length) return res.json({ jogos: [] });
 
     const matches = fixtures
       .filter(f => {
@@ -3634,7 +3652,6 @@ app.get('/buscar-jogos-time', async (req, res) => {
         return termos.some(t => h.includes(t) || a.includes(t));
       })
       .filter(f => {
-        // Ignorar sub-categorias
         const h = (f.teams?.home?.name || '').toLowerCase();
         const a = (f.teams?.away?.name || '').toLowerCase();
         return !h.match(/u\d{2}|sub-?\d{2}|junior|reserve/) && !a.match(/u\d{2}|sub-?\d{2}|junior|reserve/);
@@ -3649,11 +3666,12 @@ app.get('/buscar-jogos-time', async (req, res) => {
         horario: new Date(f.fixture?.timestamp * 1000).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }),
         status: f.fixture?.status?.short,
       }))
-      .slice(0, 12);
+      .slice(0, 15);
 
     res.json({ jogos: matches });
-  } catch(e) {
-    res.status(500).json({ error: e.message });
+  } catch(errBusca) {
+    console.error('Erro /buscar-jogos-time:', errBusca.message);
+    res.status(500).json({ error: errBusca.message });
   }
 });
 
