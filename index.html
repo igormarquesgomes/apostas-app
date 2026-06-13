@@ -957,7 +957,17 @@ async function buscarJogosTime(q){
   if(!data){ fecharDropdown(); return; }
   const dd = document.getElementById('m-dropdown');
   try{
-    const r = await fetch(`${BACKEND_URL}/buscar-jogos-time?time=${encodeURIComponent(q)}&data=${data}`);
+    // Coletar times já na lista do dia para excluir do dropdown
+    const timesExistentes = [];
+    document.querySelectorAll('.match').forEach(el => {
+      // ".match" contém "Time Casa x Time Fora" — extrair cada time
+      const txt = el.textContent || '';
+      const partes = txt.split(' x ');
+      if(partes[0]) timesExistentes.push(partes[0].trim());
+      if(partes[1]) timesExistentes.push(partes[1].trim());
+    });
+    const teParam = timesExistentes.length ? '&times_existentes=' + encodeURIComponent(timesExistentes.join('|')) : '';
+    const r = await fetch(`${BACKEND_URL}/buscar-jogos-time?time=${encodeURIComponent(q)}&data=${data}${teParam}`);
     let j;
     try { j = await r.json(); }
     catch(parseErr) {

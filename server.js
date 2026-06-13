@@ -3622,18 +3622,20 @@ app.post('/anular-jogo', async (req, res) => {
 const fixturesBuscaCache = {};
 
 // Busca jogos disponíveis de um time em uma data — usado pelo modal de add manual
+// sem filtro de sub-20 (adição manual é escolha deliberada do usuário)
+// sem filtro de horário (qualquer horário da data é válido)
 app.get('/buscar-jogos-time', async (req, res) => {
-  const { time, data } = req.query;
+  // times_existentes: lista separada por | de times já na lista do dia (evita duplicatas)
+  const { time, data, times_existentes } = req.query;
   if (!time || !data) return res.status(400).json({ error: 'time e data obrigatorios' });
   try {
-    // Usar cache se já buscamos fixtures dessa data nos últimos 30 min
+    // Cache por 30 min para não consumir quota da API-Football a cada keystroke
     let fixtures = fixturesBuscaCache[data];
     if (!fixtures || (Date.now() - (fixtures._ts || 0)) > 30 * 60 * 1000) {
       const raw = await buscarFixturesPorData(data);
       if (!raw || raw.length === 0) {
-        // Verificar se é limite de API ou data sem jogos
-        if (apiSuspensa) return res.status(503).json({ error: 'API de futebol temporariamente indisponivel: ' + apiErrorMsg });
-        return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado na API para esta data (pode ser limite de requisicoes)' });
+        if (apiSuspensa) return res.status(503).json({ error: 'API indisponivel: ' + apiErrorMsg });
+        return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado na API para esta data' });
       }
       fixtures = raw;
       fixtures._ts = Date.now();
@@ -3642,20 +3644,27 @@ app.get('/buscar-jogos-time', async (req, res) => {
 
     const normS = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
     const nTime = normS(time);
-    // Aceitar termos com 2+ caracteres para nomes curtos (ex: "AC", "FC")
     const termos = nTime.split(' ').filter(t => t.length >= 2);
     if (!termos.length) return res.json({ jogos: [] });
 
+    // Times já presentes na lista do dia — excluir do resultado
+    const timesJaNaLista = new Set(
+      (times_existentes || '').split('|').map(t => normS(t)).filter(Boolean)
+    );
+
     const matches = fixtures
       .filter(f => {
+        // Filtrar pelo termo buscado
         const h = normS(f.teams?.home?.name), a = normS(f.teams?.away?.name);
         return termos.some(t => h.includes(t) || a.includes(t));
       })
       .filter(f => {
-        const h = (f.teams?.home?.name || '').toLowerCase();
-        const a = (f.teams?.away?.name || '').toLowerCase();
-        return !h.match(/u\d{2}|sub-?\d{2}|junior|reserve/) && !a.match(/u\d{2}|sub-?\d{2}|junior|reserve/);
+        // Excluir jogos cujos times já estão na lista do dia
+        if (!timesJaNaLista.size) return true;
+        const h = normS(f.teams?.home?.name), a = normS(f.teams?.away?.name);
+        return !timesJaNaLista.has(h) && !timesJaNaLista.has(a);
       })
+      // SEM filtro de sub-20: adição manual permite qualquer categoria (copinha, etc.)
       .map(f => ({
         fixture_id: f.fixture?.id,
         time_casa: f.teams?.home?.name,
