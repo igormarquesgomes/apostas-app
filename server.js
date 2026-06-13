@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 
 const app = express();
@@ -2450,7 +2450,7 @@ async function agentValidar(data, opcoes = {}) {
       if (golsCasa !== null && golsFora !== null) {
         // Inferir mercado pela aposta antes de buscar stats
         const inferirMercadoPre = (m, a) => {
-          const al = (a||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+          const al = (a||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
           if (al.includes('escanteio') || al.includes('corner') || al.includes('canto')) return 'escanteios';
           if (al.includes('cartao') || al.includes('amarelo') || al.includes('card') || al.includes('yellow')) return 'cartoes';
           return m || '';
@@ -3126,7 +3126,7 @@ async function rotina05h() {
       console.log(`⚠️ ${diaAlvo}: ${semFixtureId.length} jogos sem fixtureId — buscando na API...`);
       // Buscar fixtures do dia para recuperar IDs
       const fixtures = await buscarFixturesPorData(diaAlvo);
-      const norm = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
+      const norm = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim() || '';
       let corrigidos = 0;
       const jogosAtualizados = jogos.map(j => {
         if (j.fixtureId) return j;
@@ -3642,7 +3642,7 @@ app.get('/buscar-jogos-time', async (req, res) => {
       fixturesBuscaCache[data] = fixtures;
     }
 
-    const normS = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const normS = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
     const nTime = normS(time);
     const termos = nTime.split(' ').filter(t => t.length >= 2);
     if (!termos.length) return res.json({ jogos: [] });
@@ -3694,7 +3694,7 @@ app.post('/adicionar-jogo-manual', async (req, res) => {
 
     // 1. Buscar fixture na API
     const fixtures = await buscarFixturesPorData(data);
-        const normM = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+        const normM = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
     const nCasa = normM(time_casa), nFora = normM(time_fora);
 
     let fixture = fixtures.find(f => {
