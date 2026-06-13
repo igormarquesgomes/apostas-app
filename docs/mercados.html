@@ -10,14 +10,16 @@
 body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;}
 
 /* NAV */
-.topnav{background:#FAF7F2;border-bottom:1px solid #E2E8F0;padding:0 28px;display:flex;align-items:center;height:48px;position:sticky;top:0;z-index:50;}
-.brand{font-size:15px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:28px;white-space:nowrap;text-decoration:none;}
-.brand span{color:#0F766E;font-weight:300;}
-.nav-links{display:flex;gap:0;flex:1;overflow-x:auto;scrollbar-width:none;}
-.nav-links::-webkit-scrollbar{display:none;}
-.nl{font-size:12px;color:#94A3B8;padding:0 14px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;}
-.nl:hover{color:#1E293B;}
-.nl.a{color:#0F766E;border-bottom-color:#0F766E;font-weight:600;}
+.nav{position:sticky;top:0;z-index:200;height:52px;background:#FFFFFF;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
+.nav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;}
+.nav-brand-icon{width:30px;height:30px;background:#0F766E;border-radius:7px;display:flex;align-items:center;justify-content:center;}
+.nav-brand-icon svg{width:14px;height:14px;color:#fff;}
+.nav-brand-name{font-size:15px;font-weight:700;color:#1E293B;}
+.nav-brand-name span{color:#0F766E;}
+.nav-links{display:flex;align-items:center;gap:2px;flex:1;}
+.nl{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:#94A3B8;text-decoration:none;transition:all .15s;white-space:nowrap;}
+.nl:hover{background:#F8FAFC;color:#1E293B;}
+.nl.a{background:#F0FDF9;color:#0F766E;font-weight:600;}
 
 /* LAYOUT */
 .page{padding:28px 28px 40px;max-width:1400px;margin:0 auto;}
@@ -89,14 +91,19 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 </head>
 <body>
 
-<nav class="topnav">
-  <a class="brand" href="index.html">Odd<span>Lab</span></a>
+<nav class="nav">
+  <a class="nav-brand" href="index.html">
+    <div class="nav-brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    <span class="nav-brand-name">Odd<span>Lab</span></span>
+  </a>
   <div class="nav-links">
     <a class="nl" href="index.html">Apostas</a>
     <a class="nl" href="dashboard.html">Dashboard</a>
     <a class="nl" href="ligas.html">Ligas</a>
     <a class="nl a" href="mercados.html">Mercados</a>
     <a class="nl" href="relatorios.html">Relatórios</a>
+    <a class="nl" href="experimental.html">Experimental</a>
+    <a class="nl" href="aluno.html">Aluno</a>
   </div>
 </nav>
 

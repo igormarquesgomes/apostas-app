@@ -3,56 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Ligas & Times · Estrela Bet</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>Ligas · OddLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#080a0f;--s1:#0e1118;--s2:#141720;--s3:#1c2030;--border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--text:#e8eaf2;--text2:#7a7f9a;--text3:#3a3f58;--green:#00e676;--red:#ff1744;--amber:#ffab00;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--display:'Bebas Neue',sans-serif;}
+:root{
+  --bg:#F0EDEA;--s1:#FFFFFF;--s2:#F8FAFC;--s3:#F1F5F9;
+  --border:#E2E8F0;--border2:#CBD5E1;
+  --text:#1E293B;--text2:#475569;--text3:#94A3B8;
+  --green:#0F766E;--red:#DC2626;--amber:#D97706;
+  --nav-h:52px;
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding-bottom:70px;}
-.nav-top{display:flex;align-items:center;justify-content:space-between;padding:0 1rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
-.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
-.nav-logo-icon{width:28px;height:28px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;}
-.nav-logo-icon svg{width:13px;height:13px;color:#000;}
-.nav-logo-name{font-size:14px;font-weight:600;color:var(--text);}
-.nav-logo-name span{color:var(--green);}
-.nav-badge{font-size:10px;font-family:var(--mono);background:rgba(0,230,118,.08);color:var(--green);border:1px solid rgba(0,230,118,.2);padding:4px 10px;border-radius:20px;}
-.nav-bottom{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--s1);border-top:1px solid var(--border);display:flex;}
-.nav-bottom a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;text-decoration:none;color:var(--text3);font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;gap:4px;transition:color .15s;border-top:2px solid transparent;}
-.nav-bottom a svg{width:18px;height:18px;}
-.nav-bottom a.active{color:var(--green);border-top-color:var(--green);}
-.page{padding:1rem;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;}
+.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1.5rem;}
+.nav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;}
+.nav-brand-icon{width:30px;height:30px;background:var(--green);border-radius:7px;display:flex;align-items:center;justify-content:center;}
+.nav-brand-icon svg{width:14px;height:14px;color:#fff;}
+.nav-brand-name{font-size:15px;font-weight:700;color:var(--text);}
+.nav-brand-name span{color:var(--green);}
+.nav-links{display:flex;align-items:center;gap:2px;flex:1;}
+.nav-link{padding:6px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .15s;white-space:nowrap;}
+.nav-link:hover{background:var(--s2);color:var(--text);}
+.nav-link.active{background:#F0FDF9;color:var(--green);}
+.page{padding:1.25rem;max-width:900px;}
 
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;}
-.page-title{font-family:var(--display);font-size:32px;letter-spacing:1px;}
+.page-title{font-size:22px;font-weight:700;color:var(--text);}
 .toggle-wrap{display:flex;gap:3px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;padding:3px;}
-.tog-btn{font-family:var(--mono);font-size:10px;padding:6px 14px;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;}
-.tog-btn.active{background:rgba(0,230,118,.1);color:var(--green);}
+.tog-btn{font-size:12px;font-weight:500;padding:6px 14px;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;}
+.tog-btn.active{background:#F0FDF9;color:var(--green);}
 
 .row{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
-.row-rank{font-family:var(--display);font-size:20px;color:var(--text3);width:26px;flex-shrink:0;}
+.row-rank{font-size:18px;font-weight:700;color:var(--text3);width:26px;flex-shrink:0;}
 .row-info{flex:1;min-width:0;}
 .row-nome{font-size:13px;font-weight:500;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .row-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-bottom:4px;}
 .row-bar-fill{height:100%;border-radius:2px;}
 .row-stats{display:flex;gap:10px;}
-.row-stat{font-family:var(--mono);font-size:10px;color:var(--text2);}
-.row-stat strong{font-size:12px;}
-.row-pct{font-family:var(--display);font-size:26px;flex-shrink:0;width:56px;text-align:right;}
+.row-stat{font-size:12px;color:var(--text2);}
+.row-stat strong{font-size:13px;}
+.row-pct{font-size:24px;font-weight:700;flex-shrink:0;width:56px;text-align:right;}
 
-.empty{text-align:center;padding:3rem;color:var(--text3);font-family:var(--mono);font-size:11px;}
+.empty{text-align:center;padding:3rem;color:var(--text3);font-size:12px;}
 .loading{text-align:center;padding:3rem;}
-.spin{width:24px;height:24px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
+.spin{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
-<div class="nav-top">
-  <a class="nav-logo" href="index.html">
-    <div class="nav-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-    <span class="nav-logo-name">Análise de <span>Apostas</span></span>
+<nav class="nav">
+  <a class="nav-brand" href="index.html">
+    <div class="nav-brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    <span class="nav-brand-name">Odd<span>Lab</span></span>
   </a>
-  <span class="nav-badge">Estrela Bet</span>
-</div>
+  <div class="nav-links">
+    <a class="nav-link" href="index.html">Apostas</a>
+    <a class="nav-link" href="dashboard.html">Dashboard</a>
+    <a class="nav-link active" href="ligas.html">Ligas</a>
+    <a class="nav-link" href="mercados.html">Mercados</a>
+    <a class="nav-link" href="relatorios.html">Relatórios</a>
+    <a class="nav-link" href="experimental.html">Experimental</a>
+    <a class="nav-link" href="aluno.html">Aluno</a>
+  </div>
+</nav>
 
 <div class="page">
   <div class="page-header">
@@ -66,12 +79,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
   <div id="vt" style="display:none"></div>
 </div>
 
-<nav class="nav-bottom">
-  <a href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Apostas</a>
-  <a href="dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>Dashboard</a>
-  <a href="relatorios.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Relatórios</a>
-  <a href="ligas.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>Ligas</a>
-</nav>
 
 <script>
 const B='https://apostas-app.onrender.com';
