@@ -1471,9 +1471,9 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       const ptS = montarPrompt(montarListaJogos(sublote, offsetAtual), blocoMem, df);
       const txS = await chamarIA(ptS, 6000);
       const jogosS = parseJogos(txS);
-      if (jogosS === null) {
-        // Parse falhou — tentar jogo a jogo com prompt completo
-        console.log(`  ⚠️ Sublote ${si+1} falhou — tentando jogo a jogo...`);
+      if (jogosS === null || jogosS.length === 0) {
+        // Parse falhou OU retornou array vazio — tentar jogo a jogo com prompt completo
+        console.log(`  ⚠️ Sublote ${si+1} falhou (${jogosS === null ? 'parse nulo' : 'array vazio'}) — tentando jogo a jogo...`);
         for (const [ji, jogoUnico] of sublote.entries()) {
           await sleep(5000);
           const ptU = montarPrompt(montarListaJogos([jogoUnico], offsetAtual + ji), blocoMem, df);
@@ -1486,7 +1486,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
             console.log(`  🗑️  Jogo ${offsetAtual + ji + 1} descartado: ${jogoUnico.timeCasa} x ${jogoUnico.timeFora} — resposta inválida/incompleta`);
           }
         }
-      } else if (jogosS.length > 0) {
+      } else {
         const jogosValidos = jogosS.map(normalizarFormatoAlternativo).filter(validarCamposEssenciais);
         const invalidos = jogosS.length - jogosValidos.length;
         if (invalidos > 0) console.log(`  🗑️  ${invalidos} jogo(s) descartado(s) do sublote ${si+1} — campos essenciais ausentes`);
