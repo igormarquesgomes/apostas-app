@@ -1050,10 +1050,11 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         priFinal = ligaMatch.pri; // 7=eliminatórias, 8=amistosos
       }
 
-      if (!jogosMap.has(key))
+      if (!jogosMap.has(key)) {
         // Salvar liga no banco automaticamente
         dbSaveLiga(ligaMatch.nome, ligaId, pais).catch(()=>{});
         jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+      }
     } else {
       // Complementares — definir tipo CORRETO e prioridade pelo país
       // Para ligas "World", tentar inferir pelo nome da liga ou aceitar como amistoso
@@ -1069,8 +1070,9 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         const isAmistososMasc = ligaLowerW.includes('friendly') || ligaLowerW.includes('international') || ligaLowerW.includes('amistoso');
         // Amistosos masculinos de seleção: pri 85 (depois das africanas/oriente médio pri 80, antes do resto pri 200)
         const priWorld = isAmistososMasc ? 85 : 150;
-        if (!jogosComp.has(key))
+        if (!jogosComp.has(key)) {
           jogosComp.set(key, { liga: `${ligaNome}`, tipo: 'copa', pri: priWorld, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+        }
         continue;
       }
 
@@ -1095,10 +1097,11 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         priComp = 200;
       }
 
-      if (!jogosComp.has(key))
+      if (!jogosComp.has(key)) {
         // Salvar liga complementar no banco automaticamente
         dbSaveLiga(`${ligaNome} (${pais})`, ligaId, pais).catch(()=>{});
         jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId: ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id });
+      }
     }
   }
 
@@ -1210,7 +1213,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     });
     const filtrados = antes - jogosNovos.length;
     if (filtrados > 0) console.log(`🚫 ${filtrados} jogos filtrados (duplicatas)`);
-    jogos = jogosNovos.slice(0, metaJogos);
+    jogos = jogosNovos; // não limitar aqui — MARGEM_RESERVA é aplicada abaixo
     if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis`);
   }
 
@@ -2447,7 +2450,7 @@ async function agentValidar(data, opcoes = {}) {
       if (golsCasa !== null && golsFora !== null) {
         // Inferir mercado pela aposta antes de buscar stats
         const inferirMercadoPre = (m, a) => {
-          const al = (a||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+          const al = (a||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
           if (al.includes('escanteio') || al.includes('corner') || al.includes('canto')) return 'escanteios';
           if (al.includes('cartao') || al.includes('amarelo') || al.includes('card') || al.includes('yellow')) return 'cartoes';
           return m || '';
@@ -3123,7 +3126,7 @@ async function rotina05h() {
       console.log(`⚠️ ${diaAlvo}: ${semFixtureId.length} jogos sem fixtureId — buscando na API...`);
       // Buscar fixtures do dia para recuperar IDs
       const fixtures = await buscarFixturesPorData(diaAlvo);
-      const norm = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim() || '';
+      const norm = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim() || '';
       let corrigidos = 0;
       const jogosAtualizados = jogos.map(j => {
         if (j.fixtureId) return j;
@@ -3576,6 +3579,269 @@ app.post('/corrigir-resultado', async (req, res) => {
 
   await dbSaveResultados(data, { ...row.resultados, apostas });
   res.json({ ok: true, mensagem: `Corrigido: ${novoPlacar} → ${novoResultado}`, resultado: novoResultado, placar: novoPlacar });
+});
+
+app.post('/anular-jogo', async (req, res) => {
+  const { data, jogo_id } = req.body;
+  if (!data || !jogo_id) return res.status(400).json({ error: 'data e jogo_id obrigatórios' });
+  try {
+    const row = await dbGet(data);
+    if (!row?.apostas?.jogos) return res.status(404).json({ error: 'Sem apostas para essa data' });
+
+    const jogo = row.apostas.jogos.find(j => j.id === jogo_id);
+    if (!jogo) return res.status(404).json({ error: 'Jogo não encontrado' });
+
+    const resultadosExistentes = row.resultados?.apostas || [];
+    const resExistente = resultadosExistentes.find(r => r.jogo_id === jogo_id);
+
+    let novosResultados;
+    if (resExistente) {
+      novosResultados = resultadosExistentes.map(r =>
+        r.jogo_id === jogo_id
+          ? { ...r, resultado_aposta: 'cancelado', anulado_manualmente: true }
+          : r
+      );
+    } else {
+      novosResultados = [...resultadosExistentes, {
+        jogo_id,
+        time_casa: jogo.time_casa,
+        time_fora: jogo.time_fora,
+        resultado_aposta: 'cancelado',
+        anulado_manualmente: true,
+        placar: null,
+      }];
+    }
+
+    await dbSaveResultados(data, { ...(row.resultados || {}), apostas: novosResultados });
+    console.log(`↩️ Jogo anulado: ${jogo.time_casa} x ${jogo.time_fora} (${data})`);
+    res.json({ ok: true, mensagem: `Jogo anulado: ${jogo.time_casa} x ${jogo.time_fora}` });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Cache de fixtures por data — evita chamar API-Football a cada keystroke do modal
+const fixturesBuscaCache = {};
+
+// Busca jogos disponíveis de um time em uma data — usado pelo modal de add manual
+// sem filtro de sub-20 (adição manual é escolha deliberada do usuário)
+// sem filtro de horário (qualquer horário da data é válido)
+app.get('/buscar-jogos-time', async (req, res) => {
+  // times_existentes: lista separada por | de times já na lista do dia (evita duplicatas)
+  const { time, data, times_existentes } = req.query;
+  if (!time || !data) return res.status(400).json({ error: 'time e data obrigatorios' });
+  try {
+    // Cache por 30 min para não consumir quota da API-Football a cada keystroke
+    let fixtures = fixturesBuscaCache[data];
+    if (!fixtures || (Date.now() - (fixtures._ts || 0)) > 30 * 60 * 1000) {
+      const raw = await buscarFixturesPorData(data);
+      if (!raw || raw.length === 0) {
+        if (apiSuspensa) return res.status(503).json({ error: 'API indisponivel: ' + apiErrorMsg });
+        return res.json({ jogos: [], aviso: 'Nenhum jogo encontrado na API para esta data' });
+      }
+      fixtures = raw;
+      fixtures._ts = Date.now();
+      fixturesBuscaCache[data] = fixtures;
+    }
+
+    const normS = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nTime = normS(time);
+    const termos = nTime.split(' ').filter(t => t.length >= 2);
+    if (!termos.length) return res.json({ jogos: [] });
+
+    // Times já presentes na lista do dia — excluir do resultado
+    const timesJaNaLista = new Set(
+      (times_existentes || '').split('|').map(t => normS(t)).filter(Boolean)
+    );
+
+    const matches = fixtures
+      .filter(f => {
+        // Filtrar pelo termo buscado
+        const h = normS(f.teams?.home?.name), a = normS(f.teams?.away?.name);
+        return termos.some(t => h.includes(t) || a.includes(t));
+      })
+      .filter(f => {
+        // Excluir jogos cujos times já estão na lista do dia
+        if (!timesJaNaLista.size) return true;
+        const h = normS(f.teams?.home?.name), a = normS(f.teams?.away?.name);
+        return !timesJaNaLista.has(h) && !timesJaNaLista.has(a);
+      })
+      // SEM filtro de sub-20: adição manual permite qualquer categoria (copinha, etc.)
+      .map(f => ({
+        fixture_id: f.fixture?.id,
+        time_casa: f.teams?.home?.name,
+        time_fora: f.teams?.away?.name,
+        liga: f.league?.name,
+        liga_id: f.league?.id,
+        pais: f.league?.country,
+        horario: new Date(f.fixture?.timestamp * 1000).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }),
+        status: f.fixture?.status?.short,
+      }))
+      .slice(0, 15);
+
+    res.json({ jogos: matches });
+  } catch(errBusca) {
+    console.error('Erro /buscar-jogos-time:', errBusca.message);
+    res.status(500).json({ error: errBusca.message });
+  }
+});
+
+// ─── Item 7: Adicionar / Confirmar jogo manual ───────────────
+// Analisa um jogo avulso com IA e retorna o resultado SEM salvar
+app.post('/adicionar-jogo-manual', async (req, res) => {
+  const { time_casa, time_fora, data, liga_id } = req.body;
+  if (!time_casa || !time_fora || !data) return res.status(400).json({ error: 'time_casa, time_fora e data obrigatorios' });
+  try {
+    console.log('\n🔧 Analise manual: ' + time_casa + ' x ' + time_fora + ' (' + data + ')');
+
+    // 1. Buscar fixture na API
+    const fixtures = await buscarFixturesPorData(data);
+        const normM = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nCasa = normM(time_casa), nFora = normM(time_fora);
+
+    let fixture = fixtures.find(f => {
+      const h = normM(f.teams?.home?.name || ''), a = normM(f.teams?.away?.name || '');
+      const casaMatch = h.includes(nCasa.split(' ')[0]) || nCasa.includes(h.split(' ')[0] || '\x00');
+      const foraMatch = a.includes(nFora.split(' ')[0]) || nFora.includes(a.split(' ')[0] || '\x00');
+      return casaMatch && foraMatch;
+    });
+    // Preferir fixture com liga_id se fornecido
+    if (liga_id) {
+      const f2 = fixtures.find(f => String(f.league?.id) === String(liga_id) && normM(f.teams?.home?.name || '').includes(nCasa.split(' ')[0]));
+      if (f2) fixture = f2;
+    }
+
+    const ligaNome = fixture?.league?.name || 'Internacional';
+    const ligaIdResolvido = fixture?.league?.id || (liga_id ? Number(liga_id) : null);
+    const tCasaId = fixture?.teams?.home?.id;
+    const tForaId = fixture?.teams?.away?.id;
+    const horario = fixture
+      ? new Date(fixture.fixture?.timestamp * 1000).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
+      : '00:00';
+
+    // 2. Coletar estatísticas
+    let statsCasa = null, statsFora = null;
+    if (tCasaId && tForaId) {
+      [statsCasa, statsFora] = await Promise.all([
+        coletarEstatisticas(tCasaId, time_casa, ligaIdResolvido, tForaId),
+        coletarEstatisticas(tForaId, time_fora, ligaIdResolvido, tCasaId)
+      ]);
+      console.log('  Stats coletadas');
+    } else {
+      console.log('  Fixture nao encontrado — analisando sem stats');
+    }
+
+    // 3. Buscar assertividade da liga no Supabase
+    let ligaPerf = '';
+    if (ligaIdResolvido) {
+      try {
+        const resL = await fetch(
+          SUPABASE_URL + '/rest/v1/ligas_conhecidas?liga_id=eq.' + ligaIdResolvido + '&select=green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes',
+          { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } }
+        );
+        const rowsL = await resL.json();
+        const st = Array.isArray(rowsL) ? rowsL[0] : null;
+        if (st && st.mercados) {
+          const mercPerf = Object.entries(st.mercados)
+            .filter(([, m]) => (m.green + m.red) >= 2)
+            .map(([merc, m]) => merc + ':' + Math.round(m.green / (m.green + m.red) * 100) + '%')
+            .join(' ');
+          if (mercPerf) ligaPerf += '\n   LigaPerf: ' + mercPerf;
+        }
+        if (st && (st.media_escanteios || st.media_cartoes)) {
+          const partes = [];
+          if (st.media_escanteios) partes.push('escanteios media real ' + Number(st.media_escanteios).toFixed(1) + ' (' + (st.amostras_escanteios || 0) + ' jogos)');
+          if (st.media_cartoes) partes.push('cartoes media real ' + Number(st.media_cartoes).toFixed(1) + ' (' + (st.amostras_cartoes || 0) + ' jogos)');
+          ligaPerf += '\n   LigaMedia: ' + partes.join(' | ');
+        }
+      } catch(ligaErr) { /* continua sem stats de liga */ }
+    }
+
+    // 4. Montar contexto
+    const sc = statsCasa, sf = statsFora;
+    const listaJogo = '1. ' + ligaNome + ' | ' + time_casa + ' x ' + time_fora + ' | ' + horario + '\n' +
+      '   Casa: forma=' + (sc?.forma || '?') + ' gols/jogo=' + (sc?.mediaGols || '?') + ' esc=' + (sc?.mediaEscanteios || '?') + ' cart=' + (sc?.mediaCartoes || '?') + '\n' +
+      '   Fora: forma=' + (sf?.forma || '?') + ' gols/jogo=' + (sf?.mediaGols || '?') + ' esc=' + (sf?.mediaEscanteios || '?') + ' cart=' + (sf?.mediaCartoes || '?') + '\n' +
+      '   H2H: ' + (sc?.h2hTexto || 'sem dados') + ligaPerf;
+
+    // 5. Memória de calibração
+    const memoria = await buscarMemoria();
+    const parts = data.split('-');
+    const df = parts[2] + '/' + parts[1] + '/' + parts[0];
+    const blocoHistorico = memoria ? 'HISTORICO DE CALIBRACAO:\n' + memoria + '\n' : '';
+
+    // 6. Prompt + IA (Sonnet + web_search)
+    const promptIA = 'Voce e um analista de apostas esportivas experiente. Analise o jogo abaixo e escolha a melhor aposta.\n\n' +
+      'DATA: ' + df + '\n' +
+      blocoHistorico +
+      'JOGO COM ESTATISTICAS REAIS:\n' + listaJogo + '\n\n' +
+      'PROCESSO OBRIGATORIO:\n' +
+      'PASSO 1 - Verifique o historico de calibracao para esse tipo de liga.\n' +
+      'PASSO 2 - Avalie CADA mercado: gols, resultado, escanteios, cartoes.\n' +
+      'PASSO 3 - Use web_search para lesoes, escalacoes e contexto atual do jogo.\n' +
+      'PASSO 4 - Escolha o mercado com MAIOR confianca. Nunca retorne confianca baixa como principal.\n\n' +
+      'CAMPO justificativa: texto para o PUBLICO. Sem termos internos. 2-3 frases em portugues natural sobre fatores esportivos.\n\n' +
+      'Retorne SOMENTE JSON valido com exatamente 1 jogo:\n' +
+      '{"jogos":[{"id":1,"liga":"' + ligaNome + '","tipo_liga":"eu","time_casa":"' + time_casa + '","time_fora":"' + time_fora + '","horario":"' + horario + '","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","razao_escolha":"media combinada alta","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Analise do jogo.","alternativas":[{"mercado":"gols","aposta":"Over 2.5","confianca":"alta","razao":"media alta"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"forma recente"},{"mercado":"escanteios","aposta":"Over 8.5","confianca":"media","razao":"media 9.2"},{"mercado":"cartoes","aposta":"Over 3.5","confianca":"baixa","razao":"media baixa"}]}]}';
+
+    const txt = await chamarIAComBusca(promptIA, 4000);
+    if (!txt) return res.status(502).json({ error: 'IA nao respondeu' });
+
+    // 7. Parsear
+    const idxS = txt.indexOf('{'), idxE = txt.lastIndexOf('}');
+    if (idxS === -1) return res.status(502).json({ error: 'IA retornou formato invalido', raw: txt.substring(0, 200) });
+    const parsed = JSON.parse(txt.slice(idxS, idxE + 1));
+    const jogosIA = (parsed.jogos || []).filter(j => j && j.aposta && j.mercado);
+    if (!jogosIA.length) return res.status(502).json({ error: 'IA nao retornou apostas validas', raw: txt.substring(0, 300) });
+
+    const jogoFinal = Object.assign({}, jogosIA[0], {
+      liga: ligaNome,
+      time_casa: time_casa,
+      time_fora: time_fora,
+      horario: horario,
+      fixtureId: fixture?.fixture?.id || null,
+      ligaId: ligaIdResolvido,
+      teamCasaId: tCasaId || null,
+      teamForaId: tForaId || null,
+      tipo_liga: jogosIA[0].tipo_liga || 'eu',
+      adicionado_manualmente: true,
+    });
+
+    console.log('  Analise manual OK: ' + jogoFinal.aposta + ' [' + jogoFinal.confianca + ']');
+    res.json({ ok: true, jogo: jogoFinal });
+  } catch(errManual) {
+    console.error('Erro /adicionar-jogo-manual:', errManual.message);
+    res.status(500).json({ error: errManual.message });
+  }
+});
+
+// Confirmar jogo manual — adiciona ao apostas_dia e reordena IDs
+app.post('/confirmar-jogo-manual', async (req, res) => {
+  const { data, jogo } = req.body;
+  if (!data || !jogo) return res.status(400).json({ error: 'data e jogo obrigatórios' });
+  try {
+    const row = await dbGet(data);
+    const jogosExistentes = row?.apostas?.jogos || [];
+
+    // Reatribuir IDs sequencialmente
+    const novosJogos = [...jogosExistentes, { ...jogo, id: jogosExistentes.length + 1, adicionado_manualmente: true }];
+    novosJogos.forEach((j, idx) => { j.id = idx + 1; });
+
+    await dbSave(data, { ...(row?.apostas || {}), jogos: novosJogos });
+
+    // Regenerar múltiplas em background
+    setTimeout(async () => {
+      try {
+        const rowAtual = await dbGet(data);
+        const multiplas = await gerarMultiplas(data, rowAtual?.apostas?.jogos || []);
+        if (multiplas) await dbSaveMultiplas(data, multiplas);
+      } catch(e) { console.error('❌ Múltiplas após add manual:', e.message); }
+    }, 5000);
+
+    console.log(`✅ Jogo manual confirmado: ${jogo.time_casa} x ${jogo.time_fora} — total agora: ${novosJogos.length}`);
+    res.json({ ok: true, total: novosJogos.length, jogos: novosJogos });
+  } catch(e) {
+    console.error('❌ /confirmar-jogo-manual:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/calibracao', async (req, res) => {
