@@ -970,18 +970,11 @@ async function buscarJogosTime(q, _retry){
     let j;
     try { j = await r.json(); }
     catch(parseErr) {
-      // Servidor dormindo (Render free tier faz cold-start em ~50s) — retentar automaticamente
-      if(!_retry){
-        let secs = 45;
-        const tick = () => {
-          dd.innerHTML = `<div class="jogo-drop-empty">Servidor acordando... tentando novamente em ${secs}s</div>`;
-          if(secs > 0){ secs--; countdown = setTimeout(tick, 1000); }
-          else buscarJogosTime(q, true);
-        };
-        tick();
-      } else {
-        dd.innerHTML = `<div class="jogo-drop-empty">Servidor demorando para responder — tente novamente em instantes</div>`;
-      }
+      // Resposta não é JSON — mostrar o texto real para diagnóstico
+      let rawText = '';
+      try { rawText = await r.text(); } catch(_){}
+      const preview = rawText.replace(/<[^>]+>/g,'').trim().substring(0, 120);
+      dd.innerHTML = `<div class="jogo-drop-empty">Resposta inesperada do servidor (HTTP ${r.status}): ${preview || parseErr.message}</div>`;
       return;
     }
     if(countdown) clearTimeout(countdown);
