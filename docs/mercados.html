@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mercados · OddLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;}
+
+/* NAV */
+.topnav{background:#FAF7F2;border-bottom:1px solid #E2E8F0;padding:0 28px;display:flex;align-items:center;height:48px;position:sticky;top:0;z-index:50;}
+.brand{font-size:15px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:28px;white-space:nowrap;text-decoration:none;}
+.brand span{color:#0F766E;font-weight:300;}
+.nav-links{display:flex;gap:0;flex:1;overflow-x:auto;scrollbar-width:none;}
+.nav-links::-webkit-scrollbar{display:none;}
+.nl{font-size:12px;color:#94A3B8;padding:0 14px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;}
+.nl:hover{color:#1E293B;}
+.nl.a{color:#0F766E;border-bottom-color:#0F766E;font-weight:600;}
+
+/* LAYOUT */
+.page{padding:28px 28px 40px;max-width:1400px;margin:0 auto;}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;}
+.page-title{font-size:22px;font-weight:800;color:#1E293B;letter-spacing:-0.5px;}
+.page-sub{font-size:13px;color:#94A3B8;margin-top:3px;font-weight:300;}
+
+/* PANELS */
+.panel{background:#fff;border-radius:12px;border:1px solid #E2E8F0;overflow:hidden;}
+.panel-head{padding:13px 18px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;}
+.panel-title{font-size:10px;font-weight:700;color:#1E293B;text-transform:uppercase;letter-spacing:.6px;}
+.panel-sub{font-size:11px;color:#94A3B8;}
+
+/* MERCADO CARDS */
+.mkt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+.mkt-card{background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:16px 18px;border-top-width:3px;}
+.mkt-card.verde{border-top-color:#0F766E;}
+.mkt-card.amber{border-top-color:#F59E0B;}
+.mkt-card.red{border-top-color:#E11D48;}
+.mkt-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.mkt-name{font-size:13px;font-weight:700;color:#1E293B;}
+.mkt-gr{font-size:10px;color:#94A3B8;margin-top:3px;}
+.mkt-pct{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;}
+.bar-bg{height:5px;background:#E2E8F0;border-radius:4px;overflow:hidden;margin-bottom:8px;}
+.bar-fill{height:5px;border-radius:4px;}
+.mkt-insight{font-size:10px;color:#64748B;line-height:1.5;padding-top:8px;border-top:1px solid #F1F5F9;font-style:italic;}
+
+/* LIGAS TABLE */
+.liga-row{display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 110px;gap:12px;align-items:center;padding:11px 18px;border-bottom:1px solid #F1F5F9;cursor:pointer;}
+.liga-row:last-child{border-bottom:none;}
+.liga-row:hover{background:#FAFAF8;}
+.liga-row.open{background:#F8FFFE;}
+.liga-thead{display:grid;grid-template-columns:36px 1fr 90px 90px 90px 90px 110px;gap:12px;padding:7px 18px 8px;border-bottom:2px solid #E2E8F0;}
+.th{font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.7px;}
+.liga-rank{font-size:13px;font-weight:800;color:#CBD5E1;}
+.liga-nome{font-size:13px;font-weight:700;color:#1E293B;}
+.liga-pais{font-size:10px;color:#94A3B8;margin-top:1px;}
+.liga-total{font-size:11px;color:#94A3B8;}
+.pct-val{font-size:14px;font-weight:800;}
+.pct-val.g{color:#0F766E;} .pct-val.a{color:#F59E0B;} .pct-val.r{color:#E11D48;} .pct-val.nd{color:#CBD5E1;}
+.tag{font-size:10px;padding:3px 9px;border-radius:5px;font-weight:700;white-space:nowrap;}
+.tg{color:#0F766E;background:#CCFBF1;} .tw{color:#B45309;background:#FEF3C7;} .tr{color:#BE123C;background:#FFE4E6;} .tp{color:#94A3B8;background:#F1F5F9;}
+.chevron{color:#CBD5E1;font-size:11px;transition:transform .15s;}
+.chevron.open{transform:rotate(90deg);color:#0F766E;}
+
+/* EXPAND */
+.expand-row{display:none;background:#F8FFFE;border-bottom:1px solid #E2E8F0;}
+.expand-row.open{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.exp-mkt{padding:14px 18px 16px 60px;border-right:1px solid #E2E8F0;}
+.exp-avgs{padding:14px 18px 16px 18px;}
+.exp-label{font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+.mkt-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.mmg{background:#fff;border-radius:8px;padding:9px 11px;border:1px solid #E2E8F0;}
+.mmg-name{font-size:9px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.mmg-pct{font-size:16px;font-weight:800;}
+.mmg-gr{font-size:10px;color:#94A3B8;margin-top:2px;}
+.avg-pills{display:flex;flex-direction:column;gap:8px;}
+.avg-pill{background:#F0FDFA;border:1px solid #99F6E4;border-radius:8px;padding:10px 13px;}
+.avg-pill-val{font-size:18px;font-weight:800;color:#0F766E;letter-spacing:-0.5px;}
+.avg-pill-lbl{font-size:10px;color:#64748B;margin-top:2px;}
+.avg-pill-am{font-size:9px;color:#94A3B8;margin-top:1px;}
+.avg-pill.nd{background:#F8FAFC;border-color:#E2E8F0;}
+.avg-pill.nd .avg-pill-val{color:#CBD5E1;}
+
+/* LOADING / EMPTY */
+.loading{text-align:center;padding:48px 20px;color:#CBD5E1;font-size:13px;}
+.empty{text-align:center;padding:48px 20px;color:#94A3B8;font-size:13px;}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="index.html">Odd<span>Lab</span></a>
+  <div class="nav-links">
+    <a class="nl" href="index.html">Apostas</a>
+    <a class="nl" href="dashboard.html">Dashboard</a>
+    <a class="nl" href="ligas.html">Ligas</a>
+    <a class="nl a" href="mercados.html">Mercados</a>
+    <a class="nl" href="relatorios.html">Relatórios</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-head">
+    <div>
+      <div class="page-title">Mercados</div>
+      <div class="page-sub">Assertividade agregada por mercado e por liga · só apostas principais</div>
+    </div>
+  </div>
+
+  <!-- 4 cards de mercado -->
+  <div class="mkt-grid" id="mkt-cards">
+    <div class="loading">carregando...</div>
+  </div>
+
+  <!-- tabela de ligas -->
+  <div class="panel" id="ligas-panel" style="display:none">
+    <div class="panel-head">
+      <span class="panel-title">Ligas por assertividade</span>
+      <span class="panel-sub" id="ligas-sub">mín. 3 jogos · clique para ver detalhes por mercado</span>
+    </div>
+    <div class="liga-thead">
+      <span class="th">#</span>
+      <span class="th">Liga</span>
+      <span class="th">Total</span>
+      <span class="th">Geral</span>
+      <span class="th">Gols</span>
+      <span class="th">Esc.</span>
+      <span class="th">Assert.</span>
+    </div>
+    <div id="ligas-body"></div>
+  </div>
+</div>
+
+<script>
+const B = 'https://apostas-app.onrender.com';
+
+function pct(g, r) {
+  if (!g && !r) return null;
+  return Math.round(g / (g + r) * 100);
+}
+
+function pctColor(p) {
+  if (p === null) return 'nd';
+  if (p >= 70) return 'g';
+  if (p >= 55) return 'a';
+  return 'r';
+}
+
+function tagClass(p) {
+  if (p === null) return 'tp';
+  if (p >= 70) return 'tg';
+  if (p >= 55) return 'tw';
+  return 'tr';
+}
+
+function mktPct(mercados, chave) {
+  const m = mercados?.[chave];
+  if (!m) return null;
+  return pct(m.green || 0, m.red || 0);
+}
+
+async function carregar() {
+  try {
+    const rows = await fetch(`${B}/ligas-conhecidas`).then(r => r.json());
+    if (!Array.isArray(rows) || !rows.length) {
+      document.getElementById('mkt-cards').innerHTML = '<div class="empty">Sem dados disponíveis.</div>';
+      return;
+    }
+
+    // Agregar mercados de todas as ligas
+    const agg = { gols: {g:0,r:0}, resultado: {g:0,r:0}, escanteios: {g:0,r:0}, cartoes: {g:0,r:0} };
+    for (const liga of rows) {
+      for (const [k, v] of Object.entries(agg)) {
+        const m = liga.mercados?.[k];
+        if (m) { v.g += m.green || 0; v.r += m.red || 0; }
+      }
+    }
+
+    const mercados = [
+      { key:'escanteios', nome:'Escanteios', ...agg.escanteios },
+      { key:'gols',       nome:'Gols',       ...agg.gols },
+      { key:'resultado',  nome:'Resultado',  ...agg.resultado },
+      { key:'cartoes',    nome:'Cartões',    ...agg.cartoes },
+    ].map(m => ({ ...m, p: pct(m.g, m.r) }))
+     .sort((a, b) => (b.p ?? -1) - (a.p ?? -1));
+
+    const insights = {
+      escanteios: 'Mais previsível — depende menos do resultado do jogo.',
+      gols: 'Maior volume de apostas — consistente acima de 65%.',
+      resultado: 'Alta variância — priorizar só com diferença clara entre times.',
+      cartoes: 'Usar como aposta principal apenas em rivalidades intensas.',
+    };
+
+    const borderColor = p => p >= 70 ? 'verde' : p >= 55 ? 'amber' : 'red';
+    const barColor    = p => p >= 70 ? '#0F766E' : p >= 55 ? '#F59E0B' : '#E11D48';
+    const pctStyle    = p => p >= 70 ? 'color:#0F766E' : p >= 55 ? 'color:#F59E0B' : 'color:#E11D48';
+
+    document.getElementById('mkt-cards').innerHTML = mercados.map(m => `
+      <div class="mkt-card ${borderColor(m.p ?? 0)}">
+        <div class="mkt-top">
+          <div>
+            <div class="mkt-name">${m.nome}</div>
+            <div class="mkt-gr">${m.g}G · ${m.r}R · ${m.g + m.r} jogos</div>
+          </div>
+          <div class="mkt-pct" style="${pctStyle(m.p ?? 0)}">${m.p !== null ? m.p + '%' : '--'}</div>
+        </div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${m.p ?? 0}%;background:${barColor(m.p ?? 0)}"></div></div>
+        <div class="mkt-insight">${insights[m.key] || ''}</div>
+      </div>
+    `).join('');
+
+    // Filtrar ligas com mínimo 3 jogos e ordenar por assertividade
+    const ligasFiltradas = rows
+      .filter(l => (l.total || 0) >= 3)
+      .map(l => ({ ...l, p: pct(l.green || 0, l.red || 0) }))
+      .sort((a, b) => (b.p ?? -1) - (a.p ?? -1));
+
+    document.getElementById('ligas-sub').textContent =
+      `${ligasFiltradas.length} ligas com mín. 3 jogos · clique para ver detalhes por mercado`;
+
+    document.getElementById('ligas-body').innerHTML = ligasFiltradas.map((l, i) => {
+      const pg = mktPct(l.mercados, 'gols');
+      const pe = mktPct(l.mercados, 'escanteios');
+      const id = `lig-${l.liga_id}`;
+      return `
+        <div class="liga-row" id="row-${id}" onclick="toggleLiga('${id}')">
+          <span class="liga-rank">${i + 1}</span>
+          <div>
+            <div class="liga-nome">${l.nome || 'Liga ' + l.liga_id}</div>
+            <div class="liga-pais">${l.pais || ''} · ${l.total || 0} jogos</div>
+          </div>
+          <span class="liga-total">${l.green || 0}G · ${l.red || 0}R</span>
+          <span class="pct-val ${pctColor(l.p)}">${l.p !== null ? l.p + '%' : '--'}</span>
+          <span class="pct-val ${pctColor(pg)}">${pg !== null ? pg + '%' : '--'}</span>
+          <span class="pct-val ${pctColor(pe)}">${pe !== null ? pe + '%' : '--'}</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span class="tag ${tagClass(l.p)}">${l.p !== null ? l.p + '%' : 'sem dados'}</span>
+            <span class="chevron" id="ch-${id}">▶</span>
+          </div>
+        </div>
+        <div class="expand-row" id="${id}">
+          <div class="exp-mkt">
+            <div class="exp-label">Assertividade por mercado</div>
+            <div class="mkt-mini-grid">
+              ${['gols','escanteios','resultado','cartoes'].map(k => {
+                const mp = mktPct(l.mercados, k);
+                const mv = l.mercados?.[k];
+                return `<div class="mmg">
+                  <div class="mmg-name">${k}</div>
+                  <div class="mmg-pct ${pctColor(mp)}">${mp !== null ? mp + '%' : '--'}</div>
+                  <div class="mmg-gr">${mv ? (mv.green||0)+'G · '+(mv.red||0)+'R' : 'sem dados'}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+          <div class="exp-avgs">
+            <div class="exp-label">Médias reais observadas</div>
+            <div class="avg-pills">
+              <div class="avg-pill${l.media_escanteios ? '' : ' nd'}">
+                <div class="avg-pill-val">${l.media_escanteios ? Number(l.media_escanteios).toFixed(1) : '--'}</div>
+                <div class="avg-pill-lbl">média de escanteios por jogo</div>
+                <div class="avg-pill-am">${l.amostras_escanteios ? l.amostras_escanteios + ' amostras' : 'sem amostras'}</div>
+              </div>
+              <div class="avg-pill${l.media_cartoes ? '' : ' nd'}">
+                <div class="avg-pill-val">${l.media_cartoes ? Number(l.media_cartoes).toFixed(1) : '--'}</div>
+                <div class="avg-pill-lbl">média de cartões por jogo</div>
+                <div class="avg-pill-am">${l.amostras_cartoes ? l.amostras_cartoes + ' amostras' : 'sem amostras'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('ligas-panel').style.display = 'block';
+  } catch(e) {
+    document.getElementById('mkt-cards').innerHTML = `<div class="empty">Erro ao carregar: ${e.message}</div>`;
+  }
+}
+
+function toggleLiga(id) {
+  const exp = document.getElementById(id);
+  const row = document.getElementById('row-' + id);
+  const ch  = document.getElementById('ch-' + id);
+  const open = exp.classList.contains('open');
+  exp.classList.toggle('open', !open);
+  row.classList.toggle('open', !open);
+  ch.classList.toggle('open', !open);
+}
+
+carregar();
+</script>
+</body>
+</html>

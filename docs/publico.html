@@ -110,7 +110,7 @@
   .rel-item:last-child { border-bottom: none; padding-bottom: 0; }
   .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
   .dot-green { background: #0F766E; }
-  .dot-amber { background: #E11D48; opacity: 0.6; }
+  .dot-amber { background: #D97706; }
 
   .nav { display: flex; border-top: 1px solid #E2E8F0; padding: 10px 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #FAF7F2; }
   .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #94A3B8; cursor: pointer; padding: 4px 0; }
@@ -427,13 +427,13 @@ async function carregarRelatorio() {
       ? statsPorDia[statsPorDia.length-1].pct - statsPorDia[0].pct
       : 0;
 
-    // Buscar relatório calibração — semanal preferido, fallback diário
+    // Buscar relatório calibração — diário de ontem preferido, semanal como fallback
     let relTexto = '', tipoRel = '';
     try {
       const rSem = await fetch(`${B}/calibracao?t=${Date.now()}`, {cache:'no-store'});
       const dSem = await rSem.json();
-      if (dSem?.semanal?.relatorio) { relTexto = dSem.semanal.relatorio; tipoRel = 'semanal'; }
-      else if (dSem?.diario?.relatorio) { relTexto = dSem.diario.relatorio; tipoRel = 'diário'; }
+      if (dSem?.diario?.relatorio) { relTexto = dSem.diario.relatorio; tipoRel = 'diário'; }
+      else if (dSem?.semanal?.relatorio) { relTexto = dSem.semanal.relatorio; tipoRel = 'semanal'; }
       if (!relTexto) {
         const rDia = await fetch(`${B}/calibracao/diario/${offsetStr(-1)}?t=${Date.now()}`, {cache:'no-store'});
         if (rDia.ok) { const dDia = await rDia.json(); if (dDia?.relatorio) { relTexto = dDia.relatorio; tipoRel = 'diário'; } }
@@ -463,20 +463,22 @@ async function carregarRelatorio() {
       .replace(/^[-*•]\s*/,'')
       .trim();
 
-    // Tentar extrair seções do novo formato
-    let destaques = extrairSecao(relTexto, 'O QUE FIZ');
-    let instrucoes = extrairSecao(relTexto, 'INSTRUÇÃO PARA AMANHÃ');
-    let padroes = extrairSecao(relTexto, 'PADRÃO IDENTIFICADO');
+    // Extrair seções do formato estruturado do relatório diário
+    let positivos = extrairSecao(relTexto, 'O QUE FIZ');
+    const padroes  = extrairSecao(relTexto, 'PADRÃO IDENTIFICADO');
+    const instrucoes = extrairSecao(relTexto, 'INSTRUÇÃO PARA AMANHÃ');
+    // "pontos de ajuste" = padrões identificados + instruções para amanhã (sem duplicatas)
+    const ajustes = [...padroes, ...instrucoes].slice(0, 3);
 
     // Fallback: filtrar por palavras-chave se não achou seções estruturadas
-    if (!destaques.length && !instrucoes.length && relTexto) {
+    if (!positivos.length && !ajustes.length && relTexto) {
       const linhas = relTexto.split('\n').map(limpar).filter(l => l.length > 20);
       for (const l of linhas) {
         const ll = l.toLowerCase();
         if (ll.includes('green') || ll.includes('acert') || ll.includes('✅') || ll.includes('assertiv')) {
-          if (destaques.length < 3) destaques.push(l);
+          if (positivos.length < 3) positivos.push(l);
         } else if (ll.includes('amanhã') || ll.includes('prioriz') || ll.includes('evitar') || ll.includes('aumentar') || ll.includes('reduzir')) {
-          if (instrucoes.length < 3) instrucoes.push(l);
+          if (ajustes.length < 3) ajustes.push(l);
         }
       }
     }
@@ -525,45 +527,24 @@ async function carregarRelatorio() {
 
       <div class="rule"></div>
 
+      ${positivos.length > 0 ? `
       <div class="rel-card" style="margin-bottom:10px;border-left:3px solid #0F766E">
-        <div class="rel-title" style="color:#0F766E">como estamos evoluindo</div>
-        <div class="rel-item" style="border:none;padding-bottom:0">
-          <div class="dot dot-green"></div>
-          <div>O sistema analisa dados históricos de cada liga para escolher o mercado com maior probabilidade de acerto — gols, resultado, escanteios ou cartões.</div>
-        </div>
-        <div class="rel-item" style="border:none;padding:6px 0 0">
-          <div class="dot dot-green"></div>
-          <div>A cada dia, aprendemos com os resultados e ajustamos automaticamente o foco para os mercados que estão performando melhor.</div>
-        </div>
-        ${assert !== null && assert < meta ? `
-        <div class="rel-item" style="border:none;padding:6px 0 0">
-          <div class="dot" style="background:#D97706"></div>
-          <div>Estamos em fase de calibração — o modelo está aprendendo os padrões das ligas para aumentar a assertividade em direção à meta de ${meta}%.</div>
-        </div>` : assert !== null && assert >= meta ? `
-        <div class="rel-item" style="border:none;padding:6px 0 0">
-          <div class="dot dot-green"></div>
-          <div>Assertividade acima da meta de ${meta}% esta semana. O sistema continua refinando os padrões para manter a consistência.</div>
-        </div>` : ''}
-      </div>
-
-      ${destaques.length > 0 ? `
-      <div class="rel-card" style="margin-bottom:10px">
-        <div class="rel-title">destaques da semana</div>
-        ${destaques.map(l=>`<div class="rel-item"><div class="dot dot-green"></div><div>${l}</div></div>`).join('')}
+        <div class="rel-title" style="color:#0F766E">pontos positivos de ontem</div>
+        ${positivos.map(l=>`<div class="rel-item"><div class="dot dot-green"></div><div>${l}</div></div>`).join('')}
       </div>` : ''}
 
-      ${instrucoes.length > 0 ? `
-      <div class="rel-card" style="margin-bottom:10px">
-        <div class="rel-title">foco para os próximos dias</div>
-        ${instrucoes.map(l=>`<div class="rel-item"><div class="dot" style="background:#0F766E;opacity:0.5"></div><div>${l}</div></div>`).join('')}
+      ${ajustes.length > 0 ? `
+      <div class="rel-card" style="margin-bottom:10px;border-left:3px solid #D97706">
+        <div class="rel-title" style="color:#92400E">pontos de ajuste</div>
+        ${ajustes.map(l=>`<div class="rel-item"><div class="dot dot-amber"></div><div>${l}</div></div>`).join('')}
       </div>` : ''}
 
       ${!relTexto ? `
       <div class="rel-card" style="background:#F0FDFA;border:1px solid #99F6E4">
-        <div class="rel-title" style="color:#0F766E">relatório em preparação</div>
+        <div class="rel-title" style="color:#0F766E">análise em preparação</div>
         <div class="rel-item" style="border:none">
           <div class="dot dot-green"></div>
-          <div>O relatório semanal é gerado automaticamente ao final de cada semana com a análise completa dos resultados e ajustes para a próxima semana.</div>
+          <div>A análise de ontem é gerada automaticamente toda manhã e ficará disponível aqui ao longo do dia.</div>
         </div>
       </div>` : ''}
     `;

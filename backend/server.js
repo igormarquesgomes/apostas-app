@@ -1359,6 +1359,13 @@ REGRA CRÍTICA: a justificativa DEVE explicar por que escolheu ESSE mercado e n�
 Se escrever "Under 2.5 é confiável" mas apostar Over 1.5, está ERRADO — seja coerente.
 NUNCA retorne confiança baixa como aposta principal — se o melhor disponível é baixa, pivote para o segundo melhor.
 
+CAMPO justificativa — REGRAS OBRIGATÓRIAS:
+- É o texto exibido ao PÚBLICO FINAL. Escreva como um especialista em apostas explicando sua análise, em português natural.
+- JAMAIS use os termos: "calibração", "assertividade", "LigaMedia", "pivotado", "nosso modelo", "histórico do sistema", "histórico mostra X%", "sistema identificou". Esses termos são internos e nunca devem aparecer no texto público.
+- Mencione apenas fatores esportivos observáveis: forma recente, H2H, média de gols/escanteios/cartões, contexto do jogo (pressão por título/rebaixamento), qualidade dos times, padrão observado nos últimos jogos.
+- O campo justificativa DEVE ser coerente com o mercado e aposta FINAL escolhidos. Se a aposta é "Over 9.5 escanteios", a justificativa fala de escanteios — nunca de gols.
+- 2 a 3 frases, direto ao ponto.
+
 REGRAS:
 - Série A e Série B têm análise OBRIGATÓRIA
 - Preencha TODOS os campos com valores numéricos reais
@@ -1577,6 +1584,9 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
             jogo.mercado = jogo.mercado_backup;
             jogo.confianca = 'media';
             jogo.alerta_odd = false;
+            // Justificativa pública deve refletir a aposta FINAL
+            const altBackup = jogo.alternativas?.find(a => a.mercado === jogo.mercado_backup && a.aposta === jogo.aposta_backup);
+            jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altBackup?.razao || '', jogo);
           }
         }
       }
@@ -1608,6 +1618,17 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       return linha - media; // positivo = linha acima da média = mais provável
     }
     return 0;
+  }
+
+  // Gera justificativa pública coerente com a aposta final (pós-pivot), sem termos técnicos internos
+  function gerarJustificativaPosPivot(aposta, mercado, razao, jogo) {
+    const termos = [/calibra[çc][aã]o\b/gi, /assertividade\b/gi, /LigaMedia\b/gi, /pivotad[ao]\b/gi, /nosso modelo\b/gi, /hist[oó]rico do sistema\b/gi];
+    let base = (razao || '').trim();
+    for (const t of termos) base = base.replace(t, '');
+    base = base.replace(/^[:\s—–-]+/, '').trim();
+    if (!base) return `Análise dos dados recentes aponta ${aposta} como a opção mais consistente para este jogo.`;
+    // Capitalizar primeira letra
+    return base.charAt(0).toUpperCase() + base.slice(1) + (base.endsWith('.') ? '' : '.');
   }
 
   // ── Pós-processamento: pivotar para confiança alta, descartar complementares sem opção ──────────
@@ -1643,6 +1664,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       jogo.mercado = melhor.mercado;
       jogo.confianca = melhor.confianca;
       jogo.razao_escolha = `Pivotado (${motivo}): ${melhor.razao}`;
+      jogo.justificativa = gerarJustificativaPosPivot(melhor.aposta, melhor.mercado, melhor.razao, jogo);
       jogosFinais.push(jogo);
     } else if (isComplementar && ['nao_recomendado', 'baixa'].includes(confAtual)) {
       // Sem alta/media disponível — comparar entre as opções baixa/nao_recomendado por probabilidade matemática
@@ -1661,6 +1683,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
         jogo.aposta = melhorBaixa.aposta;
         jogo.mercado = melhorBaixa.mercado;
         jogo.razao_escolha = `Pivotado por probabilidade (${melhorBaixa.razao})`;
+        jogo.justificativa = gerarJustificativaPosPivot(melhorBaixa.aposta, melhorBaixa.mercado, melhorBaixa.razao, jogo);
       }
       console.log(`  ⚠️  Complementar sem opção boa: ${jogo.time_casa} x ${jogo.time_fora} — guardando como reserva baixa`);
       jogo._reservaBaixa = true;
@@ -3682,6 +3705,18 @@ app.get('/datas-disponiveis', async (req, res) => {
     const rows = await response.json();
     const datas = (rows || []).map(r => r.data);
     res.json({ datas });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Retorna todas as ligas conhecidas para a aba Mercados/Ligas
+app.get('/ligas-conhecidas', async (req, res) => {
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?select=liga_id,nome,pais,green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes&order=total.desc`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await response.json();
+    res.json(rows || []);
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
