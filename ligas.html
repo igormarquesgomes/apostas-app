@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F0EDEA;--surface:#FFFFFF;--surface2:#F8FAFC;--surface3:#F1F5F9;
+  --bg:#F0EDEA;--surface:#FFFFFF;--surface2:#FAF7F2;--surface3:#F1F5F9;
   --border:#E2E8F0;--border2:#CBD5E1;
   --text:#1E293B;--text2:#475569;--text3:#94A3B8;
   --green:#0F766E;--green-lt:#F0FDF9;--green-bd:#99F6E4;
@@ -18,6 +18,7 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;min-height:100vh;}
 
+/* ── Nav ── */
 .nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:#FAF7F2;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;}
 .nav-brand{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.4px;margin-right:24px;text-decoration:none;flex-shrink:0;}
 .nav-brand span{color:var(--green);font-weight:300;}
@@ -26,32 +27,78 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .nl:hover{color:var(--text2);}
 .nl.active{color:var(--green);border-bottom-color:var(--green);font-weight:600;}
 
-.page{padding:1.25rem;max-width:900px;}
-
-/* PAGE HEADER */
+/* ── Page ── */
+.page{padding:1.25rem;max-width:960px;}
 .page-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;}
 .page-title{font-size:22px;font-weight:800;color:var(--text);}
 .toggle-wrap{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:3px;}
 .tog-btn{font-size:12px;font-weight:600;padding:6px 16px;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;}
 .tog-btn.active{background:var(--green-lt);color:var(--green);}
 
-/* SUMMARY BAR */
+/* ── Summary bar ── */
 .summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
 .summary-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
 .summary-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px;}
 .summary-val{font-size:22px;font-weight:700;line-height:1;}
 
-/* ROW CARD */
+/* ── Liga item (expandable) ── */
+.liga-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;overflow:hidden;transition:border-color .12s;}
+.liga-item:hover{border-color:var(--border2);}
+.liga-hd{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;user-select:none;}
+.liga-rank{font-size:13px;font-weight:700;color:var(--text3);width:28px;text-align:center;flex-shrink:0;}
+.liga-rank.top1{font-size:17px;}
+.liga-info{flex:1;min-width:0;}
+.liga-nome{font-size:13px;font-weight:600;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.liga-bar{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:5px;}
+.liga-bar-fill{height:100%;border-radius:2px;transition:width .4s;}
+.liga-stats{display:flex;gap:12px;}
+.liga-stat{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:3px;}
+.liga-stat strong{font-size:12px;font-weight:700;}
+.liga-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.liga-pct{font-size:26px;font-weight:800;line-height:1;}
+.liga-total{font-size:10px;color:var(--text3);text-align:right;}
+.liga-chev{font-size:12px;color:var(--text3);transition:transform .15s;flex-shrink:0;}
+.liga-chev.open{transform:rotate(90deg);color:var(--green);}
+
+/* ── Expand body ── */
+.liga-body{display:none;border-top:1px solid var(--border);background:#F8FFFE;}
+.liga-body.open{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.exp-left{padding:14px 16px 16px;border-right:1px solid var(--border);}
+.exp-right{padding:14px 16px 16px;}
+.exp-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px;}
+
+/* ── Mercado mini cards ── */
+.mkt-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.mkt-mini{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;border-top:2px solid var(--border);}
+.mkt-mini.g{border-top-color:var(--green);}
+.mkt-mini.a{border-top-color:var(--amber);}
+.mkt-mini.r{border-top-color:var(--red);}
+.mkt-mini.nd{border-top-color:var(--border2);}
+.mkt-mini-name{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:4px;}
+.mkt-mini-pct{font-size:18px;font-weight:800;line-height:1;}
+.mkt-mini-gr{font-size:10px;color:var(--text3);margin-top:3px;}
+
+/* ── Averages pills ── */
+.avg-pills{display:flex;flex-direction:column;gap:8px;}
+.avg-pill{border-radius:8px;padding:10px 13px;border:1px solid var(--border);}
+.avg-pill.has-data{background:var(--green-lt);border-color:var(--green-bd);}
+.avg-pill.no-data{background:var(--surface3);}
+.avg-pill-val{font-size:20px;font-weight:800;line-height:1;}
+.avg-pill.has-data .avg-pill-val{color:var(--green);}
+.avg-pill.no-data .avg-pill-val{color:var(--text3);}
+.avg-pill-lbl{font-size:11px;color:var(--text2);margin-top:3px;}
+.avg-pill-sub{font-size:10px;color:var(--text3);margin-top:2px;}
+.no-data-tag{display:inline-block;font-size:10px;color:var(--text3);background:var(--surface3);border:1px solid var(--border);border-radius:5px;padding:2px 7px;margin-top:4px;}
+
+/* ── Times (simple, sem expand) ── */
 .row-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;transition:border-color .12s;}
 .row-card:hover{border-color:var(--border2);}
 .row-rank{font-size:14px;font-weight:700;color:var(--text3);width:24px;text-align:center;flex-shrink:0;}
-.row-rank.top1{color:var(--amber);font-size:16px;}
-.row-rank.top2{color:var(--text2);}
-.row-rank.top3{color:var(--text2);}
+.row-rank.top1{font-size:16px;}
 .row-info{flex:1;min-width:0;}
 .row-nome{font-size:13px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .row-bar{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:6px;}
-.row-bar-fill{height:100%;border-radius:2px;transition:width .4s;}
+.row-bar-fill{height:100%;border-radius:2px;}
 .row-stats{display:flex;gap:12px;}
 .row-stat{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:3px;}
 .row-stat strong{font-size:12px;font-weight:700;}
@@ -59,7 +106,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .row-pct{font-size:26px;font-weight:800;line-height:1;margin-bottom:2px;}
 .row-total{font-size:10px;color:var(--text3);}
 
-/* STATES */
+/* ── States ── */
 .empty{text-align:center;padding:3rem;color:var(--text3);font-size:12px;line-height:1.8;}
 .loading{text-align:center;padding:3rem;}
 .spin{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;}
@@ -67,6 +114,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 
 @media(max-width:600px){
   .summary-bar{grid-template-columns:1fr 1fr;}
+  .liga-body.open{grid-template-columns:1fr;}
+  .exp-left{border-right:none;border-bottom:1px solid var(--border);}
+  .mkt-grid{grid-template-columns:repeat(4,1fr);}
 }
 </style>
 </head>
@@ -96,7 +146,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 
   <div id="summary-bar" class="summary-bar" style="display:none"></div>
 
-  <div id="vl"><div class="loading"><div class="spin"></div><div style="font-size:12px;color:var(--text3);margin-top:4px">Carregando 60 dias de dados...</div></div></div>
+  <div id="vl"><div class="loading"><div class="spin"></div><div style="font-size:12px;color:var(--text3);margin-top:4px">Carregando dados...</div></div></div>
   <div id="vt" style="display:none"></div>
 </div>
 
@@ -106,14 +156,40 @@ let dL=[],dT=[];
 let vistaAtual='ligas';
 
 function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
-function classP(p){return p>=80?'good':p>=60?'ok':'bad';}
+function clsP(p){return p>=80?'g':p>=60?'a':'r';}
 function hoje(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function off(b,n){const d=new Date(b+'T12:00:00');d.setDate(d.getDate()+n);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
+
+function mktPct(mercados,k){
+  const m=mercados?.[k];
+  if(!m||(!m.green&&!m.red)) return null;
+  const t=(m.green||0)+(m.red||0);
+  return t>0?Math.round((m.green||0)/t*100):null;
+}
 
 async function load(){
-  const h=hoje(),ps=[];
-  for(let i=1;i<60;i++) ps.push(fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null));
-  const dias=(await Promise.all(ps)).filter(d=>d&&d.apostas);
+  const h=hoje();
+
+  // Fetch em paralelo: 60 dias de apostas + ligas_conhecidas
+  const dias60=[];
+  for(let i=1;i<60;i++) dias60.push(fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null));
+
+  const [diasRaw,ligasKnownRaw]=await Promise.all([
+    Promise.all(dias60),
+    fetch(`${B}/ligas-conhecidas`).then(r=>r.ok?r.json():null).catch(()=>null)
+  ]);
+
+  const dias=diasRaw.filter(d=>d&&d.apostas);
+
+  // Construir mapa nome normalizado → dados ligas_conhecidas
+  const lkMap={};
+  if(Array.isArray(ligasKnownRaw)){
+    for(const lk of ligasKnownRaw){
+      lkMap[norm(lk.nome||'')]=lk;
+    }
+  }
+
   const lM={},tM={};
   for(const dia of dias){
     const ap=dia.apostas?.jogos||[],res=dia.resultados?.apostas||[];
@@ -133,8 +209,24 @@ async function load(){
       }
     }
   }
-  dL=Object.values(lM).map(l=>({...l,pct:Math.round(l.green/l.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
+
+  // Enriquecer ligas com dados de ligas_conhecidas
+  dL=Object.values(lM).map(l=>{
+    const pct=Math.round(l.green/l.total*100);
+    const lk=lkMap[norm(l.nome)]||null;
+    return{
+      ...l,pct,
+      pais:lk?.pais||null,
+      mercados:lk?.mercados||null,
+      media_escanteios:lk?.media_escanteios||null,
+      media_cartoes:lk?.media_cartoes||null,
+      amostras_escanteios:lk?.amostras_escanteios||null,
+      amostras_cartoes:lk?.amostras_cartoes||null,
+    };
+  }).sort((a,b)=>b.pct-a.pct||b.total-a.total);
+
   dT=Object.values(tM).filter(t=>t.total>=2).map(t=>({...t,pct:Math.round(t.green/t.total*100)})).sort((a,b)=>b.pct-a.pct||b.total-a.total);
+
   renderSummary();renderL();renderT();
 }
 
@@ -147,17 +239,76 @@ function renderSummary(){
   const pctGeral=totalT>0?Math.round(totalG/totalT*100):0;
   document.getElementById('summary-bar').style.display='grid';
   document.getElementById('summary-bar').innerHTML=`
-    <div class="summary-card"><div class="summary-label">${vistaAtual==='ligas'?'Ligas':'Times'}</div><div class="summary-val" style="color:var(--blue)">${dados.length}</div></div>
+    <div class="summary-card"><div class="summary-label">${vistaAtual==='ligas'?'Ligas':'Times'}</div><div class="summary-val" style="color:var(--text2)">${dados.length}</div></div>
     <div class="summary-card"><div class="summary-label">Assertividade</div><div class="summary-val" style="color:${corP(pctGeral)}">${pctGeral}%</div></div>
     <div class="summary-card"><div class="summary-label">Green total</div><div class="summary-val" style="color:var(--green)">${totalG}</div></div>
     <div class="summary-card"><div class="summary-label">Red total</div><div class="summary-val" style="color:var(--red)">${totalR}</div></div>`;
 }
 
-function rowHtml(item,i){
-  const rankClass=i===0?'top1':i===1?'top2':i===2?'top3':'';
+function ligaHtml(item,i){
   const rankIcon=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+  const rankCls=i<3?'top1':'';
+  const id='lg'+i;
+
+  // Mercados mini cards
+  const mktNomes={gols:'Gols',resultado:'Resultado',escanteios:'Escanteios',cartoes:'Cartões'};
+  const mktCards=Object.entries(mktNomes).map(([k,nome])=>{
+    const p=mktPct(item.mercados,k);
+    const m=item.mercados?.[k];
+    const t=m?(m.green||0)+(m.red||0):0;
+    if(p===null) return`<div class="mkt-mini nd"><div class="mkt-mini-name">${nome}</div><div class="mkt-mini-pct" style="color:var(--text3)">--</div><div class="mkt-mini-gr">sem dados</div></div>`;
+    return`<div class="mkt-mini ${clsP(p)}"><div class="mkt-mini-name">${nome}</div><div class="mkt-mini-pct" style="color:${corP(p)}">${p}%</div><div class="mkt-mini-gr">${m.green||0}G · ${m.red||0}R · ${t} ap.</div></div>`;
+  }).join('');
+
+  // Averages pills
+  const pillEsc=item.media_escanteios!=null
+    ?`<div class="avg-pill has-data"><div class="avg-pill-val">${Number(item.media_escanteios).toFixed(1)}</div><div class="avg-pill-lbl">média de escanteios / jogo</div><div class="avg-pill-sub">${item.amostras_escanteios||0} amostras registradas</div></div>`
+    :`<div class="avg-pill no-data"><div class="avg-pill-val">--</div><div class="avg-pill-lbl">média de escanteios / jogo</div><span class="no-data-tag">sem amostras ainda</span></div>`;
+
+  const pillCart=item.media_cartoes!=null
+    ?`<div class="avg-pill has-data"><div class="avg-pill-val">${Number(item.media_cartoes).toFixed(1)}</div><div class="avg-pill-lbl">média de cartões / jogo</div><div class="avg-pill-sub">${item.amostras_cartoes||0} amostras registradas</div></div>`
+    :`<div class="avg-pill no-data"><div class="avg-pill-val">--</div><div class="avg-pill-lbl">média de cartões / jogo</div><span class="no-data-tag">sem amostras ainda</span></div>`;
+
+  const paisTag=item.pais?`<span style="font-size:10px;color:var(--text3);margin-left:6px">${item.pais}</span>`:'';
+
+  return`<div class="liga-item" id="li${id}">
+    <div class="liga-hd" onclick="tog('${id}')">
+      <span class="liga-rank ${rankCls}">${rankIcon}</span>
+      <div class="liga-info">
+        <div class="liga-nome">${item.nome}${paisTag}</div>
+        <div class="liga-bar"><div class="liga-bar-fill" style="width:${item.pct}%;background:${corP(item.pct)}"></div></div>
+        <div class="liga-stats">
+          <div class="liga-stat"><strong style="color:var(--green)">${item.green}</strong> green</div>
+          <div class="liga-stat"><strong style="color:var(--red)">${item.red}</strong> red</div>
+          <div class="liga-stat"><strong style="color:var(--text2)">${item.total}</strong> total</div>
+        </div>
+      </div>
+      <div class="liga-right">
+        <div>
+          <div class="liga-pct" style="color:${corP(item.pct)}">${item.pct}%</div>
+          <div class="liga-total">${item.total} ap.</div>
+        </div>
+        <span class="liga-chev" id="cv${id}">›</span>
+      </div>
+    </div>
+    <div class="liga-body" id="bd${id}">
+      <div class="exp-left">
+        <div class="exp-title">Assertividade por mercado</div>
+        <div class="mkt-grid">${mktCards}</div>
+      </div>
+      <div class="exp-right">
+        <div class="exp-title">Médias reais observadas</div>
+        <div class="avg-pills">${pillEsc}${pillCart}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function timesHtml(item,i){
+  const rankIcon=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+  const rankCls=i<3?'top1':'';
   return`<div class="row-card">
-    <span class="row-rank ${rankClass}">${rankIcon}</span>
+    <span class="row-rank ${rankCls}">${rankIcon}</span>
     <div class="row-info">
       <div class="row-nome">${item.nome}</div>
       <div class="row-bar"><div class="row-bar-fill" style="width:${item.pct}%;background:${corP(item.pct)}"></div></div>
@@ -176,13 +327,21 @@ function rowHtml(item,i){
 
 function renderL(){
   document.getElementById('vl').innerHTML=dL.length
-    ?dL.map(rowHtml).join('')
+    ?dL.map(ligaHtml).join('')
     :`<div class="empty"><div style="font-size:32px;margin-bottom:8px">🏆</div><div>Nenhuma liga com dados ainda.</div></div>`;
 }
+
 function renderT(){
   document.getElementById('vt').innerHTML=dT.length
-    ?dT.map(rowHtml).join('')
+    ?dT.map(timesHtml).join('')
     :`<div class="empty"><div style="font-size:32px;margin-bottom:8px">👕</div><div>Nenhum time com dados suficientes.<br><small>Mínimo 2 apostas por time.</small></div></div>`;
+}
+
+function tog(id){
+  const bd=document.getElementById('bd'+id);
+  const cv=document.getElementById('cv'+id);
+  const open=bd.classList.toggle('open');
+  cv.classList.toggle('open',open);
 }
 
 function vista(v){
