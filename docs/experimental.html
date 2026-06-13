@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimental · OddLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;}
+
+.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 24px;}
+.nav-brand{font-size:14px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:24px;text-decoration:none;flex-shrink:0;}
+.nav-brand span{color:#0F766E;font-weight:300;}
+.nav-links{display:flex;align-items:center;gap:0;flex:1;}
+.nl{padding:0 12px;height:46px;display:flex;align-items:center;font-size:12px;font-weight:500;color:#94A3B8;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;}
+.nl:hover{color:#475569;}
+.nl.a{color:#0F766E;border-bottom-color:#0F766E;font-weight:600;}
+
+.page{padding:28px 28px 60px;max-width:960px;margin:0 auto;}
+.page-hd{margin-bottom:28px;}
+.page-title{font-size:22px;font-weight:800;color:#1E293B;letter-spacing:-0.5px;margin-bottom:4px;}
+.page-sub{font-size:13px;color:#94A3B8;}
+
+/* Feature cards hub */
+.hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:36px;}
+.hub-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px;cursor:pointer;transition:all .15s;}
+.hub-card:hover{border-color:#0F766E;box-shadow:0 4px 20px rgba(15,118,110,.08);}
+.hub-card.active{border-color:#0F766E;background:#F0FDF9;}
+.hub-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px;}
+.hub-icon.tg{background:#EFF9FF;}
+.hub-icon.soon{background:#F1F5F9;}
+.hub-card-title{font-size:14px;font-weight:700;color:#1E293B;margin-bottom:4px;}
+.hub-card-desc{font-size:12px;color:#64748B;line-height:1.5;}
+.hub-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-top:8px;}
+.badge-beta{background:#EFF6FF;color:#3B82F6;}
+.badge-soon{background:#F1F5F9;color:#94A3B8;}
+
+/* Section */
+.section{background:#fff;border:1px solid #E2E8F0;border-radius:14px;overflow:hidden;}
+.section-hd{padding:18px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.section-title{font-size:15px;font-weight:700;color:#1E293B;}
+.section-sub{font-size:12px;color:#94A3B8;margin-top:2px;}
+.section-body{padding:20px;}
+
+/* Day selector */
+.day-row{display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.day-btn{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid #E2E8F0;background:#fff;color:#475569;cursor:pointer;transition:all .15s;}
+.day-btn:hover{border-color:#CBD5E1;}
+.day-btn.active{background:#0F766E;color:#fff;border-color:#0F766E;}
+.day-input{font-family:'Inter',sans-serif;font-size:12px;border:1px solid #E2E8F0;border-radius:7px;padding:5px 10px;background:#fff;color:#1E293B;outline:none;margin-left:auto;}
+
+/* Telegram links list */
+.tg-list{display:flex;flex-direction:column;gap:10px;}
+.tg-item{border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:14px;transition:border-color .15s;}
+.tg-item:hover{border-color:#CBD5E1;}
+.tg-conf{flex-shrink:0;width:8px;height:8px;border-radius:50%;margin-top:5px;}
+.tg-conf.alta{background:#10B981;}
+.tg-conf.media{background:#F59E0B;}
+.tg-conf.baixa{background:#EF4444;}
+.tg-main{flex:1;min-width:0;}
+.tg-teams{font-size:13px;font-weight:700;color:#1E293B;margin-bottom:2px;}
+.tg-bet{font-size:12px;color:#0F766E;font-weight:600;margin-bottom:1px;}
+.tg-meta{font-size:11px;color:#94A3B8;}
+.tg-actions{display:flex;gap:6px;flex-shrink:0;align-items:center;}
+.tg-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#475569;transition:all .15s;text-decoration:none;white-space:nowrap;}
+.tg-btn:hover{border-color:#CBD5E1;color:#1E293B;}
+.tg-btn.primary{background:#229ED9;border-color:#229ED9;color:#fff;}
+.tg-btn.primary:hover{background:#1a8bbf;}
+.tg-btn.copy{background:#F8FAFC;}
+.tg-btn.copy:hover{background:#F1F5F9;}
+.tg-btn.copied{background:#F0FDF9;border-color:#6EE7B7;color:#0F766E;}
+
+/* Message preview */
+.msg-preview{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;font-size:12px;color:#475569;line-height:1.6;white-space:pre-wrap;font-family:monospace;margin-top:10px;display:none;}
+.tg-item.expanded .msg-preview{display:block;}
+
+.empty{text-align:center;padding:40px 20px;color:#94A3B8;font-size:13px;}
+.empty svg{width:36px;height:36px;margin:0 auto 10px;display:block;opacity:.4;}
+.loading{text-align:center;padding:32px;color:#94A3B8;font-size:13px;}
+
+/* Telegram channel config */
+.tg-config{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:12px 14px;background:#EFF9FF;border:1px solid #BAE6FD;border-radius:8px;}
+.tg-config label{font-size:11px;font-weight:700;color:#0369A1;white-space:nowrap;}
+.tg-config input{flex:1;font-family:'Inter',sans-serif;font-size:12px;border:1px solid #BAE6FD;border-radius:6px;padding:5px 9px;background:#fff;color:#1E293B;outline:none;}
+.tg-config input:focus{border-color:#38BDF8;}
+.tg-config-save{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;background:#0284C7;color:#fff;border:none;cursor:pointer;}
+
+/* Bulk actions */
+.bulk-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.bulk-btn{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#475569;transition:all .15s;}
+.bulk-btn:hover{border-color:#CBD5E1;}
+.bulk-btn.primary{background:#229ED9;border-color:#229ED9;color:#fff;}
+.bulk-btn.primary:hover{background:#1a8bbf;}
+.bulk-info{font-size:11px;color:#94A3B8;margin-left:auto;}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="index.html">Odd<span>Lab</span></a>
+  <div class="nav-links">
+    <a class="nl" href="index.html">Apostas</a>
+    <a class="nl" href="dashboard.html">Dashboard</a>
+    <a class="nl" href="ligas.html">Ligas</a>
+    <a class="nl" href="mercados.html">Mercados</a>
+    <a class="nl" href="relatorios.html">Relatórios</a>
+    <a class="nl a" href="experimental.html">Experimental</a>
+    <a class="nl" href="#">Aluno</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-hd">
+    <div class="page-title">Experimental</div>
+    <div class="page-sub">Funcionalidades em teste — podem mudar ou ser removidas</div>
+  </div>
+
+  <!-- Hub grid -->
+  <div class="hub-grid">
+    <div class="hub-card active" onclick="mostrarSecao('tg')">
+      <div class="hub-icon tg">📤</div>
+      <div class="hub-card-title">Links Telegram</div>
+      <div class="hub-card-desc">Gere mensagens formatadas por aposta para postar no seu canal do Telegram com um clique.</div>
+      <span class="hub-badge badge-beta">Beta</span>
+    </div>
+    <div class="hub-card" style="opacity:.6;cursor:default">
+      <div class="hub-icon soon">📊</div>
+      <div class="hub-card-title">Simulador de banca</div>
+      <div class="hub-card-desc">Simule estratégias de gestão de banca com base no histórico de assertividade do sistema.</div>
+      <span class="hub-badge badge-soon">Em breve</span>
+    </div>
+    <div class="hub-card" style="opacity:.6;cursor:default">
+      <div class="hub-icon soon">🔔</div>
+      <div class="hub-card-title">Alertas por odd</div>
+      <div class="hub-card-desc">Receba alertas quando uma aposta atingir a odd mínima configurada em casas de apostas.</div>
+      <span class="hub-badge badge-soon">Em breve</span>
+    </div>
+  </div>
+
+  <!-- Seção: Telegram Links -->
+  <div class="section" id="secao-tg">
+    <div class="section-hd">
+      <div>
+        <div class="section-title">📤 Links Telegram por aposta</div>
+        <div class="section-sub">Copie ou abra diretamente no Telegram para cada jogo do dia</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <!-- Config do canal -->
+      <div class="tg-config">
+        <label>Canal/username:</label>
+        <input id="tg-canal" type="text" placeholder="@seucanalaqui ou link do grupo" value="">
+        <button class="tg-config-save" onclick="salvarCanal()">Salvar</button>
+      </div>
+
+      <!-- Seletor de data -->
+      <div class="day-row">
+        <button class="day-btn" onclick="selecionarDia('ontem')">Ontem</button>
+        <button class="day-btn active" onclick="selecionarDia('hoje')">Hoje</button>
+        <button class="day-btn" onclick="selecionarDia('amanha')">Amanhã</button>
+        <input class="day-input" type="date" id="tg-data" onchange="carregarApostas(this.value)">
+      </div>
+
+      <!-- Ações em lote -->
+      <div class="bulk-row" id="bulk-row" style="display:none">
+        <button class="bulk-btn primary" onclick="abrirTodosTelegram()">📤 Abrir todas no Telegram</button>
+        <button class="bulk-btn" onclick="copiarTodasMensagens()">📋 Copiar todas</button>
+        <span class="bulk-info" id="bulk-info"></span>
+      </div>
+
+      <!-- Lista de apostas -->
+      <div id="tg-list">
+        <div class="loading">Carregando apostas...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BACKEND_URL = 'https://apostas-app.onrender.com';
+let _apostasHoje = [];
+let _dataSelecionada = '';
+
+function hoje(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function offsetData(base,n){ const d=new Date(base+'T12:00:00'); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function fmtD(iso){ const[a,m,d]=iso.split('-'); return `${d}/${m}/${a}`; }
+
+function selecionarDia(periodo){
+  document.querySelectorAll('.day-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  const base = hoje();
+  const data = periodo==='ontem'?offsetData(base,-1):periodo==='amanha'?offsetData(base,1):base;
+  document.getElementById('tg-data').value = data;
+  carregarApostas(data);
+}
+
+function mostrarSecao(id){
+  // só tg por agora
+}
+
+function salvarCanal(){
+  const v = document.getElementById('tg-canal').value.trim();
+  if(v) localStorage.setItem('tg_canal', v);
+}
+
+function getCanal(){
+  return localStorage.getItem('tg_canal') || '';
+}
+
+function formatarMensagem(jogo, data){
+  const conf = jogo.confianca === 'alta' ? '🟢' : jogo.confianca === 'media' ? '🟡' : '🔴';
+  const hora = jogo.horario || '';
+  const odd = jogo.odd_mercado ? `@${Number(jogo.odd_mercado).toFixed(2)}` : jogo.odd_sugerida ? `@${jogo.odd_sugerida}` : '';
+  const mercadoLabel = { gols:'⚽ Gols', resultado:'🏆 Resultado', escanteios:'🚩 Escanteios', cartoes:'🟨 Cartões' }[jogo.mercado] || jogo.mercado || '';
+  const liga = jogo.liga || '';
+  const pais = jogo.tipo_liga === 'br' ? '🇧🇷' : jogo.tipo_liga === 'eu' ? '🇪🇺' : '🌍';
+
+  return `${conf} *${jogo.time_casa} x ${jogo.time_fora}*
+${pais} ${liga} · ${hora} (${fmtD(data)})
+
+🎯 *${jogo.aposta}* ${odd}
+📌 ${mercadoLabel} · Confiança: ${jogo.confianca?.toUpperCase() || '-'}
+
+${jogo.justificativa || ''}
+
+_Análise: OddLab AI_`;
+}
+
+function linkTelegram(msg, canal){
+  const texto = encodeURIComponent(msg);
+  if(canal){
+    const c = canal.startsWith('@') ? canal.slice(1) : canal.replace('https://t.me/','');
+    return `https://t.me/${c}?text=${texto}`;
+  }
+  return `https://t.me/share/url?url=OddLab&text=${texto}`;
+}
+
+async function carregarApostas(data){
+  if(!data) return;
+  _dataSelecionada = data;
+  document.getElementById('tg-data').value = data;
+  document.getElementById('tg-list').innerHTML = '<div class="loading">Buscando apostas...</div>';
+  document.getElementById('bulk-row').style.display = 'none';
+  try{
+    const r = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const d = await r.json();
+    const jogos = d.apostas?.jogos || [];
+    _apostasHoje = jogos;
+    renderLista(jogos, data);
+  }catch(e){
+    document.getElementById('tg-list').innerHTML = `<div class="empty">Erro ao buscar: ${e.message}</div>`;
+  }
+}
+
+function renderLista(jogos, data){
+  if(!jogos.length){
+    document.getElementById('tg-list').innerHTML = '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>Sem apostas para esta data</div>';
+    return;
+  }
+  const canal = getCanal();
+  document.getElementById('tg-canal').value = canal;
+  document.getElementById('bulk-row').style.display = 'flex';
+  document.getElementById('bulk-info').textContent = `${jogos.length} aposta${jogos.length!==1?'s':''}`;
+
+  document.getElementById('tg-list').innerHTML = `<div class="tg-list">${jogos.map((j,i) => {
+    const msg = formatarMensagem(j, data);
+    const link = linkTelegram(msg, canal);
+    const conf = j.confianca || 'media';
+    return `<div class="tg-item" id="tgi-${i}">
+      <div class="tg-conf ${conf}"></div>
+      <div class="tg-main">
+        <div class="tg-teams">${j.time_casa} × ${j.time_fora}</div>
+        <div class="tg-bet">${j.aposta}${j.odd_mercado ? ' @'+Number(j.odd_mercado).toFixed(2) : j.odd_sugerida ? ' @'+j.odd_sugerida : ''}</div>
+        <div class="tg-meta">${j.liga||''} · ${j.horario||''} · ${conf}</div>
+        <div class="msg-preview" id="prev-${i}">${escHtml(msg)}</div>
+      </div>
+      <div class="tg-actions">
+        <button class="tg-btn copy" onclick="togglePreview(${i})">👁</button>
+        <button class="tg-btn copy" id="cpbtn-${i}" onclick="copiarMensagem(${i})">📋 Copiar</button>
+        <a class="tg-btn primary" href="${escHtml(link)}" target="_blank" rel="noopener">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.44.7-.9.44l-2.5-1.84-1.2 1.16c-.14.14-.26.26-.52.26l.18-2.6 4.72-4.26c.2-.18-.04-.28-.32-.1L7.6 14.4l-2.46-.76c-.54-.16-.54-.54.12-.8l9.62-3.7c.44-.16.84.1.76.66z"/></svg>
+          Telegram
+        </a>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function togglePreview(i){
+  const el = document.getElementById(`tgi-${i}`);
+  el.classList.toggle('expanded');
+}
+
+async function copiarMensagem(i){
+  const jogo = _apostasHoje[i];
+  if(!jogo) return;
+  const msg = formatarMensagem(jogo, _dataSelecionada);
+  try{
+    await navigator.clipboard.writeText(msg);
+    const btn = document.getElementById(`cpbtn-${i}`);
+    const orig = btn.innerHTML;
+    btn.className = 'tg-btn copied';
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => { btn.className='tg-btn copy'; btn.innerHTML=orig; }, 2000);
+  }catch(e){ alert('Erro ao copiar: '+e.message); }
+}
+
+function copiarTodasMensagens(){
+  if(!_apostasHoje.length) return;
+  const canal = getCanal();
+  const todas = _apostasHoje.map(j => formatarMensagem(j, _dataSelecionada)).join('\n\n---\n\n');
+  navigator.clipboard.writeText(todas).then(() => alert(`✅ ${_apostasHoje.length} mensagens copiadas!`)).catch(e => alert('Erro: '+e.message));
+}
+
+function abrirTodosTelegram(){
+  if(!_apostasHoje.length) return;
+  const canal = getCanal();
+  if(!canal){ alert('Configure o canal do Telegram primeiro.'); document.getElementById('tg-canal').focus(); return; }
+  _apostasHoje.forEach((j, i) => {
+    setTimeout(() => {
+      const msg = formatarMensagem(j, _dataSelecionada);
+      window.open(linkTelegram(msg, canal), '_blank');
+    }, i * 500);
+  });
+}
+
+// init
+const dataInicial = hoje();
+document.getElementById('tg-data').value = dataInicial;
+_dataSelecionada = dataInicial;
+document.getElementById('tg-canal').value = getCanal();
+carregarApostas(dataInicial);
+</script>
+</body>
+</html>

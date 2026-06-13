@@ -399,6 +399,17 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
   </div>
 </div>
 
+<!-- MODAL: Editar resultado / Informar stats / Informar análise -->
+<div class="modal-overlay" id="modal-stats" onclick="if(event.target===this)fecharModalStats()">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-hd">
+      <span class="modal-title" id="mst-titulo">Informar dados</span>
+      <button class="modal-close" onclick="fecharModalStats()">×</button>
+    </div>
+    <div class="modal-body" id="mst-body"></div>
+  </div>
+</div>
+
 <script>
 const BACKEND_URL='https://apostas-app.onrender.com';
 
@@ -817,24 +828,45 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
   return null;
 }
 
+// ─── Modal de stats/resultado (Item 9) ───────────────────────────────────────
+let _mstCallback = null;
+
+function fecharModalStats(){
+  document.getElementById('modal-stats').classList.remove('open');
+  _mstCallback = null;
+}
+
+function _mstInput(id){ return document.getElementById(id); }
+
+function _abrirModalStats(titulo, bodyHtml, callback){
+  document.getElementById('mst-titulo').textContent = titulo;
+  document.getElementById('mst-body').innerHTML = bodyHtml;
+  _mstCallback = callback;
+  document.getElementById('modal-stats').classList.add('open');
+  // focar primeiro input
+  setTimeout(() => { const f = document.querySelector('#mst-body input'); if(f) f.focus(); }, 80);
+}
+
 // ─── Ações ────────────────────────────────────────────────────────────────────
 async function editarResultado(event,idx,data,jogoId,resultadoAtual){
   event.stopPropagation();
-  const novosPlacar=prompt(`Placar real (ex: 4-3):\nDeixe em branco para manter.`,'');
-  if(novosPlacar===null) return;
-  try{
-    const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,placar:novosPlacar.trim()||null})});
-    const j=await r.json();
-    if(j.ok){
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
-      const d2=await r2.json();
-      if(d2.apostas?.jogos?.length>0){
-        const resultados=d2.resultados?.apostas||[];
-        const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
-        render(jogosComRes,data);
-      }
-    }else{alert('Erro: '+j.error);}
-  }catch(e){alert('Erro: '+e.message);}
+  _abrirModalStats('Corrigir placar', `
+    <div class="modal-field">
+      <label class="modal-label">Placar real (ex: 2-1)</label>
+      <input class="modal-input" id="mst-placar" placeholder="2-1" value="${resultadoAtual||''}" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:2px">
+    </div>
+    <div class="modal-actions" style="margin-top:8px">
+      <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
+      <button class="modal-btn primary" onclick="_mstCallback()">Salvar</button>
+    </div>`, async () => {
+    const placar = (_mstInput('mst-placar')?.value||'').trim();
+    fecharModalStats();
+    try{
+      const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,placar:placar||null})});
+      const j=await r.json();
+      if(j.ok){ await _recarregarLista(data); }else{ alert('Erro: '+j.error); }
+    }catch(e){ alert('Erro: '+e.message); }
+  });
 }
 
 async function anularJogo(event,data,jogoId){
@@ -843,58 +875,86 @@ async function anularJogo(event,data,jogoId){
   try{
     const r=await fetch(`${BACKEND_URL}/anular-jogo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId})});
     const j=await r.json();
-    if(j.ok){
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
-      const d2=await r2.json();
-      if(d2.apostas?.jogos?.length>0){
-        const resultados=d2.resultados?.apostas||[];
-        const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
-        render(jogosComRes,data);
-      }
-    }else{alert('Erro: '+(j.error||'Endpoint não disponível. Adicione POST /anular-jogo no backend.'));}
-  }catch(e){alert('Endpoint /anular-jogo não implementado ainda.');}
+    if(j.ok){ await _recarregarLista(data); }
+    else{ alert('Erro: '+(j.error||'Endpoint não disponível.')); }
+  }catch(e){ alert('Erro: '+e.message); }
 }
 
 async function informarStats(event,data,jogoId,aposta,mercado){
   event.stopPropagation();
   const isEsc=mercado==='escanteios'||aposta.toLowerCase().includes('escanteio')||aposta.toLowerCase().includes('corner');
   const isCart=mercado==='cartoes'||aposta.toLowerCase().includes('cartao')||aposta.toLowerCase().includes('cartão');
-  let escanteios=null,cartoes=null;
-  if(isEsc){const v=prompt(`Total de escanteios no jogo:\n(aposta: ${aposta})`);if(v===null)return;escanteios=parseInt(v);if(isNaN(escanteios))return alert('Número inválido');}
-  if(isCart){const v=prompt(`Total de cartões no jogo:\n(lembre: vermelho = 2)\n(aposta: ${aposta})`);if(v===null)return;cartoes=parseInt(v);if(isNaN(cartoes))return alert('Número inválido');}
-  try{
-    const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes})});
-    const j=await r.json();
-    if(j.ok){
-      alert(`✅ ${j.resultado?.toUpperCase()} — resultado atualizado!`);
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
-      const d2=await r2.json();
-      if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
-    }else{alert('Erro: '+(j.error||'desconhecido'));}
-  }catch(e){alert('Erro: '+e.message);}
+  const fields = [];
+  if(isEsc) fields.push(`<div class="modal-field"><label class="modal-label">Total de escanteios</label><input class="modal-input" id="mst-esc" type="number" min="0" placeholder="ex: 9"></div>`);
+  if(isCart) fields.push(`<div class="modal-field"><label class="modal-label">Total de cartões <small style="font-weight:400;color:var(--text3)">(vermelho = 2)</small></label><input class="modal-input" id="mst-cart" type="number" min="0" placeholder="ex: 4"></div>`);
+  _abrirModalStats('Informar stats', `
+    <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Aposta: <strong style="color:var(--text)">${aposta}</strong></p>
+    ${fields.join('')}
+    <div class="modal-actions" style="margin-top:8px">
+      <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
+      <button class="modal-btn primary" onclick="_mstCallback()">Confirmar</button>
+    </div>`, async () => {
+    const escanteios = _mstInput('mst-esc') ? parseInt(_mstInput('mst-esc').value)||null : null;
+    const cartoes    = _mstInput('mst-cart') ? parseInt(_mstInput('mst-cart').value)||null : null;
+    fecharModalStats();
+    try{
+      const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes})});
+      const j=await r.json();
+      if(j.ok){ await _recarregarLista(data); }
+      else{ alert('Erro: '+(j.error||'desconhecido')); }
+    }catch(e){ alert('Erro: '+e.message); }
+  });
 }
 
 async function informarAnalise(event,data,jogoId){
   event.stopPropagation();
-  const vEsc=prompt(`Total de ESCANTEIOS no jogo (vazio = pular):`);if(vEsc===null)return;
-  const vAmarelos=prompt(`Total de CARTÕES AMARELOS (vazio = pular):`);if(vAmarelos===null)return;
-  const vVermelhos=prompt(`Total de CARTÕES VERMELHOS (vazio = pular):`);if(vVermelhos===null)return;
-  const escanteios=vEsc.trim()?parseInt(vEsc):null;
-  const amarelos=vAmarelos.trim()?parseInt(vAmarelos):null;
-  const vermelhos=vVermelhos.trim()?parseInt(vVermelhos):null;
-  if((vEsc.trim()&&isNaN(escanteios))||(vAmarelos.trim()&&isNaN(amarelos))||(vVermelhos.trim()&&isNaN(vermelhos)))return alert('Número inválido');
-  if(escanteios===null&&amarelos===null&&vermelhos===null)return;
-  const cartoes=(amarelos!==null||vermelhos!==null)?(amarelos||0)+(vermelhos||0):null;
-  try{
-    const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes,cartoes_amarelos:amarelos,cartoes_vermelhos:vermelhos})});
-    const j=await r.json();
-    if(j.ok){
-      alert(`✅ Análise atualizada!`);
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
-      const d2=await r2.json();
-      if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
-    }else{alert('Erro: '+(j.error||'desconhecido'));}
-  }catch(e){alert('Erro: '+e.message);}
+  _abrirModalStats('Informar análise completa', `
+    <div class="modal-row">
+      <div class="modal-field" style="margin-bottom:0">
+        <label class="modal-label">Escanteios</label>
+        <input class="modal-input" id="mst-a-esc" type="number" min="0" placeholder="ex: 9">
+      </div>
+      <div class="modal-field" style="margin-bottom:0">
+        <label class="modal-label">Cartões amarelos</label>
+        <input class="modal-input" id="mst-a-amar" type="number" min="0" placeholder="ex: 3">
+      </div>
+    </div>
+    <div class="modal-field" style="margin-top:12px">
+      <label class="modal-label">Cartões vermelhos</label>
+      <input class="modal-input" id="mst-a-verm" type="number" min="0" placeholder="ex: 1">
+    </div>
+    <p style="font-size:11px;color:var(--text3);margin-top:8px">Deixe em branco os campos que não se aplicam.</p>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
+      <button class="modal-btn primary" onclick="_mstCallback()">Confirmar</button>
+    </div>`, async () => {
+    const vEsc  = _mstInput('mst-a-esc')?.value.trim();
+    const vAmar = _mstInput('mst-a-amar')?.value.trim();
+    const vVerm = _mstInput('mst-a-verm')?.value.trim();
+    const escanteios = vEsc  ? parseInt(vEsc)  : null;
+    const amarelos   = vAmar ? parseInt(vAmar) : null;
+    const vermelhos  = vVerm ? parseInt(vVerm) : null;
+    if((vEsc&&isNaN(escanteios))||(vAmar&&isNaN(amarelos))||(vVerm&&isNaN(vermelhos))) return alert('Número inválido');
+    if(escanteios===null&&amarelos===null&&vermelhos===null){ fecharModalStats(); return; }
+    const cartoes=(amarelos!==null||vermelhos!==null)?(amarelos||0)+(vermelhos||0):null;
+    fecharModalStats();
+    try{
+      const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes,cartoes_amarelos:amarelos,cartoes_vermelhos:vermelhos})});
+      const j=await r.json();
+      if(j.ok){ await _recarregarLista(data); }
+      else{ alert('Erro: '+(j.error||'desconhecido')); }
+    }catch(e){ alert('Erro: '+e.message); }
+  });
+}
+
+async function _recarregarLista(data){
+  const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+  const d2=await r2.json();
+  if(d2.apostas?.jogos?.length>0){
+    const resultados=d2.resultados?.apostas||[];
+    const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
+    render(jogosComRes,data);
+  }
 }
 
 function abrirInformarStats(){
