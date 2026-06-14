@@ -85,6 +85,14 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 .sim-divider{height:1px;background:#D1FAE5;margin:10px 0;}
 .sim-loading{text-align:center;padding:20px;color:#94A3B8;font-size:12px;}
 .sim-error{font-size:12px;color:#94A3B8;text-align:center;padding:16px;}
+.bottom-nav{display:none;}
+@media(max-width:900px){
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:300;background:#fff;border-top:1px solid #E2E8F0;height:56px;align-items:stretch;}
+  .bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#94A3B8;text-decoration:none;transition:color .12s;border-top:2px solid transparent;padding-bottom:2px;}
+  .bottom-nav a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .bottom-nav a.active{color:#0F766E;border-top-color:#0F766E;}
+  body{padding-bottom:60px;}
+}
 </style>
 </head>
 <body>
@@ -338,5 +346,12 @@ function fmtBRL(v){
 carregarUsuarios();
 calcular();
 </script>
+<nav class="bottom-nav">
+  <a href="index.html"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Apostas</a>
+  <a href="dashboard.html"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+  <a href="ligas.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>Ligas</a>
+  <a href="relatorios.html"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Relatórios</a>
+  <a href="experimental.html"><svg viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>Extra</a>
+</nav>
 </body>
 </html>
