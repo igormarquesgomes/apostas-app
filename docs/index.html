@@ -76,7 +76,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 /* ── Bet panel (table-grid) ───────────────────────── */
 .pn{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem;}
 .pnh{padding:10px 16px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);}
-.cols{display:grid;grid-template-columns:16px 20px 1fr 120px 80px 80px 70px 70px;gap:12px;align-items:center;}
+.cols{display:grid;grid-template-columns:16px 20px 1fr minmax(140px,190px) 75px 90px 80px 70px;gap:14px;align-items:center;}
 .brow-hd{padding:7px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
 .brow{padding:11px 16px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background .1s;}
 .brow:hover{background:#FAFAFA;}
@@ -90,9 +90,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .dot.green{background:var(--green);}
 .dot.red{background:var(--red);}
 .dot.void{background:var(--purple);}
-.match{font-size:13px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;}
-.pick-txt{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.meta-txt{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.match{font-size:14px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+.pick-txt{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meta-txt{font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .odd-val{font-size:14px;font-weight:700;color:var(--amber);white-space:nowrap;}
 .conf{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;white-space:nowrap;}
 .conf.alta{background:var(--green-lt);color:var(--green);}
@@ -735,17 +735,22 @@ function render(jogos,data){
       <div class="expand-row" id="ex${i}">
         <div class="exp-alts">
           <div class="expand-col-title">Alternativas</div>
-          ${j.alternativas?.length?j.alternativas.map(alt=>{
-            const isPrincipal=alt.mercado===j.mercado&&alt.aposta===j.aposta;
-            const resAlt=calcularResultadoAlt(alt,j.placar,j.mercados_resultado,j.time_casa,j.time_fora);
-            const resHtml=resAlt?`<span class="alt-res-badge ${resAlt}">${resAlt.toUpperCase()}</span>`:'';
-            return`<div class="alt-item${isPrincipal?' principal':''}">
-              <span class="alt-merc${isPrincipal?' principal-merc':''}">${mercNome[alt.mercado]||alt.mercado}${isPrincipal?' ★':''}</span>
-              <span class="alt-aposta">${alt.aposta||'-'}</span>
-              <span class="alt-conf-badge ${alt.confianca||'baixa'}">${alt.confianca||'-'}</span>
-              ${resHtml}
-            </div>`;
-          }).join(''):`<div style="color:var(--text3);font-size:12px;padding:8px 0">Sem alternativas registradas</div>`}
+          ${(()=>{
+            const alts=[...(j.alternativas||[])];
+            const temPrincipal=alts.some(a=>(a.mercado||'')===(j.mercado||'')&&(a.aposta||'').trim().toLowerCase()===(j.aposta||'').trim().toLowerCase());
+            if(!temPrincipal&&j.aposta) alts.unshift({mercado:j.mercado,aposta:j.aposta,confianca:j.confianca,_injetado:true});
+            return alts.length?alts.map(alt=>{
+              const isPrincipal=(alt.mercado===j.mercado&&(alt.aposta||'').trim().toLowerCase()===(j.aposta||'').trim().toLowerCase())||alt._injetado;
+              const resAlt=calcularResultadoAlt(alt,j.placar,j.mercados_resultado,j.time_casa,j.time_fora);
+              const resHtml=resAlt?`<span class="alt-res-badge ${resAlt}">${resAlt.toUpperCase()}</span>`:'';
+              return`<div class="alt-item${isPrincipal?' principal':''}">
+                <span class="alt-merc${isPrincipal?' principal-merc':''}">${mercNome[alt.mercado]||alt.mercado}${isPrincipal?' ★':''}</span>
+                <span class="alt-aposta">${alt.aposta||'-'}</span>
+                <span class="alt-conf-badge ${alt.confianca||'baixa'}">${alt.confianca||'-'}</span>
+                ${resHtml}
+              </div>`;
+            }).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px 0">Sem alternativas registradas</div>';
+          })()}
         </div>
         <div class="exp-just">
           <div class="expand-col-title">Análise</div>

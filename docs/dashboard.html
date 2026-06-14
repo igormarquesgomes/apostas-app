@@ -83,10 +83,19 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 /* POR PERÍODO rows */
 .per-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
 .per-row:last-child{border-bottom:none;}
+.per-row.clickable{cursor:pointer;user-select:none;}
+.per-row.clickable:hover{background:var(--surface2);margin:0 -16px;padding:10px 16px;}
 .per-left{}
 .per-label{font-size:13px;font-weight:700;color:var(--green);margin-bottom:2px;}
 .per-sub{font-size:11px;color:var(--text3);}
 .per-pct{font-size:20px;font-weight:800;}
+.per-chevron{font-size:12px;color:var(--text3);transition:transform .15s;display:inline-block;margin-left:4px;}
+.per-expand{padding:4px 0 8px 10px;border-bottom:1px solid var(--border);}
+.per-day-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F8FAFC;}
+.per-day-row:last-child{border-bottom:none;}
+.per-day-label{font-size:12px;color:var(--text2);}
+.per-day-sub{font-size:10px;color:var(--text3);}
+.per-day-pct{font-size:14px;font-weight:700;}
 
 /* POR CONFIANÇA */
 .conf-row{padding:10px 0;border-bottom:1px solid var(--border);}
@@ -359,14 +368,18 @@ function renderTudo(){
 }
 
 function renderTopStats(s, assertMes, assertAnual){
-  const p = pctFmt(s.green, s.red);
+  // Saúde geral = todos os 60 dias carregados
+  const statsGeral = agregaResultados(_diasCache);
+  const assertGeral = pctFmt(statsGeral.green, statsGeral.red);
+  const diasOrd = _diasCache.slice().sort((a,b)=>a._data.localeCompare(b._data));
+  const primeiroDia = diasOrd.length ? fmtD(diasOrd[0]._data) : '--';
   document.getElementById('top-stats').innerHTML = `
     <div class="st"><div class="st-label">Total</div><div class="st-val">${s.total}</div><div class="st-sub">apostas principais</div></div>
     <div class="st"><div class="st-label">Green</div><div class="st-val green">${s.green}</div></div>
     <div class="st"><div class="st-label">Red</div><div class="st-val red">${s.red}</div></div>
     <div class="st"><div class="st-label">Anulados</div><div class="st-val purple">${s.anulados}</div></div>
     <div class="st"><div class="st-label">Assert. mês</div><div class="st-val ${assertMes!==null?cP(assertMes):'empty'}">${assertMes!==null?assertMes+'%':'--'}</div><div class="st-sub">desde ${fmtD(hoje().substring(0,7)+'-01')}</div></div>
-    <div class="st"><div class="st-label">Assert. anual</div><div class="st-val ${assertAnual!==null?cP(assertAnual):'empty'}">${assertAnual!==null?assertAnual+'%':'--'}</div><div class="st-sub">desde jan</div></div>`;
+    <div class="st"><div class="st-label">Saúde geral</div><div class="st-val ${assertGeral!==null?cP(assertGeral):'empty'}">${assertGeral!==null?assertGeral+'%':'--'}</div><div class="st-sub">desde ${primeiroDia}</div></div>`;
 }
 
 function mktNote(mercado, pct){
@@ -397,50 +410,91 @@ function renderMercados(mkt, dias){
   }).join('');
 }
 
+function _perRow(label, sub, pct, key, children){
+  const hasChildren = children && children.length > 0;
+  const right = hasChildren
+    ? `<div style="display:flex;align-items:center;gap:6px"><span class="per-pct" style="color:${pct!==null?corP(pct):'var(--text3)'}">${pct!==null?pct+'%':'--'}</span><span class="per-chevron" id="ch-${key}">›</span></div>`
+    : `<span class="per-pct" style="color:${pct!==null?corP(pct):'var(--text3)'}">${pct!==null?pct+'%':'--'}</span>`;
+  const childHtml = hasChildren ? `<div id="exp-${key}" style="display:none" class="per-expand">${children}</div>` : '';
+  return `<div class="per-row${hasChildren?' clickable':''}" ${hasChildren?`onclick="togglePer('${key}')"`:''}><div class="per-left"><div class="per-label">${label}</div><div class="per-sub">${sub}</div></div>${right}</div>${childHtml}`;
+}
+
+function togglePer(key){
+  const el=document.getElementById('exp-'+key), ch=document.getElementById('ch-'+key);
+  if(!el) return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(ch) ch.style.transform=open?'':'rotate(90deg)';
+}
+
 function renderPorPeriodo(){
   const h = hoje();
-  const periodos = [];
+  let html = '';
 
-  // Mês atual
-  const sm = h.substring(0,7)+'-01';
-  const diasMes = _diasCache.filter(d=>d._data>=sm);
-  const sMes = agregaResultados(diasMes);
-  const pMes = pctFmt(sMes.green, sMes.red);
-  periodos.push({ label: nomeMes(h.substring(0,7)), sub: `desde ${fmtD(sm)} · ${sMes.green+sMes.red} apostas principais`, pct: pMes });
+  if(_periodo==='semana'){
+    // Dias desta semana
+    const diaSem = new Date(h+'T12:00:00').getDay();
+    const sw = off(h, -(diaSem===0?6:diaSem-1));
+    const DIAS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    for(let i=0;i<7;i++){
+      const d=off(sw,i);
+      if(d>h) break;
+      const dDias=_diasCache.filter(x=>x._data===d);
+      if(!dDias.length) continue;
+      const s=agregaResultados(dDias);
+      const pct=pctFmt(s.green,s.red);
+      const dObj=new Date(d+'T12:00:00');
+      html+=_perRow(`${DIAS[dObj.getDay()]} ${fmtD(d)}`,`${s.green+s.red} apostas`,pct,'','');
+    }
 
-  // Esta semana
-  const diaSem = new Date(h+'T12:00:00').getDay();
-  const sw = off(h, -(diaSem===0?6:diaSem-1));
-  const diasSem = _diasCache.filter(d=>d._data>=sw);
-  const sSem = agregaResultados(diasSem);
-  const pSem = pctFmt(sSem.green, sSem.red);
-  periodos.push({ label: 'Esta semana', sub: `${sSem.green+sSem.red} apostas`, pct: pSem });
+  } else if(_periodo==='mes'){
+    // Semanas do mês atual — expandem para mostrar dias
+    const sm=h.substring(0,7)+'-01';
+    const diasMes=_diasCache.filter(d=>d._data>=sm&&d._data<=h).sort((a,b)=>a._data.localeCompare(b._data));
+    const semMap={};
+    for(const d of diasMes){
+      const dt=new Date(d._data+'T12:00:00');
+      const wk=Math.ceil(dt.getDate()/7);
+      if(!semMap[wk]) semMap[wk]=[];
+      semMap[wk].push(d);
+    }
+    const DIAS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    for(const [wk,dias] of Object.entries(semMap).sort((a,b)=>a[0]-b[0])){
+      const s=agregaResultados(dias);
+      const pct=pctFmt(s.green,s.red);
+      const primeiro=fmtD(dias[0]._data), ultimo=fmtD(dias[dias.length-1]._data);
+      const childHtml=dias.map(d=>{
+        const sd=agregaResultados([d]);
+        const pd=pctFmt(sd.green,sd.red);
+        const dObj=new Date(d._data+'T12:00:00');
+        return `<div class="per-day-row"><div><div class="per-day-label">${DIAS[dObj.getDay()]} ${fmtD(d._data)}</div><div class="per-day-sub">${sd.green+sd.red} apostas</div></div><span class="per-day-pct" style="color:${pd!==null?corP(pd):'var(--text3)'}">${pd!==null?pd+'%':'--'}</span></div>`;
+      }).join('');
+      html+=_perRow(`Semana ${wk}`,`${primeiro}–${ultimo} · ${s.green+s.red} apostas`,pct,`sem-${wk}`,childHtml);
+    }
 
-  // Mês anterior
-  const mesAnterior = new Date(h.substring(0,7)+'-01T12:00:00'); mesAnterior.setMonth(mesAnterior.getMonth()-1);
-  const smAnterior = mesAnterior.toISOString().substring(0,7)+'-01';
-  const smAtual = sm;
-  const diasMesAnt = _diasCache.filter(d=>d._data>=smAnterior && d._data<smAtual);
-  const sMesAnt = agregaResultados(diasMesAnt);
-  const pMesAnt = pctFmt(sMesAnt.green, sMesAnt.red);
-  if(sMesAnt.green+sMesAnt.red > 0)
-    periodos.push({ label: nomeMes(mesAnterior.toISOString().substring(0,7)), sub: `${sMesAnt.green+sMesAnt.red} apostas`, pct: pMesAnt });
+  } else {
+    // Anual → meses do ano, cada um expande para dias
+    const year=h.substring(0,4);
+    const mesMap={};
+    for(const d of _diasCache.filter(x=>x._data.startsWith(year))){
+      const m=d._data.substring(0,7);
+      if(!mesMap[m]) mesMap[m]=[];
+      mesMap[m].push(d);
+    }
+    for(const [m,dias] of Object.entries(mesMap).sort()){
+      const s=agregaResultados(dias);
+      const pct=pctFmt(s.green,s.red);
+      const diasOrd=dias.slice().sort((a,b)=>a._data.localeCompare(b._data));
+      const childHtml=diasOrd.map(d=>{
+        const sd=agregaResultados([d]);
+        const pd=pctFmt(sd.green,sd.red);
+        return `<div class="per-day-row"><div><div class="per-day-label">${fmtD(d._data)}</div><div class="per-day-sub">${sd.green+sd.red} apostas</div></div><span class="per-day-pct" style="color:${pd!==null?corP(pd):'var(--text3)'}">${pd!==null?pd+'%':'--'}</span></div>`;
+      }).join('');
+      html+=_perRow(nomeMes(m),`${s.green+s.red} apostas`,pct,`mes-${m}`,childHtml);
+    }
+  }
 
-  // Anual
-  const sy = h.substring(0,4)+'-01-01';
-  const diasAnual = _diasCache.filter(d=>d._data>=sy);
-  const sAnual = agregaResultados(diasAnual);
-  const pAnual = pctFmt(sAnual.green, sAnual.red);
-  periodos.push({ label: `${h.substring(0,4)} (anual)`, sub: `${sAnual.green+sAnual.red} apostas`, pct: pAnual });
-
-  document.getElementById('por-periodo').innerHTML = periodos.map(p=>`
-    <div class="per-row">
-      <div class="per-left">
-        <div class="per-label">${p.label}</div>
-        <div class="per-sub">${p.sub}</div>
-      </div>
-      <div class="per-pct" style="color:${p.pct!==null?corP(p.pct):'var(--text3)'}">${p.pct!==null?p.pct+'%':'--'}</div>
-    </div>`).join('');
+  document.getElementById('por-periodo').innerHTML = html||'<div class="empty">Sem dados</div>';
 }
 
 function renderConfianca(conf){
@@ -462,37 +516,57 @@ function renderConfianca(conf){
 }
 
 function renderMultiplas(){
-  const h = hoje();
-  const recentes = _multiplasDias.slice().sort((a,b)=>b.data.localeCompare(a.data)).slice(0,10);
+  const recentes = _multiplasDias.slice().sort((a,b)=>b.data.localeCompare(a.data));
   if(!recentes.length){ document.getElementById('multiplas-hist').innerHTML='<div class="empty">Sem múltiplas ainda</div>'; return; }
-  const linhas = [];
+
+  // Calcular assertividade das múltiplas (excluir pendentes)
+  let mG=0, mR=0;
+  const linhas=[];
   for(const d of recentes){
-    const m = d.multiplas;
-    if(m?.multipla_a){
-      const r = d.res?.multipla_a?.resultado||(m.multipla_a?'pendente':null);
-      const odd = m.multipla_a.odd_total ? Number(m.multipla_a.odd_total).toFixed(2) : '--';
-      const njogos = m.multipla_a.jogos?.length||'?';
-      linhas.push({ data: d.data, tipo: 'Múltipla A', sub: `${njogos} jogos · odd ${odd}`, resultado: r });
-    }
-    if(m?.multipla_b){
-      const r = d.res?.multipla_b?.resultado||(m.multipla_b?'pendente':null);
-      const odd = m.multipla_b.odd_total ? Number(m.multipla_b.odd_total).toFixed(2) : '--';
-      const njogos = m.multipla_b.jogos?.length||'?';
-      linhas.push({ data: d.data, tipo: 'Múltipla B', sub: `${njogos} jogos · odd ${odd}`, resultado: r });
+    const m=d.multiplas;
+    for(const [tipo,key] of [['A','multipla_a'],['B','multipla_b']]){
+      if(!m?.[key]) continue;
+      const r=d.res?.[key]?.resultado||(m[key]?'pendente':null);
+      const odd=m[key].odd_total?Number(m[key].odd_total).toFixed(2):'--';
+      const njogos=m[key].jogos?.length||'?';
+      if(r==='green') mG++;
+      else if(r==='red') mR++;
+      linhas.push({data:d.data,tipo:`Múltipla ${tipo}`,sub:`${njogos} jogos · odd ${odd}`,resultado:r});
     }
   }
-  document.getElementById('multiplas-hist').innerHTML = linhas.slice(0,12).map(l=>{
-    const badge = l.resultado==='green' ? '<span class="mult-badge mb-green">GREEN</span>'
-                : l.resultado==='red'   ? '<span class="mult-badge mb-red">RED</span>'
-                : '<span class="mult-badge mb-pend">pendente</span>';
-    return `<div class="mult-row">
-      <div class="mult-left">
-        <div class="mult-data">${fmtD(l.data)} · ${l.tipo}</div>
-        <div class="mult-tipo">${l.sub}</div>
-      </div>
-      ${badge}
-    </div>`;
+  const total=mG+mR;
+  const pct=total>0?Math.round(mG/total*100):null;
+  const cor=pct===null?'var(--text3)':pct>=60?'var(--green)':pct>=45?'var(--amber)':'var(--red)';
+
+  const listHtml=linhas.slice(0,16).map(l=>{
+    const badge=l.resultado==='green'?'<span class="mult-badge mb-green">GREEN</span>'
+               :l.resultado==='red'?'<span class="mult-badge mb-red">RED</span>'
+               :'<span class="mult-badge mb-pend">pendente</span>';
+    return `<div class="mult-row"><div class="mult-left"><div class="mult-data">${fmtD(l.data)} · ${l.tipo}</div><div class="mult-tipo">${l.sub}</div></div>${badge}</div>`;
   }).join('');
+
+  document.getElementById('multiplas-hist').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0 14px;border-bottom:1px solid var(--border);margin-bottom:4px">
+      <div style="font-size:32px;font-weight:800;line-height:1;color:${cor}">${pct!==null?pct+'%':'--'}</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text)">assertividade</div>
+        <div style="font-size:11px;color:var(--text3)">${mG}G · ${mR}R · ${total} resolvidas</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;cursor:pointer" onclick="toggleMultLista()" id="mult-lista-hd">
+      <span style="font-size:12px;font-weight:600;color:var(--text2)">Histórico (${linhas.length})</span>
+      <span style="font-size:11px;color:var(--text3)" id="mult-lista-toggle">▼ ver</span>
+    </div>
+    <div id="mult-lista" style="display:none">${listHtml}</div>`;
+}
+
+function toggleMultLista(){
+  const el=document.getElementById('mult-lista');
+  const btn=document.getElementById('mult-lista-toggle');
+  if(!el) return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(btn) btn.textContent=open?'▼ ver':'▲ ocultar';
 }
 
 function toggleAdmin(){
