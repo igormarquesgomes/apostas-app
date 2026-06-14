@@ -7,22 +7,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;}
+body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;font-size:15px;}
 
 /* NAV */
-.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 24px;}
-.nav-brand{font-size:14px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:24px;text-decoration:none;flex-shrink:0;}
+.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 28px;}
+.nav-brand{font-size:16px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:8px;text-decoration:none;flex-shrink:0;}
 .nav-brand span{color:#0F766E;font-weight:300;}
-.nav-links{display:flex;align-items:center;flex:1;overflow-x:auto;}
-.nl{padding:0 13px;height:46px;display:flex;align-items:center;font-size:12px;font-weight:500;color:#94A3B8;text-decoration:none;transition:color .12s;white-space:nowrap;border-bottom:2px solid transparent;}
+.nav-links{display:flex;align-items:center;flex:1;gap:2px;padding:0 8px;overflow-x:auto;}
+.nl{padding:0 16px;height:46px;display:flex;align-items:center;font-size:13px;font-weight:500;color:#94A3B8;text-decoration:none;transition:color .12s;white-space:nowrap;border-bottom:2px solid transparent;}
 .nl:hover{color:#475569;}
 .nl.a{color:#0F766E;border-bottom-color:#0F766E;font-weight:600;}
 
 /* PAGE */
-.page{padding:28px 28px 40px;max-width:900px;margin:0 auto;}
-.page-hd{margin-bottom:22px;}
-.page-title{font-size:22px;font-weight:800;color:#1E293B;letter-spacing:-0.5px;margin-bottom:3px;}
-.page-sub{font-size:13px;color:#94A3B8;font-weight:300;}
+.page{padding:28px 32px 40px;max-width:1000px;margin:0 auto;}
+.page-hd{margin-bottom:24px;}
+.page-title{font-size:24px;font-weight:800;color:#1E293B;letter-spacing:-0.5px;margin-bottom:4px;}
+.page-sub{font-size:14px;color:#94A3B8;font-weight:300;}
 
 /* GRUPO (tipo de relatório) */
 .grupo{margin-bottom:24px;}
@@ -34,21 +34,21 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 /* REPORT CARD */
 .rel-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;margin-bottom:8px;transition:border-color .15s;}
 .rel-card:hover{border-color:#CBD5E1;}
-.rel-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;gap:12px;}
+.rel-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;gap:12px;}
 .rel-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0;}
-.rel-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.rel-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .ico-d{background:#EFF6FF;} .ico-w{background:#F0FDF9;} .ico-m{background:#F5F3FF;} .ico-s{background:#FFFBEB;}
 .rel-meta{flex:1;min-width:0;}
-.rel-titulo{font-size:13px;font-weight:600;color:#1E293B;margin-bottom:3px;}
+.rel-titulo{font-size:14px;font-weight:600;color:#1E293B;margin-bottom:3px;}
 .rel-periodo{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.tipo-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:20px;}
+.tipo-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:20px;}
 .tb-d{background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;}
 .tb-w{background:#F0FDF9;color:#0F766E;border:1px solid #99F6E4;}
 .tb-m{background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE;}
 .tb-s{background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;}
-.rel-data{font-size:11px;color:#94A3B8;}
+.rel-data{font-size:12px;color:#94A3B8;}
 .rel-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.assert-badge{font-size:16px;font-weight:800;padding:3px 10px;border-radius:8px;}
+.assert-badge{font-size:17px;font-weight:800;padding:4px 12px;border-radius:8px;}
 .ab-good{color:#0F766E;background:#F0FDF9;}
 .ab-ok{color:#D97706;background:#FFFBEB;}
 .ab-bad{color:#DC2626;background:#FEF2F2;}

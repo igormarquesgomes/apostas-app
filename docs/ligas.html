@@ -7,50 +7,50 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;}
+body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;font-size:15px;}
 
 /* NAV */
-.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 24px;}
-.nav-brand{font-size:14px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:24px;text-decoration:none;flex-shrink:0;}
+.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 28px;}
+.nav-brand{font-size:16px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:8px;text-decoration:none;flex-shrink:0;}
 .nav-brand span{color:#0F766E;font-weight:300;}
-.nav-links{display:flex;align-items:center;flex:1;overflow-x:auto;}
-.nl{padding:0 13px;height:46px;display:flex;align-items:center;font-size:12px;font-weight:500;color:#94A3B8;text-decoration:none;transition:color .12s;white-space:nowrap;border-bottom:2px solid transparent;}
+.nav-links{display:flex;align-items:center;flex:1;gap:2px;padding:0 8px;overflow-x:auto;}
+.nl{padding:0 16px;height:46px;display:flex;align-items:center;font-size:13px;font-weight:500;color:#94A3B8;text-decoration:none;transition:color .12s;white-space:nowrap;border-bottom:2px solid transparent;}
 .nl:hover{color:#475569;}
 .nl.a{color:#0F766E;border-bottom-color:#0F766E;font-weight:600;}
 
 /* PAGE */
-.page{padding:28px 28px 40px;max-width:1200px;margin:0 auto;}
-.page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
-.page-title{font-size:22px;font-weight:800;color:#1E293B;letter-spacing:-0.5px;}
-.page-sub{font-size:13px;color:#94A3B8;margin-top:3px;font-weight:300;}
+.page{padding:28px 32px 40px;max-width:1400px;margin:0 auto;}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.page-title{font-size:24px;font-weight:800;color:#1E293B;letter-spacing:-0.5px;}
+.page-sub{font-size:14px;color:#94A3B8;margin-top:3px;font-weight:300;}
 .toggle-wrap{display:flex;gap:3px;background:#fff;border:1px solid #CBD5E1;border-radius:8px;padding:3px;align-self:flex-start;}
-.tog-btn{font-size:12px;font-weight:600;padding:6px 16px;border-radius:5px;border:none;background:transparent;color:#475569;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;}
+.tog-btn{font-size:13px;font-weight:600;padding:6px 16px;border-radius:5px;border:none;background:transparent;color:#475569;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;}
 .tog-btn.active{background:#F0FDF9;color:#0F766E;}
 
 /* SUMMARY BAR */
-.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-.sc{background:#fff;border-radius:10px;border:1px solid #E2E8F0;padding:13px 16px;}
-.sl{font-size:9px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
-.sv{font-size:22px;font-weight:800;color:#1E293B;line-height:1;}
+.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.sc{background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:16px 20px;}
+.sl{font-size:11px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.sv{font-size:26px;font-weight:800;color:#1E293B;line-height:1;}
 
 /* PANEL */
 .panel{background:#fff;border-radius:12px;border:1px solid #E2E8F0;overflow:hidden;}
-.panel-head{padding:13px 18px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;}
-.panel-title{font-size:10px;font-weight:700;color:#1E293B;text-transform:uppercase;letter-spacing:.6px;}
-.panel-sub{font-size:11px;color:#94A3B8;}
+.panel-head{padding:14px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;}
+.panel-title{font-size:11px;font-weight:700;color:#1E293B;text-transform:uppercase;letter-spacing:.6px;}
+.panel-sub{font-size:12px;color:#94A3B8;}
 
 /* LIGAS TABLE */
-.liga-thead{display:grid;grid-template-columns:36px 1fr 100px 90px 90px 90px 90px 110px;gap:12px;padding:7px 18px 8px;border-bottom:2px solid #E2E8F0;}
-.th{font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.7px;}
-.liga-row{display:grid;grid-template-columns:36px 1fr 100px 90px 90px 90px 90px 110px;gap:12px;align-items:center;padding:11px 18px;border-bottom:1px solid #F1F5F9;cursor:pointer;}
+.liga-thead{display:grid;grid-template-columns:36px 1fr 100px 90px 90px 90px 90px 110px;gap:12px;padding:8px 20px 9px;border-bottom:2px solid #E2E8F0;}
+.th{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.7px;}
+.liga-row{display:grid;grid-template-columns:36px 1fr 100px 90px 90px 90px 90px 110px;gap:12px;align-items:center;padding:13px 20px;border-bottom:1px solid #F1F5F9;cursor:pointer;}
 .liga-row:last-child{border-bottom:none;}
 .liga-row:hover{background:#FAFAF8;}
 .liga-row.open{background:#F8FFFE;}
 .liga-rank{font-size:13px;font-weight:800;color:#CBD5E1;}
-.liga-nome{font-size:13px;font-weight:700;color:#1E293B;}
-.liga-pais{font-size:10px;color:#94A3B8;margin-top:1px;}
-.liga-total{font-size:11px;color:#94A3B8;}
-.pct-val{font-size:14px;font-weight:800;}
+.liga-nome{font-size:14px;font-weight:700;color:#1E293B;}
+.liga-pais{font-size:11px;color:#94A3B8;margin-top:1px;}
+.liga-total{font-size:12px;color:#94A3B8;}
+.pct-val{font-size:15px;font-weight:800;}
 .pct-val.g{color:#0F766E;}.pct-val.a{color:#F59E0B;}.pct-val.r{color:#E11D48;}.pct-val.nd{color:#CBD5E1;}
 .tag{font-size:10px;padding:3px 9px;border-radius:5px;font-weight:700;white-space:nowrap;}
 .tg{color:#0F766E;background:#CCFBF1;}.tw{color:#B45309;background:#FEF3C7;}.tr{color:#BE123C;background:#FFE4E6;}.tp{color:#94A3B8;background:#F1F5F9;}
