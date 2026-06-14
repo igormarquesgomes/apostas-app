@@ -1182,15 +1182,31 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     }
   }
 
-  // Combinar prioritários + complementares ordenados por prioridade
-  // Limite de 4 apenas às 13:00
+  // 1. Prioritários ordenados por prioridade
   let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
 
+  // 2. Filtrar times já selecionados ANTES de decidir se precisamos de complementares
+  if (timesIgnorar.size > 0) {
+    const antes = jogos.length;
+    jogos = jogos.filter(j => {
+      const casa = j.timeCasa?.toLowerCase();
+      const fora = j.timeFora?.toLowerCase();
+      return !timesIgnorar.has(casa) && !timesIgnorar.has(fora);
+    });
+    const filtrados = antes - jogos.length;
+    if (filtrados > 0) console.log(`🚫 ${filtrados} jogos filtrados (duplicatas) da lista prioritária`);
+  }
+
+  // 3. Se ainda falta, buscar em complementares (já excluindo times ignorados)
   if (jogos.length < metaJogos) {
     const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
     let cont13h = 0;
     const compFiltrado = [];
     for (const j of compOrdenado) {
+      const casa = j.timeCasa?.toLowerCase();
+      const fora = j.timeFora?.toLowerCase();
+      // Ignorar duplicatas também nos complementares
+      if (timesIgnorar.size > 0 && (timesIgnorar.has(casa) || timesIgnorar.has(fora))) continue;
       if (j.horario === '13:00') {
         cont13h++;
         if (cont13h <= 4) compFiltrado.push(j);
@@ -1199,23 +1215,11 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
       }
     }
     const faltam = metaJogos - jogos.length;
-    // Pegar o dobro do necessário para ter reserva após filtro de timesIgnorar
-    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 5)];
+    console.log(`📋 Buscando ${faltam} jogo(s) em ligas complementares → ${compFiltrado.length} candidatos disponíveis`);
+    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 3)];
   }
 
-  // Filtrar times já selecionados (para complemento)
-  if (timesIgnorar.size > 0) {
-    const antes = jogos.length;
-    const jogosNovos = jogos.filter(j => {
-      const casa = j.timeCasa?.toLowerCase();
-      const fora = j.timeFora?.toLowerCase();
-      return !timesIgnorar.has(casa) && !timesIgnorar.has(fora);
-    });
-    const filtrados = antes - jogosNovos.length;
-    if (filtrados > 0) console.log(`🚫 ${filtrados} jogos filtrados (duplicatas)`);
-    jogos = jogosNovos; // não limitar aqui — MARGEM_RESERVA é aplicada abaixo
-    if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis`);
-  }
+  if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis após todos os filtros`);
 
   console.log(`\nJogos selecionados: ${jogos.length}`);
   jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
