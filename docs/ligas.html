@@ -229,7 +229,7 @@ function renderLigas(){
     const pe=mktPct(l.mercados,'escanteios');
     const pr=mktPct(l.mercados,'resultado');
     const pc=mktPct(l.mercados,'cartoes');
-    const id=`lig-${l.liga_id||i}`;
+    const id=`lig-${i}`;
     const rank=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
     return`
       <div class="liga-row" id="row-${id}" onclick="tog('${id}')">
