@@ -875,7 +875,7 @@ async function coletarEstatisticas(teamId, teamNome, ligaId, oponenteId) {
   const mediaGols = calcularMediaGols(ultimosJogos, teamId);
 
   // Calcular média de escanteios e cartões dos últimos jogos
-  let totalEscanteios = 0, totalCartoes = 0, countStats = 0;
+  let totalEscanteios = 0, totalCartoes = 0, countStats = 0, countCartoes = 0;
   for (const f of ultimosJogos) {
     if (f.statistics) {
       const statsTime = f.statistics.find(s => s.team?.id === teamId);
@@ -883,7 +883,7 @@ async function coletarEstatisticas(teamId, teamNome, ligaId, oponenteId) {
         const esc = statsTime.statistics?.find(s => s.type === 'Corner Kicks')?.value;
         const cart = statsTime.statistics?.find(s => s.type === 'Yellow Cards')?.value;
         if (esc) { totalEscanteios += parseInt(esc) || 0; countStats++; }
-        if (cart) totalCartoes += parseInt(cart) || 0;
+        if (cart) { totalCartoes += parseInt(cart) || 0; countCartoes++; }
       }
     }
   }
@@ -892,7 +892,7 @@ async function coletarEstatisticas(teamId, teamNome, ligaId, oponenteId) {
     forma,
     mediaGols,
     mediaEscanteios: countStats > 0 ? (totalEscanteios / countStats).toFixed(1) : '-',
-    mediaCartoes: countStats > 0 ? (totalCartoes / countStats).toFixed(1) : '-',
+    mediaCartoes: countCartoes > 0 ? (totalCartoes / countCartoes).toFixed(1) : '-',
     h2hTexto: h2h.slice(0,5).map(f => {
       const data = (f.fixture?.date||'').substring(0,10);
       const gh = f.goals?.home ?? '-', ga = f.goals?.away ?? '-';
@@ -2388,8 +2388,8 @@ async function validarMultipla(multipla, resultadosApostas) {
           if (/cancelado|adiado|suspens/i.test(txt.split('\n').find(l => l.toLowerCase().includes(nc)) || '')) {
             resultadosJogos[idx] = 'cancelado';
           } else {
-            const m = txt.match(new RegExp(nc + '[^\n]*?(\d+)[-x](\d+)', 'i'))
-                    || txt.match(new RegExp('(\d+)[-x](\d+)[^\n]*' + nf, 'i'));
+            const m = txt.match(new RegExp(nc + '[^\\n]*?(\\d+)[-x](\\d+)', 'i'))
+                    || txt.match(new RegExp('(\\d+)[-x](\\d+)[^\\n]*' + nf, 'i'));
             if (m) {
               const gC = parseInt(m[1]), gF = parseInt(m[2]);
               resultadosJogos[idx] = verificarAposta({...j}, gC, gF, null);
@@ -2746,10 +2746,11 @@ async function agentValidar(data, opcoes = {}) {
         const resA = await validarMultipla(rowM.multiplas.multipla_a, row.resultados.apostas || []);
         const resB = await validarMultipla(rowM.multiplas.multipla_b, row.resultados.apostas || []);
         if (resA || resB) {
+          const prev = resMultExistente || {};
           await dbSaveResultadosMultiplas(data, {
             validado_em: new Date().toISOString(),
-            multipla_a: resA,
-            multipla_b: resB
+            multipla_a: resA || prev.multipla_a || null,
+            multipla_b: resB || prev.multipla_b || null,
           });
           console.log(`✅ Múltiplas: A=${resA?.resultado||'?'} B=${resB?.resultado||'?'}`);
         }
@@ -2825,8 +2826,13 @@ async function agentValidar(data, opcoes = {}) {
           if (!contarRequisicao()) { resultados.push({ encontrado: false, placar: null, resultado_aposta: 'pendente', motivo: 'limite API', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora }); continue; }
           const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${data}&timezone=America/Sao_Paulo`, { headers: { 'x-apisports-key': APIFOOTBALL_KEY } });
           const json = await res.json();
-          cacheFixtures = json.response || [];
-          cacheFixtures._ts = agora; // Timestamp para controle de recarregamento
+          const fixtures = json.response;
+          if (!Array.isArray(fixtures) || fixtures.length === 0) {
+            console.log(`⚠️ Fixtures vazios ou erro de API — cache não atualizado`);
+          } else {
+            cacheFixtures = fixtures;
+            cacheFixtures._ts = agora;
+          }
           console.log(`📊 Fixtures carregados: ${cacheFixtures.length} jogos | Req: ${reqHoje}/${LIMITE_SEGURO}`);
           await sleep(300);
         }
@@ -3348,7 +3354,8 @@ Seja direto e acionável. Máx 400 palavras. A IA que ler este relatório amanh�
           resultadoAlt = calcularResultadoAlternativaTexto(alt.aposta, res.mercados_resultado?.[alt.mercado]);
         } else if (res.placar) {
           const jogoAlt = { ...aposta, mercado: alt.mercado, aposta: alt.aposta };
-          resultadoAlt = verificarAposta(jogoAlt, ...res.placar.split('-').map(Number), statsAlt);
+          const [gcAlt, gfAlt] = res.placar.split('-').map(Number);
+          resultadoAlt = verificarAposta(jogoAlt, gcAlt, gfAlt, statsAlt);
         }
         if (!['green','red'].includes(resultadoAlt)) continue;
         if (!statsPorLiga[aposta.ligaId].mercados[alt.mercado]) statsPorLiga[aposta.ligaId].mercados[alt.mercado] = { green: 0, red: 0 };
@@ -3897,7 +3904,8 @@ app.post('/sincronizar-ligas', async (req, res) => {
               resultadoAlt = calcularResultadoAlternativaTexto(alt.aposta, res.mercados_resultado?.[alt.mercado]);
             } else if (res.placar) {
               const jogoAlt = { ...aposta, mercado: alt.mercado, aposta: alt.aposta };
-              resultadoAlt = verificarAposta(jogoAlt, ...res.placar.split('-').map(Number), statsAlt);
+              const [gcAlt2, gfAlt2] = res.placar.split('-').map(Number);
+              resultadoAlt = verificarAposta(jogoAlt, gcAlt2, gfAlt2, statsAlt);
             }
             if (!['green','red'].includes(resultadoAlt)) continue;
             if (!statsPorLiga[aposta.ligaId].mercados[alt.mercado]) statsPorLiga[aposta.ligaId].mercados[alt.mercado] = { green: 0, red: 0 };
@@ -4541,7 +4549,8 @@ app.get('/apostas-resultado/:data', async (req, res) => {
 
 function agendarRotina() {
   const agora = new Date();
-  const prox = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()+1, 0, 5, 0));
+  // 06:05 UTC = 03:05 Brasília (UTC-3), após os jogos europeus terminarem
+  const prox = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()+1, 6, 5, 0));
   const ms = prox.getTime() - agora.getTime();
   console.log(`⏰ Próxima rotina em ${Math.round(ms/60000)} min`);
   setTimeout(() => {
