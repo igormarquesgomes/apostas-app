@@ -1736,6 +1736,480 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
   return resultado;
 }
 
+// ─── Multi-agente: utilitários ──────────────────────────────
+
+function filtrarMemoria(blocoMem, palavrasChave) {
+  if (!blocoMem) return '';
+  return blocoMem.split('\n')
+    .filter(l => palavrasChave.some(p => l.toLowerCase().includes(p)))
+    .join('\n');
+}
+
+async function chamarIASonnet(prompt, maxTokens = 4000) {
+  const modelos = ['claude-sonnet-4-5', 'claude-3-5-sonnet-20241022'];
+  for (const modelo of modelos) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: modelo, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
+      });
+      const json = await res.json();
+      if (!json.error) {
+        registrarCusto(modelo, json.usage?.input_tokens || 2000, json.usage?.output_tokens || 500);
+        return (json.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+      }
+    } catch(e) {}
+  }
+  return chamarIA(prompt, maxTokens);
+}
+
+// ─── Multi-agente: carregador de fixtures ───────────────────
+
+async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar) {
+  const [hM, mM] = horaMin.split(':').map(Number);
+  const minMinutos = hM * 60 + mM;
+  const fixtures = await buscarFixturesPorData(data);
+  const jogosMap = new Map(), jogosComp = new Map();
+
+  for (const f of fixtures) {
+    const ts = f.fixture?.timestamp, status = f.fixture?.status?.short, ligaId = f.league?.id;
+    const timeCasa = f.teams?.home?.name, timeFora = f.teams?.away?.name;
+    if (!ts || !timeCasa || !timeFora || status !== 'NS') continue;
+    const ligaNome = f.league?.name || '';
+    const subRegex = /\bU(1[7-9]|20)\b/i;
+    if (subRegex.test(timeCasa) || subRegex.test(timeFora) || subRegex.test(ligaNome)) continue;
+    const ligaLower = ligaNome.toLowerCase();
+    if (ligaLower.includes('amateur') || ligaLower.includes('reserve') || ligaLower.includes('youth')) continue;
+    const dt = new Date(ts * 1000);
+    let hBR = dt.getUTCHours() - 3; const mBR = dt.getUTCMinutes();
+    if (hBR < 0) hBR += 24;
+    const totalMin = hBR * 60 + mBR;
+    if (totalMin < minMinutos || (hBR >= 1 && hBR < 10)) continue;
+    const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
+    const key = `${timeCasa}-${timeFora}`, pais = f.league?.country || '';
+    if (LIGAS_IGNORAR.has(ligaId) || ligaBrasileiraNaoRelevante(ligaNome, pais)) continue;
+    const ligaMatch = LIGAS_PRIORITY[ligaId];
+    if (ligaMatch) {
+      let priFinal = ligaMatch.pri;
+      if (ligaMatch.pri === 5 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
+      else if (ligaMatch.selecaoCampea) { if (!isSelecaoCampea(timeCasa, timeFora)) continue; }
+      if (!jogosMap.has(key)) { dbSaveLiga(ligaMatch.nome, ligaId, pais).catch(()=>{}); jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); }
+    } else {
+      const paisLower = pais.toLowerCase(), isWorldLeague = paisLower === 'world';
+      if (!isWorldLeague && PAISES_IGNORAR_COMP.has(paisLower)) continue;
+      if (isWorldLeague) { const priWorld = (ligaNome.toLowerCase().includes('friendly')||ligaNome.toLowerCase().includes('international')) ? 85 : 150; if (!jogosComp.has(key)) jogosComp.set(key, { liga: ligaNome, tipo: 'copa', pri: priWorld, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); continue; }
+      let priComp = 200, tipoComp = 'other';
+      const EUROPEUS = ["england","scotland","spain","italy","france","germany","portugal","netherlands","belgium","turkey","austria","switzerland","denmark","norway","croatia","serbia","ukraine","greece","russia","poland","czech-republic","finland","sweden","hungary","romania","slovakia","bulgaria","georgia","albania","armenia","estonia","latvia","lithuania","luxembourg","malta","wales","ireland","iceland","cyprus","north macedonia","montenegro","kosovo","andorra","faroe islands","gibraltar","bosnia"];
+      const SUL_AMERICANOS = ["argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"];
+      const AFRICA_ORIENTE = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
+      if (EUROPEUS.includes(paisLower)) { tipoComp = 'eu'; priComp = isTimesEuropaB(timeCasa, timeFora) ? 50 : 90; }
+      else if (SUL_AMERICANOS.includes(paisLower)) { tipoComp = 'sul'; priComp = 70; }
+      else if (AFRICA_ORIENTE.includes(paisLower)) { tipoComp = 'af'; priComp = 80; }
+      if (!jogosComp.has(key)) { dbSaveLiga(`${ligaNome} (${pais})`, ligaId, pais).catch(()=>{}); jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); }
+    }
+  }
+
+  const todasLigaIds = [...new Set([...jogosMap.values(), ...jogosComp.values()].map(j => j.ligaId).filter(Boolean))];
+  const ligaStatsMap = new Map();
+  if (todasLigaIds.length > 0) {
+    try {
+      const resL = await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=in.(${todasLigaIds.join(',')})&select=liga_id,nome,green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      for (const row of (await resL.json() || [])) { if (row.total >= 3) ligaStatsMap.set(row.liga_id, { ...row, assertividade: Math.round((row.green / row.total) * 100) }); }
+    } catch(e) {}
+  }
+
+  const memoria = await buscarMemoria();
+  let blocoMem = memoria ? `\nHISTÓRICO DE CALIBRAÇÃO:\n${memoria.substring(0,3000)}\n` : '';
+  if (ligaStatsMap.size > 0) {
+    let blocoLigas = '\nASSERTIVIDADE HISTÓRICA POR LIGA:\n';
+    for (const [lid, st] of ligaStatsMap) {
+      const merc = Object.entries(st.mercados || {}).filter(([,m]) => (m.green+m.red) >= 2).map(([nm,m]) => { const tot=m.green+m.red; return `${nm}:${Math.round((m.green/tot)*100)}%(${m.green}G/${m.red}R)`; }).join(' ');
+      blocoLigas += `  Liga ${lid} (${st.nome||'?'}): geral ${st.assertividade}%${merc ? ' — '+merc : ''}\n`;
+    }
+    blocoMem = (blocoMem||'') + blocoLigas;
+  }
+
+  for (const [, jogo] of jogosComp) {
+    const st = ligaStatsMap.get(jogo.ligaId);
+    if (st) {
+      if (st.assertividade >= 80) jogo.pri = Math.min(jogo.pri, 60);
+      else if (st.assertividade >= 70) jogo.pri = Math.min(jogo.pri, 70);
+      else if (st.assertividade >= 60) jogo.pri = Math.min(jogo.pri, 80);
+      else if (st.assertividade < 40 && st.total >= 5) jogo.pri = Math.max(jogo.pri, 180);
+    }
+  }
+
+  let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
+  if (timesIgnorar.size > 0) jogos = jogos.filter(j => !timesIgnorar.has(j.timeCasa?.toLowerCase()) && !timesIgnorar.has(j.timeFora?.toLowerCase()));
+  if (jogos.length < metaJogos) {
+    const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
+    const compFiltrado = []; let cont13h = 0;
+    for (const j of compOrdenado) {
+      if (timesIgnorar.size > 0 && (timesIgnorar.has(j.timeCasa?.toLowerCase()) || timesIgnorar.has(j.timeFora?.toLowerCase()))) continue;
+      if (j.horario === '13:00') { cont13h++; if (cont13h <= 4) compFiltrado.push(j); } else compFiltrado.push(j);
+    }
+    jogos = [...jogos, ...compFiltrado.slice(0, (metaJogos - jogos.length) * 3)];
+  }
+  if (!jogos.length) return null;
+
+  const MARGEM = 3;
+  jogos = jogos.slice(0, Math.min(metaJogos + MARGEM, jogos.length));
+  console.log(`\nMulti-agente — jogos selecionados: ${jogos.length}`);
+  jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
+
+  for (const f of fixtures) {
+    const tCasaNome = f.teams?.home?.name, tForaNome = f.teams?.away?.name;
+    const jogo = jogos.find(j => j.timeCasa === tCasaNome && j.timeFora === tForaNome);
+    if (!jogo || jogo._stats) continue;
+    const [statsCasa, statsFora] = await Promise.all([
+      coletarEstatisticas(f.teams?.home?.id, tCasaNome, f.league?.id, f.teams?.away?.id),
+      coletarEstatisticas(f.teams?.away?.id, tForaNome, f.league?.id, f.teams?.home?.id)
+    ]);
+    await sleep(300);
+    jogo._stats = { statsCasa, statsFora };
+    console.log(`  ✅ Stats: ${tCasaNome} vs ${tForaNome}`);
+  }
+
+  const ano = parseInt(data.substring(0,4)), mes = parseInt(data.substring(5,7)), dia = parseInt(data.substring(8,10));
+  const df = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano}`;
+  return { jogos, ligaStatsMap, blocoMem, fixtures, df };
+}
+
+// ─── Multi-agente: prompts especializados ────────────────────
+
+function _promptAgentGols(jogo, ligaStatsMap, memGols) {
+  const sc = jogo._stats?.statsCasa, sf = jogo._stats?.statsFora;
+  const st = ligaStatsMap?.get(jogo.ligaId);
+  const gPerf = st?.mercados?.gols;
+  const ligaGols = gPerf && (gPerf.green+gPerf.red) >= 2 ? `${Math.round(gPerf.green/(gPerf.green+gPerf.red)*100)}% (${gPerf.green}G/${gPerf.red}R)` : 'sem histórico';
+  return `Especialista em GOLS. Analise APENAS o mercado de gols.
+
+Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
+Casa: média ${sc?.mediaGols||'?'} gols/jogo | forma ${sc?.forma||'?'}
+Fora: média ${sf?.mediaGols||'?'} gols/jogo | forma ${sf?.forma||'?'}
+H2H: ${sc?.h2hTexto||'sem dados'}
+Liga histórico gols: ${ligaGols}
+${memGols ? `Memória:\n${memGols.substring(0,350)}` : ''}
+
+Avalie: Over/Under 0.5, 1.5, 2.5, 3.5, BTTS (ambos marcam), Primeiro tempo com gol.
+Calcule probabilidade real (0.0–1.0) baseada nos dados.
+
+Retorne APENAS JSON:
+{"mercado":"gols","opcao_1":{"aposta":"Over 1.5 gols","probabilidade":0.85,"razao":"..."},"opcao_2":{"aposta":"Over 2.5 gols","probabilidade":0.68,"razao":"..."}}`;
+}
+
+function _promptAgentResultado(jogo, ligaStatsMap, memResultado) {
+  const sc = jogo._stats?.statsCasa, sf = jogo._stats?.statsFora;
+  const st = ligaStatsMap?.get(jogo.ligaId);
+  const rPerf = st?.mercados?.resultado;
+  const ligaRes = rPerf && (rPerf.green+rPerf.red) >= 2 ? `${Math.round(rPerf.green/(rPerf.green+rPerf.red)*100)}% (${rPerf.green}G/${rPerf.red}R)` : 'sem histórico';
+  return `Especialista em RESULTADO. Analise APENAS o resultado do jogo.
+
+Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
+Casa: forma ${sc?.forma||'?'} | média gols ${sc?.mediaGols||'?'}
+Fora: forma ${sf?.forma||'?'} | média gols ${sf?.mediaGols||'?'}
+H2H: ${sc?.h2hTexto||'sem dados'}
+Liga histórico resultado: ${ligaRes}
+${memResultado ? `Memória:\n${memResultado.substring(0,350)}` : ''}
+
+Avalie: Casa vence, Fora vence, Empate, Dupla Chance 1X, Dupla Chance X2.
+Calcule probabilidade real (0.0–1.0).
+
+Retorne APENAS JSON:
+{"mercado":"resultado","opcao_1":{"aposta":"Dupla Chance Casa (1X)","probabilidade":0.78,"razao":"..."},"opcao_2":{"aposta":"Casa vence","probabilidade":0.62,"razao":"..."}}`;
+}
+
+function _promptAgentEscanteios(jogo, ligaStatsMap, memEscanteios) {
+  const sc = jogo._stats?.statsCasa, sf = jogo._stats?.statsFora;
+  const st = ligaStatsMap?.get(jogo.ligaId);
+  const ePerf = st?.mercados?.escanteios;
+  const ligaEsc = ePerf && (ePerf.green+ePerf.red) >= 2 ? `${Math.round(ePerf.green/(ePerf.green+ePerf.red)*100)}% (${ePerf.green}G/${ePerf.red}R)` : 'sem histórico';
+  const mediaLiga = st?.media_escanteios ? `${st.media_escanteios.toFixed(1)} (${st.amostras_escanteios||0} jogos)` : 'não disponível';
+  const escC = parseFloat(sc?.mediaEscanteios)||0, escF = parseFloat(sf?.mediaEscanteios)||0;
+  const mediaComb = (escC > 0 && escF > 0) ? (escC + escF).toFixed(1) : '?';
+  return `Especialista em ESCANTEIOS. Analise APENAS escanteios.
+
+Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
+Casa: média ${sc?.mediaEscanteios||'?'} escanteios/jogo
+Fora: média ${sf?.mediaEscanteios||'?'} escanteios/jogo
+Média combinada estimada: ${mediaComb}
+LigaMedia real de escanteios: ${mediaLiga}
+Liga histórico escanteios: ${ligaEsc}
+${memEscanteios ? `Memória:\n${memEscanteios.substring(0,300)}` : ''}
+
+REGRA: Se LigaMedia disponível e linha sugerida > LigaMedia + 1.5, use linha mais conservadora.
+Avalie: Over/Under 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, Mais escanteios Casa/Fora.
+
+Retorne APENAS JSON:
+{"mercado":"escanteios","opcao_1":{"aposta":"Over 8.5 escanteios","probabilidade":0.80,"razao":"..."},"opcao_2":{"aposta":"Over 7.5 escanteios","probabilidade":0.88,"razao":"..."}}`;
+}
+
+function _promptAgentCartoes(jogo, ligaStatsMap, memCartoes) {
+  const sc = jogo._stats?.statsCasa, sf = jogo._stats?.statsFora;
+  const st = ligaStatsMap?.get(jogo.ligaId);
+  const cPerf = st?.mercados?.cartoes;
+  const ligaCart = cPerf && (cPerf.green+cPerf.red) >= 2 ? `${Math.round(cPerf.green/(cPerf.green+cPerf.red)*100)}% (${cPerf.green}G/${cPerf.red}R)` : 'sem histórico';
+  const mediaLigaCart = st?.media_cartoes ? `${st.media_cartoes.toFixed(1)} (${st.amostras_cartoes||0} jogos)` : 'não disponível';
+  const cartC = parseFloat(sc?.mediaCartoes)||0, cartF = parseFloat(sf?.mediaCartoes)||0;
+  const mediaComb = (cartC > 0 && cartF > 0) ? (cartC + cartF).toFixed(1) : '?';
+  return `Especialista em CARTÕES. Analise APENAS cartões.
+
+Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
+Casa: média ${sc?.mediaCartoes||'?'} cartões/jogo
+Fora: média ${sf?.mediaCartoes||'?'} cartões/jogo
+Média combinada estimada: ${mediaComb}
+LigaMedia real de cartões: ${mediaLigaCart}
+Liga histórico cartões: ${ligaCart}
+${memCartoes ? `Memória:\n${memCartoes.substring(0,300)}` : ''}
+
+Avalie: Over/Under 1.5, 2.5, 3.5, 4.5, Mais cartões Casa/Fora.
+Considere rivalidade e contexto (rebaixamento/título = mais cartões).
+
+Retorne APENAS JSON:
+{"mercado":"cartoes","opcao_1":{"aposta":"Over 3.5 cartões","probabilidade":0.65,"razao":"..."},"opcao_2":{"aposta":"Over 2.5 cartões","probabilidade":0.80,"razao":"..."}}`;
+}
+
+function _promptCoordenador(jogo, ligaStatsMap, blocoMem, agentes, df) {
+  const sc = jogo._stats?.statsCasa, sf = jogo._stats?.statsFora;
+  const escC = parseFloat(sc?.mediaEscanteios)||0, escF = parseFloat(sf?.mediaEscanteios)||0;
+  const cartC = parseFloat(sc?.mediaCartoes)||0, cartF = parseFloat(sf?.mediaCartoes)||0;
+  const mediaCombEsc = (escC > 0 && escF > 0) ? (escC + escF).toFixed(1) : '?';
+  const mediaCombCart = (cartC > 0 && cartF > 0) ? (cartC + cartF).toFixed(1) : '?';
+
+  const blocoAg = agentes.map(a => {
+    if (!a) return '';
+    const op1 = a.opcao_1 ? `${a.opcao_1.aposta} (${Math.round((a.opcao_1.probabilidade||0)*100)}%) — ${a.opcao_1.razao}` : 'falhou';
+    const op2 = a.opcao_2 ? `${a.opcao_2.aposta} (${Math.round((a.opcao_2.probabilidade||0)*100)}%) — ${a.opcao_2.razao}` : 'sem opção 2';
+    return `[${a.mercado?.toUpperCase()}] Opção 1: ${op1} | Opção 2: ${op2}`;
+  }).filter(Boolean).join('\n');
+
+  return `COORDENADOR. Escolha a MELHOR aposta para este jogo com base nos especialistas abaixo.
+
+JOGO: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | tipo: ${jogo.tipo||'eu'} | ${jogo.horario} | ${df}
+Casa: forma ${sc?.forma||'?'} | gols ${sc?.mediaGols||'?'} | esc ${sc?.mediaEscanteios||'?'} | cart ${sc?.mediaCartoes||'?'}
+Fora: forma ${sf?.forma||'?'} | gols ${sf?.mediaGols||'?'} | esc ${sf?.mediaEscanteios||'?'} | cart ${sf?.mediaCartoes||'?'}
+
+ANÁLISES ESPECIALIZADAS:
+${blocoAg}
+
+${blocoMem ? `MEMÓRIA DE CALIBRAÇÃO (contexto histórico):\n${blocoMem.substring(0,1200)}` : ''}
+
+CRITÉRIOS DE DECISÃO (siga rigorosamente):
+1. Prioridade 1: probabilidade mais alta (segurança > odd)
+2. Prioridade 2: se probabilidades similares (<5% diferença), use value = odd_real / (1/probabilidade)
+3. NUNCA escolha opção apenas pela odd alta
+4. Se melhor opção de um agente < 55%, use opcao_2 desse agente
+5. confianca: alta ≥ 75% | media 55–74% | baixa < 55%
+
+CAMPO justificativa (PÚBLICO): escreva como especialista em apostas. PROIBIDO usar: "calibração", "assertividade %", "LigaMedia", "especialista", "agente", "sistema". Use apenas: forma recente, H2H, médias, contexto esportivo. 2–3 frases.
+
+Retorne SOMENTE JSON válido:
+{"time_casa":"${jogo.timeCasa}","time_fora":"${jogo.timeFora}","liga":"${jogo.liga}","tipo_liga":"${jogo.tipo||'eu'}","horario":"${jogo.horario}","aposta":"Over 1.5 gols","mercado":"gols","confianca":"alta","probabilidade_estimada":0.85,"odd_sugerida":"1.65","value":1.40,"razao_escolha":"...","aposta_backup":"BTTS","mercado_backup":"gols","media_gols_casa":"${sc?.mediaGols||'?'}","media_gols_fora":"${sf?.mediaGols||'?'}","media_escanteios":"${mediaCombEsc}","media_cartoes":"${mediaCombCart}","forma_casa":"${sc?.forma||'?'}","forma_fora":"${sf?.forma||'?'}","justificativa":"Análise pública aqui.","alternativas":[{"mercado":"gols","aposta":"Over 2.5 gols","confianca":"alta","razao":"..."},{"mercado":"resultado","aposta":"Dupla Chance 1X","confianca":"media","razao":"..."},{"mercado":"escanteios","aposta":"Over 8.5 escanteios","confianca":"media","razao":"..."},{"mercado":"cartoes","aposta":"Over 2.5 cartões","confianca":"baixa","razao":"..."}]}`;
+}
+
+// ─── Multi-agente: parse e análise por jogo ──────────────────
+
+function _parseAgenteJson(txt) {
+  if (!txt) return null;
+  try {
+    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+    if (s === -1 || e === -1) return null;
+    return JSON.parse(txt.slice(s, e+1));
+  } catch(e) { return null; }
+}
+
+async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df) {
+  const label = `${jogo.timeCasa} x ${jogo.timeFora}`;
+  console.log(`\n🤖 Multi-agente: ${label}`);
+  console.log(`  ⚡ Agentes especializados rodando em paralelo...`);
+
+  const memGols       = filtrarMemoria(blocoMem, ['gol', 'over', 'under', 'placar', 'btts', 'marca']);
+  const memResultado  = filtrarMemoria(blocoMem, ['result', 'vence', 'empate', 'dupla chance', '1x', 'x2']);
+  const memEscanteios = filtrarMemoria(blocoMem, ['escanteio', 'corner']);
+  const memCartoes    = filtrarMemoria(blocoMem, ['cartão', 'cartoes', 'amarelo', 'vermelho']);
+
+  const [txtGols, txtResultado, txtEscanteios, txtCartoes] = await Promise.all([
+    chamarIA(_promptAgentGols(jogo, ligaStatsMap, memGols), 600),
+    chamarIA(_promptAgentResultado(jogo, ligaStatsMap, memResultado), 600),
+    chamarIA(_promptAgentEscanteios(jogo, ligaStatsMap, memEscanteios), 600),
+    chamarIA(_promptAgentCartoes(jogo, ligaStatsMap, memCartoes), 600),
+  ]);
+
+  const agGols       = _parseAgenteJson(txtGols);
+  const agResultado  = _parseAgenteJson(txtResultado);
+  const agEscanteios = _parseAgenteJson(txtEscanteios);
+  const agCartoes    = _parseAgenteJson(txtCartoes);
+
+  const logAg = (nome, ag) => {
+    if (!ag?.opcao_1) { console.log(`  ❌ ${nome}: falhou`); return; }
+    const p1 = `${ag.opcao_1.aposta} (${Math.round((ag.opcao_1.probabilidade||0)*100)}%)`;
+    const p2 = ag.opcao_2 ? `${ag.opcao_2.aposta} (${Math.round((ag.opcao_2.probabilidade||0)*100)}%)` : '-';
+    console.log(`  ✅ ${nome}: ${p1} | ${p2}`);
+  };
+  logAg('Gols      ', agGols);
+  logAg('Resultado ', agResultado);
+  logAg('Escanteios', agEscanteios);
+  logAg('Cartões   ', agCartoes);
+
+  const agentes = [agGols, agResultado, agEscanteios, agCartoes].filter(a => a?.opcao_1);
+  if (!agentes.length) { console.log(`  ❌ Todos os agentes falharam — descartando ${label}`); return null; }
+
+  const txtCoord = await chamarIASonnet(_promptCoordenador(jogo, ligaStatsMap, blocoMem, agentes, df), 1500);
+  const resultado = _parseAgenteJson(txtCoord);
+
+  if (!resultado?.aposta || !resultado?.mercado || !resultado?.justificativa) {
+    console.log(`  ❌ Coordenador falhou — descartando ${label}`); return null;
+  }
+
+  const probPct = resultado.probabilidade_estimada ? Math.round(resultado.probabilidade_estimada*100)+'%' : '?';
+  console.log(`  🎯 Coordenador: ${resultado.mercado} ${resultado.aposta} (${probPct}) — value ${resultado.value||'?'}`);
+  return resultado;
+}
+
+// ─── gerarApostasMultiAgente ─────────────────────────────────
+
+async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = new Set()) {
+  console.log('\n🚀 Iniciando geração multi-agente...');
+
+  const loaded = await _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar);
+  if (!loaded?.jogos?.length) { console.log('⚠️ Nenhum jogo disponível para multi-agente'); return null; }
+
+  const { jogos, ligaStatsMap, blocoMem, df } = loaded;
+  const jogosResultado = [];
+
+  for (const jogo of jogos) {
+    try {
+      const res = await _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df);
+      if (res) jogosResultado.push(res);
+    } catch(e) { console.error(`❌ Multi-agente erro ${jogo.timeCasa} x ${jogo.timeFora}:`, e.message); }
+    await sleep(3000);
+  }
+
+  console.log(`\n✅ Multi-agente: ${jogosResultado.length} apostas brutas`);
+  if (!jogosResultado.length) return null;
+
+  // ── Pós-processamento idêntico ao gerarApostas ─────────────
+
+  function normalizarFormatoAlternativo(j) {
+    if (!j) return j;
+    if (j.status === 'nao_recomendado' && j.aposta_se_forcado) {
+      const ap = j.aposta_se_forcado.toLowerCase();
+      let mercado = j.mercado_evitar;
+      if (ap.includes('vence')||ap.includes('empat')||ap.includes('dupla')||ap.includes('chance')) mercado = 'resultado';
+      else if (ap.includes('escantei')) mercado = 'escanteios';
+      else if (ap.includes('cart')) mercado = 'cartoes';
+      else if (ap.includes('gol')||ap.includes('over')||ap.includes('under')) mercado = 'gols';
+      return { ...j, aposta: j.aposta_se_forcado, mercado: mercado||'resultado', confianca: j.confianca_alternativa||'baixa', justificativa: j.razao_alternativa||'Análise sem padrão claro.', razao_escolha: j.razao_principal||'' };
+    }
+    return j;
+  }
+  function validarCamposEssenciais(j) {
+    if (!j) return false;
+    if (!j.aposta || j.aposta === 'undefined' || j.aposta.trim() === '') return false;
+    if (!j.mercado || j.mercado === 'undefined') return false;
+    if (!j.justificativa || j.justificativa === '-' || j.justificativa.trim() === '') return false;
+    return true;
+  }
+  function gerarJustificativaPosPivot(aposta, mercado, razao, jogo) {
+    const termos = [/calibra[çc][aã]o\b/gi,/assertividade\b/gi,/LigaMedia\b/gi,/pivotad[ao]\b/gi,/nosso modelo\b/gi,/hist[oó]rico do sistema\b/gi,/especialista\b/gi,/agente\b/gi];
+    let base = (razao||'').trim();
+    for (const t of termos) base = base.replace(t, '');
+    base = base.replace(/^[:\s—–-]+/,'').trim();
+    if (!base) return `Análise dos dados recentes aponta ${aposta} como a opção mais consistente para este jogo.`;
+    return base.charAt(0).toUpperCase() + base.slice(1) + (base.endsWith('.')?'':'.');
+  }
+  function calcularScoreProbabilidade(aposta, mercado, jogo) {
+    if (!aposta) return 0;
+    const ap = aposta.toLowerCase();
+    const mg = (parseFloat(jogo.media_gols_casa)||0)+(parseFloat(jogo.media_gols_fora)||0);
+    const me = parseFloat(jogo.media_escanteios)||0, mc = parseFloat(jogo.media_cartoes)||0;
+    const m2 = ap.match(/([\d.]+)/); const linha = m2 ? parseFloat(m2[1]) : null;
+    if (linha === null) return 0;
+    const media = mercado==='gols' ? mg : mercado==='escanteios' ? me : mercado==='cartoes' ? mc : 0;
+    if (!media) return 0;
+    if (ap.includes('over')||ap.includes('mais')) return media - linha;
+    if (ap.includes('under')||ap.includes('menos')) return linha - media;
+    return 0;
+  }
+
+  const norm = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+  const fixtureMap = new Map(), metaMap = new Map();
+  for (const jg of jogos) {
+    const k = `${norm(jg.timeCasa)}|${norm(jg.timeFora)}`;
+    fixtureMap.set(k, jg.fixtureId);
+    metaMap.set(k, { tipo: jg.tipo, liga: jg.liga, pri: jg.pri, ligaId: jg.ligaId, teamCasaId: jg.teamCasaId, teamForaId: jg.teamForaId });
+  }
+
+  const resultado = { jogos: jogosResultado.map(normalizarFormatoAlternativo).filter(validarCamposEssenciais).map(j => {
+    const k = `${norm(j.time_casa)}|${norm(j.time_fora)}`;
+    let fixtureId = fixtureMap.get(k) || null;
+    const meta = metaMap.get(k) || {};
+    if (!fixtureId) {
+      const alt = jogos.find(jg => { const nc=norm(jg.timeCasa),nf=norm(jg.timeFora),jc=norm(j.time_casa),jf=norm(j.time_fora); return nc?.split(' ')[0]===jc?.split(' ')[0] && nf?.split(' ')[0]===jf?.split(' ')[0]; });
+      if (alt) { fixtureId = alt.fixtureId; meta.ligaId = alt.ligaId; }
+    }
+    return { ...j, tipo_liga: meta.tipo||j.tipo_liga||'eu', liga: meta.liga||j.liga||'Internacional', pri: meta.pri||20, fixtureId: fixtureId||null, ligaId: meta.ligaId||j.ligaId||null, teamCasaId: meta.teamCasaId||null, teamForaId: meta.teamForaId||null };
+  }) };
+  resultado.jogos.sort((a,b) => (a.pri||20)-(b.pri||20));
+
+  console.log('\n💰 Buscando odds reais (multi-agente)...');
+  const todasOdds = await buscarOddsDia(data);
+  if (todasOdds) {
+    for (const jogo of resultado.jogos) {
+      const oddsJogo = extrairOdds(todasOdds, jogo.time_casa, jogo.time_fora, jogo.mercado);
+      const oddReal = selecionarOdd(oddsJogo, jogo.aposta, jogo.time_casa, jogo.time_fora);
+      if (oddReal) {
+        jogo.odd_mercado = parseFloat(oddReal);
+        const oddMin = {gols:1.40,resultado:1.50,escanteios:1.55,cartoes:1.55}[jogo.mercado]||1.35;
+        if (parseFloat(oddReal) < oddMin) {
+          jogo.alerta_odd = true; jogo.confianca = 'baixa';
+          if (jogo.aposta_backup && jogo.mercado_backup) {
+            console.log(`  ⚡ Pivotando odd: ${jogo.time_casa} x ${jogo.time_fora} → ${jogo.aposta_backup}`);
+            jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
+            jogo.aposta = jogo.aposta_backup; jogo.mercado = jogo.mercado_backup; jogo.confianca = 'media'; jogo.alerta_odd = false;
+            const altB = jogo.alternativas?.find(a => a.mercado===jogo.mercado_backup && a.aposta===jogo.aposta_backup);
+            jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altB?.razao||'', jogo);
+          }
+        }
+      }
+    }
+  }
+
+  const jogosFinais = [];
+  for (const jogo of resultado.jogos) {
+    const conf = jogo.confianca||'media';
+    const isComp = (jogo.pri||99) >= 60;
+    if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { console.log(`  🗑️  Descartando complementar: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } jogosFinais.push(jogo); continue; }
+    if (conf === 'alta') { jogosFinais.push(jogo); continue; }
+    const alvo = ['nao_recomendado','baixa'].includes(conf) ? ['alta','media'] : ['alta'];
+    const melhor = jogo.alternativas.find(a => alvo.includes(a.confianca) && a.aposta);
+    if (melhor) {
+      const motivo = ['nao_recomendado','baixa'].includes(conf) ? `${conf} → pivotando` : 'buscando alta';
+      console.log(`  ⚡ Pivot(${motivo}): ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → ${melhor.aposta}`);
+      jogo.aposta_original = jogo.aposta_original||jogo.aposta; jogo.mercado_original = jogo.mercado_original||jogo.mercado;
+      jogo.aposta = melhor.aposta; jogo.mercado = melhor.mercado; jogo.confianca = melhor.confianca;
+      jogo.razao_escolha = `Pivotado(${motivo}): ${melhor.razao}`; jogo.justificativa = gerarJustificativaPosPivot(melhor.aposta, melhor.mercado, melhor.razao, jogo);
+      jogosFinais.push(jogo);
+    } else if (isComp && ['nao_recomendado','baixa'].includes(conf)) {
+      const candidatos = jogo.alternativas.filter(a => ['baixa','nao_recomendado'].includes(a.confianca) && a.aposta);
+      const atualScore = calcularScoreProbabilidade(jogo.aposta, jogo.mercado, jogo);
+      let melhorBaixa = null, melhorScore = atualScore;
+      for (const a of candidatos) { if (a.mercado===jogo.mercado && a.aposta===jogo.aposta) continue; const sc2 = calcularScoreProbabilidade(a.aposta, a.mercado, jogo); if (sc2 > melhorScore) { melhorScore = sc2; melhorBaixa = a; } }
+      if (melhorBaixa) { jogo.aposta = melhorBaixa.aposta; jogo.mercado = melhorBaixa.mercado; jogo.razao_escolha = `Pivotado prob: ${melhorBaixa.razao}`; jogo.justificativa = gerarJustificativaPosPivot(melhorBaixa.aposta, melhorBaixa.mercado, melhorBaixa.razao, jogo); }
+      jogo._reservaBaixa = true; jogosFinais.push(jogo);
+    } else { jogosFinais.push(jogo); }
+  }
+
+  jogosFinais.sort((a,b) => { const ord={alta:0,media:1,baixa:2,nao_recomendado:3}; const oa=ord[a.confianca]??2,ob=ord[b.confianca]??2; return oa!==ob ? oa-ob : (a.pri||99)-(b.pri||99); });
+  resultado.jogos = jogosFinais.slice(0, metaJogos);
+  resultado.jogos.forEach((j, idx) => { j.id = idx + 1; });
+
+  const dist = resultado.jogos.reduce((acc,j) => { const c=j.confianca||'media'; acc[c]=(acc[c]||0)+1; return acc; }, {});
+  console.log(`  📊 Multi-agente final: ${Object.entries(dist).map(([c,n])=>`${c}:${n}`).join(' | ')}`);
+  return resultado;
+}
+
 // ─── Geração de Múltiplas ────────────────────────────────────
 const PRIORIDADES_MULTIPLA = new Set([1,2,3,4,5,6]); // Só até pri 6
 
@@ -3044,7 +3518,12 @@ async function rotina04h() {
     console.log(`🚫 Times já selecionados: ${[...timesJaSelecionados].join(', ')}`);
 
     // Gerar apostas passando os times já selecionados para evitar duplicatas
-    const resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
+    let resultado = null;
+    try {
+      resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
+      if (!resultado?.jogos?.length) { console.log(`⚠️ Multi-agente sem jogos — fallback gerarApostas`); resultado = null; }
+    } catch(e) { console.error('❌ Multi-agente falhou, usando fallback:', e.message); }
+    if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
     if (!resultado?.jogos?.length) {
       console.log(`⚠️ ${diaAlvo}: não foi possível gerar novos jogos`);
       continue;
@@ -3097,7 +3576,12 @@ async function rotina05h() {
         jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
       );
       const faltam = 15 - jogos.length;
-      const resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
+      let resultado = null;
+      try {
+        resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
+        if (!resultado?.jogos?.length) { console.log(`⚠️ Multi-agente sem jogos — fallback gerarApostas`); resultado = null; }
+      } catch(e) { console.error('❌ Multi-agente falhou, usando fallback:', e.message); }
+      if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
       if (resultado?.jogos?.length) {
         const jogosCompletos = {
           jogos: [...jogos, ...resultado.jogos.map((j, i) => ({...j, id: jogos.length + i + 1}))]
