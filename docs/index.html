@@ -245,19 +245,50 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .modal-result-alts{margin-top:12px;}
 .modal-result-alts-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;}
 
-/* ── Mobile ───────────────────────────────────────── */
+/* ── Mobile card layout ───────────────────────────── */
+.mob-expand-hint{display:none;}
 @media(max-width:900px){
   .sidebar{display:none;}
   .nav-links{display:none;}
   .nav-actions .nav-btn span{display:none;}
-  .stats-bar{grid-template-columns:repeat(2,1fr);}
-  .stats-bar .stat-card:nth-child(5){display:none;}
-  .cols{grid-template-columns:16px 20px 1fr 70px 60px;}
-  .brow-hd span:nth-child(n+4):not(:nth-child(4)):not(:nth-child(5)){display:none;}
-  .brow>*:nth-child(n+6){display:none;}
+
+  /* Stats: 3 colunas, mostrar só Green/Red/Assert */
+  .stats-bar{grid-template-columns:repeat(3,1fr);}
+  .stats-bar .stat-card:nth-child(1){display:none;} /* Jogos hoje */
+  .stats-bar .stat-card:nth-child(4){display:none;} /* Anulados */
+
+  /* Ocultar cabeçalho de tabela no mobile */
+  .brow-hd{display:none;}
+
+  /* Card layout para cada aposta */
+  .brow.cols{
+    display:grid;
+    grid-template-columns:1fr auto;
+    grid-template-areas:
+      "info  result"
+      "info  odd"
+      "meta  conf"
+      "act   act";
+    gap:2px 10px;
+    padding:12px 14px;
+  }
+  .brow>.chevron{display:none;}
+  .brow>.dot{display:none;}
+  .brow-info{grid-area:info;min-width:0;}
+  .brow .meta-txt{grid-area:meta;display:block;align-self:center;}
+  .brow .odd-val{grid-area:odd;text-align:right;align-self:end;font-size:16px;}
+  .brow .brow-conf{grid-area:conf;display:flex!important;justify-content:flex-end;align-self:center;}
+  .brow .result-col{grid-area:result;display:flex!important;justify-content:flex-end;align-self:start;}
+  .brow .act-col{grid-area:act;display:flex!important;align-items:center;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;}
+  .mob-expand-hint{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--green);}
+  .brow.open .mob-expand-hint{opacity:.5;}
+
+  /* Expand row: single column */
   .expand-row.open{grid-template-columns:1fr;}
   .exp-alts{border-right:none;}
-  .mobile-just{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px;color:var(--text3);margin-top:4px;line-height:1.4;}
+
+  /* Mobile-just: 2 linhas de justificativa */
+  .mobile-just{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px;color:var(--text3);margin-top:3px;line-height:1.4;}
 }
 @media(max-width:640px){
   .main{padding:.75rem;}
@@ -721,16 +752,16 @@ function render(jogos,data){
       rows+=`<div class="brow cols ${resCls}" id="jc${i}" onclick="tog(${i})">
         <span class="chevron" id="cv${i}">›</span>
         <span class="dot ${dotCls}"></span>
-        <div style="min-width:0">
+        <div class="brow-info">
           <div class="match">${j.time_casa} x ${j.time_fora}</div>
           <div class="pick-txt">${j.aposta} · ${mercNome[j.mercado]||j.mercado}</div>
           ${j.justificativa?`<div class="mobile-just">${j.justificativa}</div>`:''}
         </div>
         <div class="meta-txt">${j.liga||''}${j.horario?` · ${j.horario}`:''}${j.placar?` · ${j.placar}`:''}</div>
         <div class="odd-val">${odd}</div>
-        <div><span class="conf ${confNorm}">${confNorm.charAt(0).toUpperCase()+confNorm.slice(1)}</span></div>
+        <div class="brow-conf"><span class="conf ${confNorm}">${confNorm.charAt(0).toUpperCase()+confNorm.slice(1)}</span></div>
         <div class="result-col">${resBadge}</div>
-        <div class="act-col">${anularBtn}</div>
+        <div class="act-col"><span class="mob-expand-hint">► Alternativas e análise</span>${anularBtn}</div>
       </div>
       <div class="expand-row" id="ex${i}">
         <div class="exp-alts">
@@ -1214,6 +1245,10 @@ async function confirmarJogoManual(data){
     }
   }catch(e){ alert('Erro ao confirmar: ' + e.message); }
 }
+
+// Auto-load Hoje ao abrir
+carregarDia(hojeStr,'Hoje');
+document.querySelector('.day-btn[onclick*="hojeStr,\'Hoje\'"]')?.classList.add('active');
 </script>
 
 <!-- BOTTOM NAV MOBILE -->
