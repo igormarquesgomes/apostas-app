@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aluno · OddLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;font-size:14px;}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 24px;}
+.nav-brand{font-size:14px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:24px;text-decoration:none;flex-shrink:0;}
+.nav-brand span{color:#0F766E;font-weight:300;}
+.nav-links{display:flex;align-items:center;flex:1;}
+.nl{padding:0 12px;height:46px;display:flex;align-items:center;font-size:13px;font-weight:500;color:#94A3B8;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;}
+.nl:hover{color:#475569;}
+.nl.a{color:#0F766E;border-bottom-color:#0F766E;font-weight:600;}
+
+/* PAGE */
+.page{padding:32px 40px 60px;max-width:1200px;margin:0 auto;}
+.page-hd{margin-bottom:28px;}
+.page-title{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:5px;}
+.page-sub{font-size:13px;color:#64748B;}
+
+/* LAYOUT: 2 colunas */
+.layout{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start;}
+@media(max-width:900px){.layout{grid-template-columns:1fr;}}
+
+/* PANEL */
+.panel{background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;}
+.panel-hd{padding:18px 22px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.panel-title{font-size:14px;font-weight:700;color:#1E293B;}
+.panel-meta{font-size:12px;color:#94A3B8;}
+.panel-body{padding:0;}
+
+/* USERS TABLE */
+.user-thead{display:grid;grid-template-columns:2fr 1fr 1fr 100px;gap:0;padding:10px 20px;border-bottom:1px solid #E2E8F0;}
+.user-thead span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;}
+.user-row{display:grid;grid-template-columns:2fr 1fr 1fr 100px;gap:0;padding:14px 20px;border-bottom:1px solid #F1F5F9;align-items:center;transition:background .12s;}
+.user-row:last-child{border-bottom:none;}
+.user-row:hover{background:#FAFAF9;}
+.user-cell{display:flex;align-items:center;gap:10px;}
+.avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;}
+.user-nome{font-size:13px;font-weight:600;color:#1E293B;}
+.user-id{font-size:11px;color:#94A3B8;margin-top:1px;}
+.user-date{font-size:12px;color:#475569;}
+.user-date.hoje{color:#0F766E;font-weight:600;}
+.user-date.ontem{color:#D97706;font-weight:500;}
+.acessos-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+.acessos-badge.alto{background:#F0FDF9;color:#0F766E;}
+.acessos-badge.medio{background:#FFFBEB;color:#D97706;}
+.acessos-badge.baixo{background:#F8FAFC;color:#64748B;}
+
+.empty-state{text-align:center;padding:48px 20px;color:#94A3B8;}
+.empty-state svg{width:36px;height:36px;margin:0 auto 10px;display:block;opacity:.4;}
+.loading{text-align:center;padding:36px;color:#94A3B8;font-size:13px;}
+
+/* SIMULAÇÃO */
+.sim-panel{background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;position:sticky;top:66px;}
+.sim-hd{padding:18px 22px;border-bottom:1px solid #E2E8F0;}
+.sim-title{font-size:14px;font-weight:700;color:#1E293B;margin-bottom:3px;}
+.sim-sub{font-size:12px;color:#64748B;line-height:1.5;}
+.sim-body{padding:20px 22px;}
+.sim-field{margin-bottom:16px;}
+.sim-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:6px;}
+.sim-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.sim-input{width:100%;font-family:inherit;font-size:14px;font-weight:600;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 12px;background:#F8FAFC;color:#1E293B;outline:none;transition:border-color .12s;}
+.sim-input:focus{border-color:#0F766E;background:#fff;}
+.sim-select{width:100%;font-family:inherit;font-size:13px;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 12px;background:#F8FAFC;color:#1E293B;outline:none;appearance:none;cursor:pointer;}
+.sim-select:focus{border-color:#0F766E;}
+.periodo-tabs{display:flex;gap:6px;}
+.periodo-tab{flex:1;text-align:center;padding:7px 6px;border-radius:8px;font-size:12px;font-weight:600;border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;cursor:pointer;transition:all .15s;}
+.periodo-tab.active{background:#0F766E;color:#fff;border-color:#0F766E;}
+.sim-result{margin-top:16px;background:#F0FDF9;border:1.5px solid #99F6E4;border-radius:12px;padding:16px 18px;}
+.sim-result-titulo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#0F766E;margin-bottom:12px;}
+.sim-result-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.sim-result-row:last-child{margin-bottom:0;}
+.sim-result-label{font-size:13px;color:#475569;}
+.sim-result-val{font-size:14px;font-weight:700;color:#1E293B;}
+.sim-result-val.green{color:#0F766E;}
+.sim-result-val.red{color:#DC2626;}
+.sim-result-sub{font-size:11px;color:#64748B;margin-top:1px;}
+.sim-divider{height:1px;background:#D1FAE5;margin:10px 0;}
+.sim-loading{text-align:center;padding:20px;color:#94A3B8;font-size:12px;}
+.sim-error{font-size:12px;color:#94A3B8;text-align:center;padding:16px;}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="index.html">Odd<span>Lab</span></a>
+  <div class="nav-links">
+    <a class="nl" href="index.html">Apostas</a>
+    <a class="nl" href="dashboard.html">Dashboard</a>
+    <a class="nl" href="ligas.html">Ligas</a>
+    <a class="nl" href="mercados.html">Mercados</a>
+    <a class="nl" href="relatorios.html">Relatórios</a>
+    <a class="nl" href="experimental.html">Experimental</a>
+    <a class="nl a" href="aluno.html">Aluno</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-hd">
+    <div class="page-title">Aluno</div>
+    <div class="page-sub">Usuários registrados · acesso e gestão de banca</div>
+  </div>
+
+  <div class="layout">
+    <!-- Tabela de usuários -->
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">Usuários registrados</span>
+        <span class="panel-meta" id="usuarios-meta">carregando…</span>
+      </div>
+      <div class="panel-body">
+        <div class="user-thead">
+          <span>Nome</span>
+          <span>Primeiro acesso</span>
+          <span>Último acesso</span>
+          <span>Total acessos</span>
+        </div>
+        <div id="usuarios-lista"><div class="loading">Carregando usuários…</div></div>
+      </div>
+    </div>
+
+    <!-- Simulação de gestão -->
+    <div class="sim-panel">
+      <div class="sim-hd">
+        <div class="sim-title">Simulação de gestão</div>
+        <div class="sim-sub">Simule o crescimento da banca com base na assertividade real do período selecionado.</div>
+      </div>
+      <div class="sim-body">
+        <div class="sim-row">
+          <div>
+            <label class="sim-label">Banca inicial (R$)</label>
+            <input class="sim-input" id="sim-banca" type="number" value="500" min="10" oninput="calcular()">
+          </div>
+          <div>
+            <label class="sim-label">Entrada por aposta</label>
+            <select class="sim-select" id="sim-entrada" onchange="calcular()">
+              <option value="0.01">1% da banca</option>
+              <option value="0.02">2% da banca</option>
+              <option value="0.03">3% da banca</option>
+              <option value="0.05">5% da banca</option>
+              <option value="fixed10">R$ 10 fixo</option>
+              <option value="fixed25">R$ 25 fixo</option>
+              <option value="fixed50">R$ 50 fixo</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="sim-label">Período</label>
+        <div class="periodo-tabs" id="periodo-tabs">
+          <button class="periodo-tab active" onclick="selPeriodo('mes',this)">Mês atual</button>
+          <button class="periodo-tab" onclick="selPeriodo('semana',this)">Semana</button>
+          <button class="periodo-tab" onclick="selPeriodo('anual',this)">Anual</button>
+        </div>
+
+        <div id="sim-result">
+          <div class="sim-loading">Carregando dados…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BACKEND_URL = 'https://apostas-app.onrender.com';
+const CORES = ['#0F766E','#7C3AED','#DC2626','#D97706','#2563EB','#059669','#9333EA','#EA580C'];
+let _periodo = 'mes';
+let _statsCache = {};
+
+// ── Usuários ──────────────────────────────────────────────────────────────────
+async function carregarUsuarios(){
+  try{
+    const r = await fetch(`${BACKEND_URL}/admin/usuarios`);
+    const d = await r.json();
+    const lista = d.usuarios || [];
+    document.getElementById('usuarios-meta').textContent = `${lista.length} usuário${lista.length!==1?'s':''} · via oddlab_usuarios`;
+    if(!lista.length){
+      document.getElementById('usuarios-lista').innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Nenhum usuário registrado</div>';
+      return;
+    }
+    document.getElementById('usuarios-lista').innerHTML = lista.map((u,i) => {
+      const iniciais = (u.nome||'?').split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
+      const cor = CORES[i % CORES.length];
+      const primAcesso = fmtData(u.primeiro_acesso);
+      const ultAcesso = fmtDataRelativa(u.ultimo_acesso);
+      const acessos = u.acessos || 0;
+      const badgeClass = acessos >= 100 ? 'alto' : acessos >= 20 ? 'medio' : 'baixo';
+      const deviceShort = (u.device_id||'').substring(0,8)+'…';
+      return `<div class="user-row">
+        <div class="user-cell">
+          <div class="avatar" style="background:${cor}">${iniciais}</div>
+          <div>
+            <div class="user-nome">${esc(u.nome)}</div>
+            <div class="user-id">device_id: ${deviceShort}</div>
+          </div>
+        </div>
+        <div class="user-date">${primAcesso}</div>
+        <div class="user-date ${ultAcesso.classe}">${ultAcesso.texto}</div>
+        <div><span class="acessos-badge ${badgeClass}">${acessos} acessos</span></div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    document.getElementById('usuarios-lista').innerHTML = `<div class="empty-state">Erro ao carregar: ${e.message}</div>`;
+    document.getElementById('usuarios-meta').textContent = 'erro';
+  }
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmtData(iso){
+  if(!iso) return '–';
+  const d = new Date(iso);
+  return `${d.getDate()} ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function fmtDataRelativa(iso){
+  if(!iso) return { texto:'–', classe:'' };
+  const d = new Date(iso);
+  const agora = new Date();
+  const diffMin = Math.floor((agora - d) / 60000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+  const hora = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  if(diffD === 0) return { texto:`hoje, ${hora}`, classe:'hoje' };
+  if(diffD === 1) return { texto:`ontem, ${hora}`, classe:'ontem' };
+  return { texto:`${d.getDate()} ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][d.getMonth()]}, ${hora}`, classe:'' };
+}
+
+// ── Simulação ─────────────────────────────────────────────────────────────────
+function selPeriodo(p, btn){
+  _periodo = p;
+  document.querySelectorAll('.periodo-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  calcular();
+}
+
+async function carregarStats(){
+  if(Object.keys(_statsCache).length) return _statsCache;
+  try{
+    const r = await fetch(`${BACKEND_URL}/calibracao`);
+    const d = await r.json();
+    _statsCache = d;
+    return d;
+  }catch(e){ return {}; }
+}
+
+async function calcular(){
+  const banca = parseFloat(document.getElementById('sim-banca').value) || 500;
+  const entradaVal = document.getElementById('sim-entrada').value;
+  document.getElementById('sim-result').innerHTML = '<div class="sim-loading">Calculando…</div>';
+
+  // Buscar stats de apostas para o período
+  let total = 0, green = 0, assert = 0, periodo_label = '';
+  try{
+    // Usar endpoint de apostas por período
+    const periodoMap = { mes:'mes', semana:'semana', anual:'anual' };
+    const r = await fetch(`${BACKEND_URL}/apostas/${periodoMap[_periodo]}`);
+    const d = await r.json();
+    if(d.apostas){
+      // Contar green/red das apostas do período
+      const todas = Object.values(d.apostas).flatMap(v => Array.isArray(v) ? v : (v?.jogos||[]));
+      total = todas.length;
+      green = todas.filter(j => j.resultado === 'green' || j.resultado_aposta === 'green').length;
+      assert = total > 0 ? Math.round(green/total*100) : 0;
+    }
+    const periodoLabels = { mes:'Mês atual', semana:'Esta semana', anual:'2026 (anual)' };
+    periodo_label = periodoLabels[_periodo];
+  }catch(e){
+    // Fallback: usar calibração
+    const cal = await carregarStats();
+    const relMap = { mes: cal.mensal, semana: cal.semanal, anual: cal.semestral };
+    const rel = relMap[_periodo];
+    assert = rel?.assertividade || 0;
+    // Sem total exato — estimativa
+    total = _periodo==='mes' ? 180 : _periodo==='semana' ? 65 : 700;
+    green = Math.round(total * assert / 100);
+    const periodoLabels = { mes:'Mês atual', semana:'Esta semana', anual:'2026 (anual)' };
+    periodo_label = periodoLabels[_periodo];
+  }
+
+  if(!total){
+    document.getElementById('sim-result').innerHTML = '<div class="sim-error">Sem apostas com resultado no período</div>';
+    return;
+  }
+
+  const red = total - green;
+  // Odd média estimada por mercado (~1.82)
+  const oddMedia = 1.82;
+  let bancaAtual = banca;
+  const apostas_por_n = [];
+  for(let i = 0; i < total; i++){
+    const isGreen = i < green;
+    const entrada = entradaVal.startsWith('fixed') ? parseFloat(entradaVal.replace('fixed','')) : bancaAtual * parseFloat(entradaVal);
+    if(isGreen){ bancaAtual += entrada * (oddMedia - 1); }
+    else { bancaAtual -= entrada; }
+    if(bancaAtual <= 0){ bancaAtual = 0; break; }
+  }
+
+  const lucro = bancaAtual - banca;
+  const roi = banca > 0 ? (lucro / banca * 100) : 0;
+  const isPos = lucro >= 0;
+
+  document.getElementById('sim-result').innerHTML = `
+    <div class="sim-result">
+      <div class="sim-result-titulo">Resultado simulado · ${esc(periodo_label)}</div>
+      <div class="sim-result-row">
+        <span class="sim-result-label">Banca inicial</span>
+        <div>
+          <div class="sim-result-val">${fmtBRL(banca)}</div>
+        </div>
+      </div>
+      <div class="sim-result-row">
+        <span class="sim-result-label">Apostas · assertividade</span>
+        <div class="sim-result-val" style="color:#475569">${total} apostas · ${assert}%</div>
+      </div>
+      <div class="sim-divider"></div>
+      <div class="sim-result-row">
+        <span class="sim-result-label">Banca final</span>
+        <div>
+          <div class="sim-result-val">${fmtBRL(bancaAtual)}</div>
+          <div class="sim-result-sub ${isPos?'green':'red'}">${isPos?'+':''}${fmtBRL(lucro)} · ROI ${isPos?'+':''}${roi.toFixed(1)}%</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function fmtBRL(v){
+  return 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// Init
+carregarUsuarios();
+calcular();
+</script>
+</body>
+</html>

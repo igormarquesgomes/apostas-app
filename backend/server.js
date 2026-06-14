@@ -3203,6 +3203,17 @@ app.get('/oddlab/usuario/:device_id', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/admin/usuarios', async (req, res) => {
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/oddlab_usuarios?select=nome,device_id,acessos,primeiro_acesso,ultimo_acesso&order=acessos.desc`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await r.json();
+    res.json({ ok: true, usuarios: Array.isArray(rows) ? rows : [] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/health', (req, res) => res.json({
   status: 'ok', api: 'API-Football v3',
   api_suspensa: apiSuspensa, api_erro: apiErrorMsg || null,
