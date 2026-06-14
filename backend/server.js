@@ -1792,7 +1792,8 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     const ligaMatch = LIGAS_PRIORITY[ligaId];
     if (ligaMatch) {
       let priFinal = ligaMatch.pri;
-      if (ligaMatch.pri === 5 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
+      if (ligaMatch.pri === 3) priFinal = 3;
+      else if (ligaMatch.pri === 5 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
       else if (ligaMatch.selecaoCampea) { if (!isSelecaoCampea(timeCasa, timeFora)) continue; }
       if (!jogosMap.has(key)) { dbSaveLiga(ligaMatch.nome, ligaId, pais).catch(()=>{}); jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); }
     } else {
@@ -2133,7 +2134,7 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
     return 0;
   }
 
-  const norm = s => s?.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+  const norm = s => s == null ? '' : s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
   const fixtureMap = new Map(), metaMap = new Map();
   for (const jg of jogos) {
     const k = `${norm(jg.timeCasa)}|${norm(jg.timeFora)}`;
