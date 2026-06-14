@@ -10,11 +10,11 @@
 body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;font-size:14px;}
 
 /* NAV */
-.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 24px;}
-.nav-brand{font-size:14px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:24px;text-decoration:none;flex-shrink:0;}
+.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 28px;}
+.nav-brand{font-size:16px;font-weight:700;color:#1E293B;letter-spacing:-0.4px;margin-right:8px;text-decoration:none;flex-shrink:0;}
 .nav-brand span{color:#0F766E;font-weight:300;}
-.nav-links{display:flex;align-items:center;flex:1;overflow-x:auto;}
-.nl{padding:0 13px;height:46px;display:flex;align-items:center;font-size:12px;font-weight:500;color:#94A3B8;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;transition:color .12s;}
+.nav-links{display:flex;align-items:center;flex:1;gap:2px;padding:0 8px;justify-content:center;overflow-x:auto;}
+.nl{padding:0 16px;height:46px;display:flex;align-items:center;font-size:13px;font-weight:500;color:#94A3B8;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;transition:color .12s;}
 .nl:hover{color:#475569;}
 .nl.a{color:#0F766E;border-bottom-color:#0F766E;font-weight:600;}
 
@@ -263,37 +263,19 @@ async function calcular(){
   const entradaVal = document.getElementById('sim-entrada').value;
   document.getElementById('sim-result').innerHTML = '<div class="sim-loading">Calculando…</div>';
 
-  // Buscar stats de apostas para o período
   let total = 0, green = 0, assert = 0, periodo_label = '';
-  try{
-    // Usar endpoint de apostas por período
-    const periodoMap = { mes:'mes', semana:'semana', anual:'anual' };
-    const r = await fetch(`${BACKEND_URL}/apostas/${periodoMap[_periodo]}`);
-    const d = await r.json();
-    if(d.apostas){
-      // Contar green/red das apostas do período
-      const todas = Object.values(d.apostas).flatMap(v => Array.isArray(v) ? v : (v?.jogos||[]));
-      total = todas.length;
-      green = todas.filter(j => j.resultado === 'green' || j.resultado_aposta === 'green').length;
-      assert = total > 0 ? Math.round(green/total*100) : 0;
-    }
-    const periodoLabels = { mes:'Mês atual', semana:'Esta semana', anual:'2026 (anual)' };
-    periodo_label = periodoLabels[_periodo];
-  }catch(e){
-    // Fallback: usar calibração
-    const cal = await carregarStats();
-    const relMap = { mes: cal.mensal, semana: cal.semanal, anual: cal.semestral };
-    const rel = relMap[_periodo];
-    assert = rel?.assertividade || 0;
-    // Sem total exato — estimativa
-    total = _periodo==='mes' ? 180 : _periodo==='semana' ? 65 : 700;
-    green = Math.round(total * assert / 100);
-    const periodoLabels = { mes:'Mês atual', semana:'Esta semana', anual:'2026 (anual)' };
-    periodo_label = periodoLabels[_periodo];
-  }
+  const periodoLabels = { mes:'Mês atual', semana:'Esta semana', anual:'2026 (anual)' };
+  periodo_label = periodoLabels[_periodo];
 
-  if(!total){
-    document.getElementById('sim-result').innerHTML = '<div class="sim-error">Sem apostas com resultado no período</div>';
+  const cal = await carregarStats();
+  const relMap = { mes: cal.mensal, semana: cal.semanal, anual: cal.semestral };
+  const rel = relMap[_periodo];
+  assert = rel?.assertividade || 0;
+  total = _periodo==='mes' ? 180 : _periodo==='semana' ? 45 : 700;
+  green = Math.round(total * assert / 100);
+
+  if(!assert){
+    document.getElementById('sim-result').innerHTML = '<div class="sim-error">Relatório de calibração não disponível para o período</div>';
     return;
   }
 
