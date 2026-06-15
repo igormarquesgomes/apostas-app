@@ -55,7 +55,7 @@ const links = document.querySelectorAll('.nav-link[data-page]');
 const STORAGE_KEY = 'oddlab_app_page';
 
 function navigate(page, save) {
-  frame.src = page;
+  frame.src = page + '?embedded=true';
   links.forEach(l => l.classList.toggle('active', l.dataset.page === page));
   if (save !== false) localStorage.setItem(STORAGE_KEY, page);
 }
