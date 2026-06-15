@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OddLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F0EDEA;--surface:#FFFFFF;--surface2:#FAF7F2;
+  --border:#E2E8F0;--border2:#CBD5E1;
+  --text:#1E293B;--text2:#475569;--text3:#94A3B8;
+  --green:#0F766E;--green-lt:#F0FDF9;--green-bd:#99F6E4;
+  --nav-h:46px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;}
+body{background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+
+/* Nav */
+.nav{height:var(--nav-h);background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:0;flex-shrink:0;}
+.nav-brand{display:flex;align-items:center;text-decoration:none;flex-shrink:0;margin-right:8px;}
+.nav-brand-name{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-0.4px;}
+.nav-brand-name span{color:var(--green);font-weight:300;}
+.nav-links{display:flex;align-items:center;gap:2px;flex:1;padding:0 4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.nav-links::-webkit-scrollbar{display:none;}
+.nav-link{padding:0 12px;height:var(--nav-h);display:flex;align-items:center;font-size:13px;font-weight:500;color:var(--text3);text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;background:none;border-top:none;border-left:none;border-right:none;border-radius:0;transition:color .12s;}
+.nav-link:hover{color:var(--text2);}
+.nav-link.active{color:var(--green);border-bottom-color:var(--green);font-weight:600;}
+
+/* iframe */
+#frame{flex:1;width:100%;border:none;display:block;}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-brand" href="app.html">
+    <span class="nav-brand-name">Odd<span>Lab</span></span>
+  </a>
+  <div class="nav-links">
+    <button class="nav-link" data-page="index.html">Apostas</button>
+    <button class="nav-link" data-page="dashboard.html">Dashboard</button>
+    <button class="nav-link" data-page="ligas.html">Ligas</button>
+    <button class="nav-link" data-page="relatorios.html">Relatórios</button>
+    <button class="nav-link" data-page="mercados.html">Mercados</button>
+    <button class="nav-link" data-page="aluno.html">Aluno</button>
+    <button class="nav-link" data-page="experimental.html">Experimental</button>
+  </div>
+</nav>
+<iframe id="frame" src="index.html" title="OddLab"></iframe>
+
+<script>
+const frame = document.getElementById('frame');
+const links = document.querySelectorAll('.nav-link[data-page]');
+const STORAGE_KEY = 'oddlab_app_page';
+
+function navigate(page, save) {
+  frame.src = page;
+  links.forEach(l => l.classList.toggle('active', l.dataset.page === page));
+  if (save !== false) localStorage.setItem(STORAGE_KEY, page);
+}
+
+links.forEach(l => l.addEventListener('click', () => navigate(l.dataset.page)));
+
+// Restore last page
+const saved = localStorage.getItem(STORAGE_KEY);
+const validPages = Array.from(links).map(l => l.dataset.page);
+const initial = (saved && validPages.includes(saved)) ? saved : 'index.html';
+navigate(initial, false);
+</script>
+</body>
+</html>
