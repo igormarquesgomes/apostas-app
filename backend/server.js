@@ -4137,7 +4137,7 @@ app.post('/validar-pendentes', async (req, res) => {
 
 // Corrigir resultado de uma aposta manualmente
 app.post('/corrigir-resultado', async (req, res) => {
-  const { data, jogo_id, placar } = req.body;
+  const { data, jogo_id, placar, resultado } = req.body;
   if (!data || !jogo_id) return res.status(400).json({ error: 'Parâmetros inválidos' });
 
   const row = await dbGet(data);
@@ -4151,8 +4151,12 @@ app.post('/corrigir-resultado', async (req, res) => {
   let novoResultado = apostaRes.resultado_aposta;
   let novoPlacar = apostaRes.placar;
 
-  // Se forneceu placar, recalcular green/red
-  if (placar && placar.match(/^\d+-\d+$/)) {
+  // Se forneceu resultado direto (green/red/cancelado), usar sem recalcular
+  if (resultado && ['green','red','cancelado','pendente'].includes(resultado)) {
+    novoResultado = resultado;
+    console.log(`✏️ Resultado forçado: ${apostaRes.time_casa} x ${apostaRes.time_fora} → ${resultado}`);
+  } else if (placar && placar.match(/^\d+-\d+$/)) {
+    // Se forneceu placar, recalcular green/red
     const partes = placar.split('-');
     const gC = parseInt(partes[0]), gF = parseInt(partes[1]);
     novoPlacar = placar;
