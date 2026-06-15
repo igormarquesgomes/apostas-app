@@ -85,6 +85,22 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 /* LOADING / EMPTY */
 .loading{text-align:center;padding:48px 20px;color:#CBD5E1;font-size:13px;}
 .empty{text-align:center;padding:48px 20px;color:#94A3B8;font-size:13px;}
+
+@media(max-width:640px){
+  .page{padding:16px 14px 32px;}
+  .page-head{flex-direction:column;gap:4px;margin-bottom:16px;}
+  .mkt-grid{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .mkt-card{padding:12px 14px;}
+  .mkt-pct{font-size:22px;}
+  .mkt-insight{font-size:9px;}
+  .liga-thead{display:none;}
+  .liga-row{grid-template-columns:1fr auto;padding:11px 14px;}
+  .liga-rank,.liga-total,.liga-row>.pct-val{display:none;}
+  .expand-row.open{grid-template-columns:1fr;}
+  .exp-mkt{padding:12px 14px 14px;border-right:none;border-bottom:1px solid #E2E8F0;}
+  .exp-avgs{padding:12px 14px 14px;}
+  .mkt-mini-grid{grid-template-columns:repeat(2,1fr);}
+}
 </style>
 </head>
 <body>
