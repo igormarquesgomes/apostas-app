@@ -1884,7 +1884,7 @@ function _promptAgentGols(jogo, ligaStatsMap, memGols) {
   const st = ligaStatsMap?.get(jogo.ligaId);
   const gPerf = st?.mercados?.gols;
   const ligaGols = gPerf && (gPerf.green+gPerf.red) >= 2 ? `${Math.round(gPerf.green/(gPerf.green+gPerf.red)*100)}% (${gPerf.green}G/${gPerf.red}R)` : 'sem histórico';
-  return `Especialista em GOLS. Analise APENAS o mercado de gols.
+  return `Analise o mercado de GOLS para este jogo e retorne SOMENTE um objeto JSON válido, sem texto antes ou depois.
 
 Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
 Casa: média ${sc?.mediaGols||'?'} gols/jogo | forma ${sc?.forma||'?'}
@@ -1893,11 +1893,11 @@ H2H: ${sc?.h2hTexto||'sem dados'}
 Liga histórico gols: ${ligaGols}
 ${memGols ? `Memória:\n${memGols.substring(0,350)}` : ''}
 
-Avalie: Over/Under 0.5, 1.5, 2.5, 3.5, BTTS (ambos marcam), Primeiro tempo com gol.
-Calcule probabilidade real (0.0–1.0) baseada nos dados.
+Escolha as 2 melhores opções entre: Over 0.5, Over 1.5, Over 2.5, Over 3.5, Under 2.5, BTTS, Primeiro tempo com gol.
+Probabilidade = número decimal entre 0.01 e 0.99. Nunca use 0 ou 1.
 
-Retorne APENAS JSON:
-{"mercado":"gols","opcao_1":{"aposta":"Over 1.5 gols","probabilidade":0.85,"razao":"..."},"opcao_2":{"aposta":"Over 2.5 gols","probabilidade":0.68,"razao":"..."}}`;
+RESPONDA APENAS COM ESTE JSON (sem markdown, sem texto extra):
+{"mercado":"gols","opcao_1":{"aposta":"Over 1.5 gols","probabilidade":0.85,"razao":"média combinada 2.8 gols, H2H 4/5 com Over 1.5"},"opcao_2":{"aposta":"Over 2.5 gols","probabilidade":0.65,"razao":"equipes ofensivas mas defesa de fora é sólida"}}`;
 }
 
 function _promptAgentResultado(jogo, ligaStatsMap, memResultado) {
@@ -1905,7 +1905,7 @@ function _promptAgentResultado(jogo, ligaStatsMap, memResultado) {
   const st = ligaStatsMap?.get(jogo.ligaId);
   const rPerf = st?.mercados?.resultado;
   const ligaRes = rPerf && (rPerf.green+rPerf.red) >= 2 ? `${Math.round(rPerf.green/(rPerf.green+rPerf.red)*100)}% (${rPerf.green}G/${rPerf.red}R)` : 'sem histórico';
-  return `Especialista em RESULTADO. Analise APENAS o resultado do jogo.
+  return `Analise o RESULTADO deste jogo e retorne SOMENTE um objeto JSON válido, sem texto antes ou depois.
 
 Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
 Casa: forma ${sc?.forma||'?'} | média gols ${sc?.mediaGols||'?'}
@@ -1914,11 +1914,13 @@ H2H: ${sc?.h2hTexto||'sem dados'}
 Liga histórico resultado: ${ligaRes}
 ${memResultado ? `Memória:\n${memResultado.substring(0,350)}` : ''}
 
-Avalie: Casa vence, Fora vence, Empate, Dupla Chance 1X, Dupla Chance X2.
-Calcule probabilidade real (0.0–1.0).
+Estime as probabilidades brutas: casa_vence, empate, fora_vence (devem somar ~1.0).
+Então calcule: dupla_chance_1X = casa_vence + empate, dupla_chance_X2 = fora_vence + empate.
+opcao_1 = a aposta com maior probabilidade. opcao_2 = segunda maior.
+Probabilidade = número decimal entre 0.01 e 0.99. Nunca use 0 ou 1.
 
-Retorne APENAS JSON:
-{"mercado":"resultado","opcao_1":{"aposta":"Dupla Chance Casa (1X)","probabilidade":0.78,"razao":"..."},"opcao_2":{"aposta":"Casa vence","probabilidade":0.62,"razao":"..."}}`;
+RESPONDA APENAS COM ESTE JSON (sem markdown, sem texto extra):
+{"mercado":"resultado","opcao_1":{"aposta":"Dupla Chance Casa (1X)","probabilidade":0.78,"razao":"casa forte em casa, empate frequente nessa liga"},"opcao_2":{"aposta":"Casa vence","probabilidade":0.58,"razao":"5 vitórias em 7 jogos em casa"}}`;
 }
 
 function _promptAgentEscanteios(jogo, ligaStatsMap, memEscanteios) {
@@ -1929,7 +1931,9 @@ function _promptAgentEscanteios(jogo, ligaStatsMap, memEscanteios) {
   const mediaLiga = st?.media_escanteios ? `${st.media_escanteios.toFixed(1)} (${st.amostras_escanteios||0} jogos)` : 'não disponível';
   const escC = parseFloat(sc?.mediaEscanteios)||0, escF = parseFloat(sf?.mediaEscanteios)||0;
   const mediaComb = (escC > 0 && escF > 0) ? (escC + escF).toFixed(1) : '?';
-  return `Especialista em ESCANTEIOS. Analise APENAS escanteios.
+  const semDados = mediaComb === '?' && mediaLiga === 'não disponível' && ligaEsc === 'sem histórico';
+  if (semDados) return `{"sem_dados":true,"razao":"Sem dados de escanteios para ${jogo.timeCasa} x ${jogo.timeFora}"}`;
+  return `Analise ESCANTEIOS deste jogo e retorne SOMENTE um objeto JSON válido, sem texto antes ou depois.
 
 Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
 Casa: média ${sc?.mediaEscanteios||'?'} escanteios/jogo
@@ -1940,10 +1944,11 @@ Liga histórico escanteios: ${ligaEsc}
 ${memEscanteios ? `Memória:\n${memEscanteios.substring(0,300)}` : ''}
 
 REGRA: Se LigaMedia disponível e linha sugerida > LigaMedia + 1.5, use linha mais conservadora.
-Avalie: Over/Under 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, Mais escanteios Casa/Fora.
+Se NÃO houver dados suficientes para avaliar, retorne: {"sem_dados":true,"razao":"motivo"}
+Probabilidade = número decimal entre 0.01 e 0.99. Nunca use 0 ou 1. Nunca retorne texto livre.
 
-Retorne APENAS JSON:
-{"mercado":"escanteios","opcao_1":{"aposta":"Over 8.5 escanteios","probabilidade":0.80,"razao":"..."},"opcao_2":{"aposta":"Over 7.5 escanteios","probabilidade":0.88,"razao":"..."}}`;
+RESPONDA APENAS COM ESTE JSON (sem markdown, sem texto extra):
+{"mercado":"escanteios","opcao_1":{"aposta":"Over 8.5 escanteios","probabilidade":0.80,"razao":"média combinada 9.8, alinhada com LigaMedia"},"opcao_2":{"aposta":"Over 7.5 escanteios","probabilidade":0.88,"razao":"linha conservadora confirmada pelo histórico"}}`;
 }
 
 function _promptAgentCartoes(jogo, ligaStatsMap, memCartoes) {
@@ -1954,7 +1959,9 @@ function _promptAgentCartoes(jogo, ligaStatsMap, memCartoes) {
   const mediaLigaCart = st?.media_cartoes ? `${st.media_cartoes.toFixed(1)} (${st.amostras_cartoes||0} jogos)` : 'não disponível';
   const cartC = parseFloat(sc?.mediaCartoes)||0, cartF = parseFloat(sf?.mediaCartoes)||0;
   const mediaComb = (cartC > 0 && cartF > 0) ? (cartC + cartF).toFixed(1) : '?';
-  return `Especialista em CARTÕES. Analise APENAS cartões.
+  const semDados = mediaComb === '?' && mediaLigaCart === 'não disponível' && ligaCart === 'sem histórico';
+  if (semDados) return `{"sem_dados":true,"razao":"Sem dados de cartões para ${jogo.timeCasa} x ${jogo.timeFora}"}`;
+  return `Analise CARTÕES deste jogo e retorne SOMENTE um objeto JSON válido, sem texto antes ou depois.
 
 Jogo: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | ${jogo.horario}
 Casa: média ${sc?.mediaCartoes||'?'} cartões/jogo
@@ -1966,9 +1973,11 @@ ${memCartoes ? `Memória:\n${memCartoes.substring(0,300)}` : ''}
 
 Avalie: Over/Under 1.5, 2.5, 3.5, 4.5, Mais cartões Casa/Fora.
 Considere rivalidade e contexto (rebaixamento/título = mais cartões).
+Se NÃO houver dados suficientes para avaliar, retorne: {"sem_dados":true,"razao":"motivo"}
+Probabilidade = número decimal entre 0.01 e 0.99. Nunca use 0 ou 1. Nunca retorne texto livre.
 
-Retorne APENAS JSON:
-{"mercado":"cartoes","opcao_1":{"aposta":"Over 3.5 cartões","probabilidade":0.65,"razao":"..."},"opcao_2":{"aposta":"Over 2.5 cartões","probabilidade":0.80,"razao":"..."}}`;
+RESPONDA APENAS COM ESTE JSON (sem markdown, sem texto extra):
+{"mercado":"cartoes","opcao_1":{"aposta":"Over 2.5 cartões","probabilidade":0.72,"razao":"média combinada 3.4, árbitro rigoroso nessa liga"},"opcao_2":{"aposta":"Over 3.5 cartões","probabilidade":0.55,"razao":"contexto de rivalidade aumenta cartões"}}`;
 }
 
 function _promptCoordenador(jogo, ligaStatsMap, blocoMem, agentes, df) {
@@ -1978,12 +1987,16 @@ function _promptCoordenador(jogo, ligaStatsMap, blocoMem, agentes, df) {
   const mediaCombEsc = (escC > 0 && escF > 0) ? (escC + escF).toFixed(1) : '?';
   const mediaCombCart = (cartC > 0 && cartF > 0) ? (cartC + cartF).toFixed(1) : '?';
 
-  const blocoAg = agentes.map(a => {
-    if (!a) return '';
-    const op1 = a.opcao_1 ? `${a.opcao_1.aposta} (${Math.round((a.opcao_1.probabilidade||0)*100)}%) — ${a.opcao_1.razao}` : 'falhou';
+  // P4: lista todos os 4 mercados — com dados reais ou marcados como SEM DADOS
+  const TODOS_MERCADOS = ['gols', 'resultado', 'escanteios', 'cartoes'];
+  const agMap = new Map(agentes.map(a => [a.mercado, a]));
+  const blocoAg = TODOS_MERCADOS.map(m => {
+    const a = agMap.get(m);
+    if (!a) return `[${m.toUpperCase()}] — SEM DADOS (agente falhou — NÃO USE este mercado)`;
+    const op1 = `${a.opcao_1.aposta} (${Math.round((a.opcao_1.probabilidade||0)*100)}%) — ${a.opcao_1.razao}`;
     const op2 = a.opcao_2 ? `${a.opcao_2.aposta} (${Math.round((a.opcao_2.probabilidade||0)*100)}%) — ${a.opcao_2.razao}` : 'sem opção 2';
-    return `[${a.mercado?.toUpperCase()}] Opção 1: ${op1} | Opção 2: ${op2}`;
-  }).filter(Boolean).join('\n');
+    return `[${m.toUpperCase()}] Opção 1: ${op1} | Opção 2: ${op2}`;
+  }).join('\n');
 
   return `COORDENADOR. Escolha a MELHOR aposta para este jogo com base nos especialistas abaixo.
 
@@ -1997,11 +2010,12 @@ ${blocoAg}
 ${blocoMem ? `MEMÓRIA DE CALIBRAÇÃO (contexto histórico):\n${blocoMem.substring(0,1200)}` : ''}
 
 CRITÉRIOS DE DECISÃO (siga rigorosamente):
-1. Prioridade 1: probabilidade mais alta (segurança > odd)
-2. Prioridade 2: se probabilidades similares (<5% diferença), use value = odd_real / (1/probabilidade)
-3. NUNCA escolha opção apenas pela odd alta
-4. Se melhor opção de um agente < 55%, use opcao_2 desse agente
-5. confianca: alta ≥ 75% | media 55–74% | baixa < 55%
+1. PROIBIDO usar mercados marcados como "SEM DADOS" — só escolha de mercados com dados reais acima
+2. Prioridade: probabilidade mais alta (segurança > odd)
+3. Se probabilidades similares (<5% diferença), use value = odd_real / (1/probabilidade)
+4. NUNCA invente probabilidades — use APENAS os números fornecidos pelos agentes acima
+5. Se melhor opção de um agente < 55%, use opcao_2 desse agente
+6. confianca: alta ≥ 75% | media 55–74% | baixa < 55%
 
 CAMPO justificativa (PÚBLICO): escreva como especialista em apostas. PROIBIDO usar: "calibração", "assertividade %", "LigaMedia", "especialista", "agente", "sistema". Use apenas: forma recente, H2H, médias, contexto esportivo. 2–3 frases.
 
@@ -2020,7 +2034,38 @@ function _parseAgenteJson(txt) {
   } catch(e) { return null; }
 }
 
-async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df) {
+// Retorna null se agente sinalizou sem_dados ou opcao_1 inválida
+function _parseAgenteFiltrado(txt) {
+  const obj = _parseAgenteJson(txt);
+  if (!obj) return null;
+  if (obj.sem_dados) return null;
+  if (!obj.opcao_1?.aposta || (obj.opcao_1.probabilidade||0) <= 0) return null;
+  return obj;
+}
+
+// Calcula Dupla Chance a partir das probabilidades brutas do agente Resultado
+function _enriquecerResultadoComDuplaChance(ag) {
+  if (!ag || ag.mercado !== 'resultado') return ag;
+  const ops = [ag.opcao_1, ag.opcao_2].filter(Boolean);
+  const find = (kws) => ops.find(o => kws.some(k => (o.aposta||'').toLowerCase().includes(k)));
+  const pCasa   = find(['casa vence','home wins','1 vence'])?.probabilidade || 0;
+  const pEmpate = find(['empate','draw','empat'])?.probabilidade || 0;
+  const pFora   = find(['fora vence','away wins','visitante'])?.probabilidade || 0;
+  if (!pCasa && !pFora) return ag;
+  const p1X = Math.min(pCasa + pEmpate, 0.99);
+  const pX2 = Math.min(pFora + pEmpate, 0.99);
+  // Substituir opcao_1 por dupla chance se ganhar ≥10pp sobre vitória simples
+  if (p1X >= pX2 && p1X > pCasa + 0.10) {
+    ag.opcao_1 = { aposta: 'Dupla Chance Casa (1X)', probabilidade: parseFloat(p1X.toFixed(2)), razao: `Casa(${Math.round(pCasa*100)}%) + Empate(${Math.round(pEmpate*100)}%)` };
+    if (!ag.opcao_2 || ag.opcao_2.probabilidade < pX2) ag.opcao_2 = { aposta: 'Dupla Chance Fora (X2)', probabilidade: parseFloat(pX2.toFixed(2)), razao: `Fora(${Math.round(pFora*100)}%) + Empate(${Math.round(pEmpate*100)}%)` };
+  } else if (pX2 > p1X && pX2 > pFora + 0.10) {
+    ag.opcao_1 = { aposta: 'Dupla Chance Fora (X2)', probabilidade: parseFloat(pX2.toFixed(2)), razao: `Fora(${Math.round(pFora*100)}%) + Empate(${Math.round(pEmpate*100)}%)` };
+    if (!ag.opcao_2 || ag.opcao_2.probabilidade < p1X) ag.opcao_2 = { aposta: 'Dupla Chance Casa (1X)', probabilidade: parseFloat(p1X.toFixed(2)), razao: `Casa(${Math.round(pCasa*100)}%) + Empate(${Math.round(pEmpate*100)}%)` };
+  }
+  return ag;
+}
+
+async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df, _gerarApostasRef) {
   const label = `${jogo.timeCasa} x ${jogo.timeFora}`;
   console.log(`\n🤖 Multi-agente: ${label}`);
   console.log(`  ⚡ Agentes especializados rodando em paralelo...`);
@@ -2030,37 +2075,68 @@ async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df) {
   const memEscanteios = filtrarMemoria(blocoMem, ['escanteio', 'corner']);
   const memCartoes    = filtrarMemoria(blocoMem, ['cartão', 'cartoes', 'amarelo', 'vermelho']);
 
+  // Prompts de escanteios/cartões podem já retornar JSON sem_dados antes de chamar a IA
+  const promptEsc = _promptAgentEscanteios(jogo, ligaStatsMap, memEscanteios);
+  const promptCart = _promptAgentCartoes(jogo, ligaStatsMap, memCartoes);
+  const escPreSemDados = promptEsc.startsWith('{"sem_dados"');
+  const cartPreSemDados = promptCart.startsWith('{"sem_dados"');
+
   const [txtGols, txtResultado, txtEscanteios, txtCartoes] = await Promise.all([
     chamarIA(_promptAgentGols(jogo, ligaStatsMap, memGols), 600),
     chamarIA(_promptAgentResultado(jogo, ligaStatsMap, memResultado), 600),
-    chamarIA(_promptAgentEscanteios(jogo, ligaStatsMap, memEscanteios), 600),
-    chamarIA(_promptAgentCartoes(jogo, ligaStatsMap, memCartoes), 600),
+    escPreSemDados  ? Promise.resolve(promptEsc)  : chamarIA(promptEsc, 600),
+    cartPreSemDados ? Promise.resolve(promptCart) : chamarIA(promptCart, 600),
   ]);
 
-  const agGols       = _parseAgenteJson(txtGols);
-  const agResultado  = _parseAgenteJson(txtResultado);
-  const agEscanteios = _parseAgenteJson(txtEscanteios);
-  const agCartoes    = _parseAgenteJson(txtCartoes);
-
-  const logAg = (nome, ag) => {
-    if (!ag?.opcao_1) { console.log(`  ❌ ${nome}: falhou`); return; }
+  // P1: log detalhado com erro específico ao falhar
+  const logAg = (nome, txt, ag) => {
+    if (!ag?.opcao_1) {
+      let erroMsg = 'sem JSON válido';
+      if (txt) {
+        const s = txt.indexOf('{'), e2 = txt.lastIndexOf('}');
+        if (s !== -1 && e2 !== -1) { try { JSON.parse(txt.slice(s, e2+1)); erroMsg = 'JSON ok mas sem opcao_1'; } catch(ex) { erroMsg = ex.message.substring(0,80); } }
+        else erroMsg = `sem chaves — raw: ${txt.substring(0,60)}`;
+      }
+      console.log(`  ❌ ${nome}: falhou — ${erroMsg}`);
+      return;
+    }
     const p1 = `${ag.opcao_1.aposta} (${Math.round((ag.opcao_1.probabilidade||0)*100)}%)`;
     const p2 = ag.opcao_2 ? `${ag.opcao_2.aposta} (${Math.round((ag.opcao_2.probabilidade||0)*100)}%)` : '-';
     console.log(`  ✅ ${nome}: ${p1} | ${p2}`);
   };
-  logAg('Gols      ', agGols);
-  logAg('Resultado ', agResultado);
-  logAg('Escanteios', agEscanteios);
-  logAg('Cartões   ', agCartoes);
 
-  const agentes = [agGols, agResultado, agEscanteios, agCartoes].filter(a => a?.opcao_1);
-  if (!agentes.length) { console.log(`  ❌ Todos os agentes falharam — descartando ${label}`); return null; }
+  // P2: Dupla Chance automática para agente Resultado
+  const agGols       = _parseAgenteJson(txtGols);
+  const agResultado  = _enriquecerResultadoComDuplaChance(_parseAgenteJson(txtResultado));
+  // P3: filtro sem_dados para escanteios e cartões
+  const agEscanteios = _parseAgenteFiltrado(txtEscanteios);
+  const agCartoes    = _parseAgenteFiltrado(txtCartoes);
 
-  const txtCoord = await chamarIASonnet(_promptCoordenador(jogo, ligaStatsMap, blocoMem, agentes, df), 1500);
+  logAg('Gols      ', txtGols,       agGols);
+  logAg('Resultado ', txtResultado,  agResultado);
+  logAg('Escanteios', txtEscanteios, agEscanteios);
+  logAg('Cartões   ', txtCartoes,    agCartoes);
+
+  const agentesValidos = [agGols, agResultado, agEscanteios, agCartoes].filter(a => a?.opcao_1);
+
+  // P4: se menos de 2 agentes retornaram dados — fallback por jogo
+  if (agentesValidos.length < 2) {
+    console.log(`  ⚠️ Multi-agente insuficiente (${agentesValidos.length}/4 agentes) — usando fallback para ${label}`);
+    return null; // gerarApostasMultiAgente vai chamar fallback no loop
+  }
+
+  const txtCoord = await chamarIASonnet(_promptCoordenador(jogo, ligaStatsMap, blocoMem, agentesValidos, df), 1500);
   const resultado = _parseAgenteJson(txtCoord);
 
   if (!resultado?.aposta || !resultado?.mercado || !resultado?.justificativa) {
     console.log(`  ❌ Coordenador falhou — descartando ${label}`); return null;
+  }
+
+  // P4: validar que o mercado escolhido realmente veio de um agente válido
+  const mercadosDisponiveis = new Set(agentesValidos.map(a => a.mercado));
+  if (!mercadosDisponiveis.has(resultado.mercado)) {
+    console.log(`  ⚠️ Coordenador escolheu mercado "${resultado.mercado}" que não tem dados — descartando`);
+    return null;
   }
 
   const probPct = resultado.probabilidade_estimada ? Math.round(resultado.probabilidade_estimada*100)+'%' : '?';
@@ -2167,10 +2243,15 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
           jogo.alerta_odd = true; jogo.confianca = 'baixa';
           if (jogo.aposta_backup && jogo.mercado_backup) {
             console.log(`  ⚡ Pivotando odd: ${jogo.time_casa} x ${jogo.time_fora} → ${jogo.aposta_backup}`);
+            const novaAposta = jogo.aposta_backup, novoMercado = jogo.mercado_backup;
             jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
-            jogo.aposta = jogo.aposta_backup; jogo.mercado = jogo.mercado_backup; jogo.confianca = 'media'; jogo.alerta_odd = false;
-            const altB = jogo.alternativas?.find(a => a.mercado===jogo.mercado_backup && a.aposta===jogo.aposta_backup);
+            jogo.aposta = novaAposta; jogo.mercado = novoMercado; jogo.confianca = 'media'; jogo.alerta_odd = false;
+            const altB = jogo.alternativas?.find(a => a.mercado===novoMercado && a.aposta===novaAposta);
             jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altB?.razao||'', jogo);
+            // P5: atualizar backup para próxima alternativa diferente da nova aposta
+            const proxB = jogo.alternativas?.find(a => a.aposta && a.aposta !== jogo.aposta && a.mercado !== jogo.mercado);
+            if (proxB) { jogo.aposta_backup = proxB.aposta; jogo.mercado_backup = proxB.mercado; }
+            else { jogo.aposta_backup = null; jogo.mercado_backup = null; }
           }
         }
       }
@@ -2191,6 +2272,9 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
       jogo.aposta_original = jogo.aposta_original||jogo.aposta; jogo.mercado_original = jogo.mercado_original||jogo.mercado;
       jogo.aposta = melhor.aposta; jogo.mercado = melhor.mercado; jogo.confianca = melhor.confianca;
       jogo.razao_escolha = `Pivotado(${motivo}): ${melhor.razao}`; jogo.justificativa = gerarJustificativaPosPivot(melhor.aposta, melhor.mercado, melhor.razao, jogo);
+      // P5: atualizar backup para próxima melhor alternativa (diferente da nova aposta)
+      const proxBackup = jogo.alternativas?.find(a => a.aposta && a.aposta !== jogo.aposta && a.mercado !== jogo.mercado);
+      if (proxBackup) { jogo.aposta_backup = proxBackup.aposta; jogo.mercado_backup = proxBackup.mercado; }
       jogosFinais.push(jogo);
     } else if (isComp && ['nao_recomendado','baixa'].includes(conf)) {
       const candidatos = jogo.alternativas.filter(a => ['baixa','nao_recomendado'].includes(a.confianca) && a.aposta);
