@@ -3027,9 +3027,11 @@ async function agentValidar(data, opcoes = {}) {
         const mercadoEfetivo = inferirMercadoPre(jogo.mercado?.toLowerCase(), jogo.aposta);
 
         // Buscar stats detalhadas se precisar (cartões/escanteios)
+        // Busca sempre que: aposta principal é escanteios/cartões OU existem alternativas nesses mercados
+        const temAltStats = jogo.alternativas?.some(a => ['escanteios','cartoes'].includes(a.mercado));
         let stats = null;
-        if (['escanteios','cartoes'].includes(mercadoEfetivo) && fixtureIdUsado) {
-          console.log(`    📊 Buscando stats para mercado: ${mercadoEfetivo}`);
+        if ((['escanteios','cartoes'].includes(mercadoEfetivo) || temAltStats) && fixtureIdUsado) {
+          console.log(`    📊 Buscando stats para mercado: ${mercadoEfetivo}${temAltStats?' (alternativas)':''}`);
           stats = await buscarStatsFixture(fixtureIdUsado);
           if (!stats) console.log(`    ⚠️ Stats não encontradas para fixtureId: ${fixtureIdUsado}`);
           await sleep(300);
@@ -3076,19 +3078,19 @@ async function agentValidar(data, opcoes = {}) {
             };
           }
           // Escanteios e cartões — só se a API trouxe stats reais (não zeradas)
-          if (stats?.escanteiosTotal > 0) {
+          if (stats?.escanteiosTotal != null) {
             const esc = stats.escanteiosTotal;
             mercadosResult.escanteios = {};
-            for (const linha of ['7.5','8.5','9.5','10.5','11.5','12.5']) {
+            for (const linha of ['4.5','5.5','6.5','7.5','8.5','9.5','10.5','11.5','12.5','13.5','14.5']) {
               const l = parseFloat(linha);
               mercadosResult.escanteios[`Over ${linha}`] = esc > l ? 'green' : 'red';
               mercadosResult.escanteios[`Under ${linha}`] = esc < l ? 'green' : 'red';
             }
           }
-          if (stats?.cartoesTotal > 0) {
+          if (stats?.cartoesTotal != null) {
             const cart = stats.cartoesTotal;
             mercadosResult.cartoes = {};
-            for (const linha of ['2.5','3.5','4.5','5.5']) {
+            for (const linha of ['0.5','1.5','2.5','3.5','4.5','5.5','6.5','7.5']) {
               const l = parseFloat(linha);
               mercadosResult.cartoes[`Over ${linha}`] = cart > l ? 'green' : 'red';
               mercadosResult.cartoes[`Under ${linha}`] = cart < l ? 'green' : 'red';
@@ -3429,7 +3431,7 @@ Seja direto e acionável. Máx 400 palavras. A IA que ler este relatório amanh�
 
     // Acumular mercados ALTERNATIVOS — calcular o que teria dado green com placar real e/ou stats reais
     if (aposta.alternativas?.length) {
-      const statsAlt = (res.escanteios_total || res.cartoes_total) ? { escanteiosTotal: res.escanteios_total || 0, cartoesTotal: res.cartoes_total || 0 } : null;
+      const statsAlt = (res.escanteios_total != null || res.cartoes_total != null) ? { escanteiosTotal: res.escanteios_total ?? 0, cartoesTotal: res.cartoes_total ?? 0 } : null;
       for (const alt of aposta.alternativas) {
         if (alt.mercado === mercado) continue; // já contou acima
         let resultadoAlt;
@@ -3980,7 +3982,7 @@ app.post('/sincronizar-ligas', async (req, res) => {
 
         // Acumular mercados ALTERNATIVOS — aproveitar TODO dado já coletado, sem custo extra
         if (aposta.alternativas?.length) {
-          const statsAlt = (res.escanteios_total || res.cartoes_total) ? { escanteiosTotal: res.escanteios_total || 0, cartoesTotal: res.cartoes_total || 0 } : null;
+          const statsAlt = (res.escanteios_total != null || res.cartoes_total != null) ? { escanteiosTotal: res.escanteios_total ?? 0, cartoesTotal: res.cartoes_total ?? 0 } : null;
           for (const alt of aposta.alternativas) {
             if (alt.mercado === mercado) continue;
             let resultadoAlt;
