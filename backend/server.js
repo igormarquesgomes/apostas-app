@@ -4468,7 +4468,15 @@ app.post('/informar-stats', async (req, res) => {
       cartoesCasa: 0, cartoesFora: 0,
     };
 
-    const resultado = verificarAposta(jogo, gC, gF, statsInformadas);
+    const mainMercado = (jogo.mercado || '').toLowerCase();
+    const apostaPrincipalStats = mainMercado === 'escanteios' || mainMercado === 'cartoes' ||
+      (jogo.aposta||'').toLowerCase().includes('escanteio') ||
+      (jogo.aposta||'').toLowerCase().includes('corner') ||
+      (jogo.aposta||'').toLowerCase().includes('cartao') ||
+      (jogo.aposta||'').toLowerCase().includes('cartão');
+    const resultado = apostaPrincipalStats
+      ? verificarAposta(jogo, gC, gF, statsInformadas)
+      : (resExistente.resultado_aposta || 'pendente');
 
     // Montar mercados_resultado para escanteios/cartões com os dados informados
     const mercadosResultExtra = { ...(resExistente.mercados_resultado || {}) };
