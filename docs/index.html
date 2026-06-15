@@ -955,8 +955,9 @@ async function informarStats(event,data,jogoId,aposta,mercado){
       <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
       <button class="modal-btn primary" onclick="_mstCallback()">Confirmar</button>
     </div>`, async () => {
-    const escanteios = _mstInput('mst-esc') ? parseInt(_mstInput('mst-esc').value)||null : null;
-    const cartoes    = _mstInput('mst-cart') ? parseInt(_mstInput('mst-cart').value)||null : null;
+    const _parseVal = v => { const s=(v||'').trim(); if(s==='') return null; const n=parseInt(s); return isNaN(n)?null:n; };
+    const escanteios = _mstInput('mst-esc') ? _parseVal(_mstInput('mst-esc').value) : null;
+    const cartoes    = _mstInput('mst-cart') ? _parseVal(_mstInput('mst-cart').value) : null;
     fecharModalStats();
     try{
       const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes})});
@@ -989,13 +990,14 @@ async function informarAnalise(event,data,jogoId){
       <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
       <button class="modal-btn primary" onclick="_mstCallback()">Confirmar</button>
     </div>`, async () => {
-    const vEsc  = _mstInput('mst-a-esc')?.value.trim();
-    const vAmar = _mstInput('mst-a-amar')?.value.trim();
-    const vVerm = _mstInput('mst-a-verm')?.value.trim();
-    const escanteios = vEsc  ? parseInt(vEsc)  : null;
-    const amarelos   = vAmar ? parseInt(vAmar) : null;
-    const vermelhos  = vVerm ? parseInt(vVerm) : null;
-    if((vEsc&&isNaN(escanteios))||(vAmar&&isNaN(amarelos))||(vVerm&&isNaN(vermelhos))) return alert('Número inválido');
+    const _pv = v => { const s=(v||'').trim(); if(s==='') return null; const n=parseInt(s); return isNaN(n)?null:n; };
+    const vEsc  = _mstInput('mst-a-esc')?.value;
+    const vAmar = _mstInput('mst-a-amar')?.value;
+    const vVerm = _mstInput('mst-a-verm')?.value;
+    const escanteios = _pv(vEsc);
+    const amarelos   = _pv(vAmar);
+    const vermelhos  = _pv(vVerm);
+    if((vEsc?.trim()&&escanteios===null)||(vAmar?.trim()&&amarelos===null)||(vVerm?.trim()&&vermelhos===null)) return alert('Número inválido');
     if(escanteios===null&&amarelos===null&&vermelhos===null){ fecharModalStats(); return; }
     const cartoes=(amarelos!==null||vermelhos!==null)?(amarelos||0)+(vermelhos||0):null;
     fecharModalStats();

@@ -4484,7 +4484,7 @@ app.post('/informar-stats', async (req, res) => {
 
     // Montar mercados_resultado para escanteios/cartões com os dados informados
     const mercadosResultExtra = { ...(resExistente.mercados_resultado || {}) };
-    if (escanteios) {
+    if (escanteios != null) {
       mercadosResultExtra.escanteios = {};
       for (const linha of ['4.5','5.5','6.5','7.5','8.5','9.5','10.5','11.5','12.5','13.5','14.5']) {
         const l = parseFloat(linha);
@@ -4492,7 +4492,7 @@ app.post('/informar-stats', async (req, res) => {
         mercadosResultExtra.escanteios[`Under ${linha}`] = escanteios < l ? 'green' : 'red';
       }
     }
-    if (cartoes) {
+    if (cartoes != null) {
       mercadosResultExtra.cartoes = {};
       for (const linha of ['2.5','3.5','4.5','5.5']) {
         const l = parseFloat(linha);
