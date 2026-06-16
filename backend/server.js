@@ -2020,6 +2020,7 @@ CRITÉRIOS DE DECISÃO (siga rigorosamente):
 4. NUNCA invente probabilidades — use APENAS os números fornecidos pelos agentes acima
 5. Se melhor opção de um agente < 55%, use opcao_2 desse agente
 6. confianca: alta ≥ 75% | media 55–74% | baixa < 55%
+7. CAMPO alternativas: inclua APENAS mercados com dados reais acima. PROIBIDO criar uma entrada para mercado marcado "SEM DADOS" — omita-o completamente do array (nunca escreva "indisponível", "sem dados" ou similar como aposta)
 
 CAMPO justificativa (PÚBLICO): escreva como especialista em apostas. PROIBIDO usar: "calibração", "assertividade %", "LigaMedia", "especialista", "agente", "sistema". Use apenas: forma recente, H2H, médias, contexto esportivo. 2–3 frases.
 
@@ -2141,6 +2142,15 @@ async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df, _gerar
   if (!mercadosDisponiveis.has(resultado.mercado)) {
     console.log(`  ⚠️ Coordenador escolheu mercado "${resultado.mercado}" que não tem dados — descartando`);
     return null;
+  }
+
+  // Remover alternativas de mercados SEM DADOS que o coordenador tenha inventado
+  // (ex: "Mercado indisponível" como aposta — texto-placeholder em vez de omitir a entrada)
+  if (resultado.alternativas?.length) {
+    const antes = resultado.alternativas.length;
+    resultado.alternativas = resultado.alternativas.filter(a => mercadosDisponiveis.has(a.mercado));
+    const removidas = antes - resultado.alternativas.length;
+    if (removidas > 0) console.log(`  🧹 ${removidas} alternativa(s) de mercado sem dados removida(s)`);
   }
 
   const probPct = resultado.probabilidade_estimada ? Math.round(resultado.probabilidade_estimada*100)+'%' : '?';
