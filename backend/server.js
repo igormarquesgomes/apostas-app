@@ -2952,8 +2952,8 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   if (isEscanteios && stats) {
     const esc = stats.escanteiosTotal;
     console.log(`    🔍 Stats escanteios: total=${esc} casa=${stats.escanteiosCasa} fora=${stats.escanteiosFora}`);
-    // Se stats zeradas, API não tem dados para essa liga — needs manual review
-    if (esc === 0 && stats.escanteiosCasa === 0 && stats.escanteiosFora === 0) {
+    // Se stats zeradas E não confirmadas manualmente, API não tem dados para essa liga — needs manual review
+    if (!stats.confirmado && esc === 0 && stats.escanteiosCasa === 0 && stats.escanteiosFora === 0) {
       console.log(`    ⚠️ Stats escanteios zeradas — liga sem cobertura de stats, correção manual necessária`);
       return 'sem_stats';
     }
@@ -2984,8 +2984,8 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     apostaNorm.includes('yellow');
   if (isCartoes && stats) {
     const cart = stats.cartoesTotal;
-    // Se stats zeradas, API não tem dados para essa liga — needs manual review
-    if (cart === 0 && stats.cartoesCasa === 0 && stats.cartoesFora === 0) {
+    // Se stats zeradas E não confirmadas manualmente, API não tem dados para essa liga — needs manual review
+    if (!stats.confirmado && cart === 0 && stats.cartoesCasa === 0 && stats.cartoesFora === 0) {
       console.log(`    ⚠️ Stats cartões zeradas — liga sem cobertura de stats, correção manual necessária`);
       return 'sem_stats';
     }
@@ -4721,6 +4721,7 @@ app.post('/informar-stats', async (req, res) => {
       escanteiosCasa: 0, escanteiosFora: 0,
       cartoesTotal: cartoes || 0,
       cartoesCasa: 0, cartoesFora: 0,
+      confirmado: true, // dado informado manualmente — nunca tratar 0 como "sem cobertura"
     };
 
     const mainMercado = (jogo.mercado || '').toLowerCase();
