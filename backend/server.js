@@ -452,6 +452,10 @@ async function dbGet(data) {
   } catch(e) { return null; }
 }
 
+// Outputs brutos dos agentes especializados (Gols/Resultado/Escanteios/Cartões) por data
+// Uso interno do Agente de Múltiplas — nunca persistido no banco
+const _agentesRawCache = new Map();
+
 // ─── Banco de ligas conhecidas ───────────────────────────────
 const cacheLigas = new Map(); // Cache em memória para evitar requisições repetidas
 
@@ -2141,6 +2145,9 @@ async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df, _gerar
 
   const probPct = resultado.probabilidade_estimada ? Math.round(resultado.probabilidade_estimada*100)+'%' : '?';
   console.log(`  🎯 Coordenador: ${resultado.mercado} ${resultado.aposta} (${probPct}) — value ${resultado.value||'?'}`);
+
+  // Anexar outputs brutos dos agentes especializados (uso interno do Agente de Múltiplas)
+  resultado._agentesRaw = agentesValidos;
   return resultado;
 }
 
@@ -2165,6 +2172,19 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
 
   console.log(`\n✅ Multi-agente: ${jogosResultado.length} apostas brutas`);
   if (!jogosResultado.length) return null;
+
+  // Capturar outputs brutos dos agentes especializados para uso pelo Agente de Múltiplas
+  // (mantido só em memória — nunca persistido no banco)
+  const agentesRawMap = new Map();
+  for (const j of jogosResultado) {
+    if (j._agentesRaw) {
+      const key = `${(j.time_casa||'').toLowerCase()}|${(j.time_fora||'').toLowerCase()}`;
+      agentesRawMap.set(key, j._agentesRaw);
+      delete j._agentesRaw;
+    }
+  }
+  _agentesRawCache.set(data, agentesRawMap);
+  if (_agentesRawCache.size > 5) { const k = _agentesRawCache.keys().next().value; _agentesRawCache.delete(k); }
 
   // ── Pós-processamento idêntico ao gerarApostas ─────────────
 
@@ -2373,6 +2393,232 @@ Retorne SOMENTE JSON:
   } catch(err) {
     console.error('Erro parse múltiplas:', err.message);
     return null;
+  }
+}
+
+// ─── Agentes especializados de Múltiplas (A e B) ─────────────
+// Buscar histórico de múltiplas dos últimos N dias numa única query
+async function buscarHistoricoMultiplas(data, dias = 30) {
+  const desde = diaOffset(data, -dias);
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?data=gte.${desde}&data=lt.${data}&multiplas=not.is.null&select=data,multiplas,resultados_multiplas&order=data.desc&limit=60`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch(e) { console.error('Erro buscarHistoricoMultiplas:', e.message); return []; }
+}
+
+// Processar histórico em padrões: assertividade por mercado/liga, quebradores e vencedores frequentes
+function processarHistoricoMultiplas(rows) {
+  const porTipo = { A: [], B: [] };
+  const apostaStats = {};  // "mercado: aposta" -> {g,r}
+  const mercadoStats = {}; // mercado -> {g,r}
+  const ligaStats = {};    // liga -> {g,r}
+  const timeStats = {};    // nome do time -> {g,r}
+
+  const reg = (obj, key, campo) => { if (!key) return; obj[key] = obj[key] || { g: 0, r: 0 }; obj[key][campo]++; };
+
+  for (const row of rows) {
+    const m = row.multiplas, r = row.resultados_multiplas;
+    if (!m) continue;
+    for (const [tipo, key] of [['A','multipla_a'],['B','multipla_b']]) {
+      const mm = m[key];
+      if (!mm?.jogos?.length) continue;
+      const rr = r?.[key];
+      const resultadoGeral = rr?.resultado || 'pendente';
+      const jogosRes = (rr?.jogos_resultado?.length ? rr.jogos_resultado : mm.jogos);
+      if (resultadoGeral !== 'pendente') {
+        porTipo[tipo].push({ data: row.data, resultado: resultadoGeral, odd: mm.odd_total, jogos: jogosRes });
+      }
+      for (const j of jogosRes) {
+        const jr = j.resultado;
+        if (jr !== 'green' && jr !== 'red') continue;
+        const campo = jr === 'green' ? 'g' : 'r';
+        const mercado = (j.mercado || '').toLowerCase();
+        const apostaKey = j.mercado && j.aposta ? `${j.mercado}: ${j.aposta}` : null;
+        reg(mercadoStats, mercado, campo);
+        reg(apostaStats, apostaKey, campo);
+        reg(ligaStats, j.liga, campo);
+        reg(timeStats, j.time_casa, campo);
+        reg(timeStats, j.time_fora, campo);
+      }
+    }
+  }
+
+  const topN = (obj, campoOrdenar, n = 8) => Object.entries(obj)
+    .filter(([,s]) => (s.g + s.r) >= 2)
+    .sort((a,b) => b[1][campoOrdenar] - a[1][campoOrdenar])
+    .slice(0, n);
+
+  return {
+    porTipo, apostaStats, mercadoStats, ligaStats, timeStats,
+    quebradoresFrequentes: topN(apostaStats, 'r'),
+    vencedoresFrequentes: topN(apostaStats, 'g'),
+    timesQuebradores: topN(timeStats, 'r'),
+  };
+}
+
+// Montar bloco de texto com o histórico processado para um tipo (A ou B)
+function montarDigestHistorico(hist, tipo) {
+  const linhas = hist.porTipo[tipo];
+  const g = linhas.filter(l => l.resultado === 'green').length;
+  const r = linhas.length - g;
+  const recentesTxt = linhas.slice(0, 12).map(l => {
+    const jogosTxt = l.jogos.map(j => {
+      const marker = j.resultado === 'red' ? '❌quebrou' : j.resultado === 'green' ? '✅' : '?';
+      return `${j.time_casa} x ${j.time_fora} [${j.aposta}] ${marker}`;
+    }).join(' | ');
+    return `${l.data} (odd ${l.odd || '?'}) → ${l.resultado.toUpperCase()}: ${jogosTxt}`;
+  }).join('\n') || 'sem histórico ainda para este tipo';
+
+  const fmtStats = (obj, n = 8) => Object.entries(obj)
+    .filter(([,s]) => (s.g + s.r) >= 2)
+    .sort((a,b) => (b[1].g+b[1].r) - (a[1].g+a[1].r))
+    .slice(0, n)
+    .map(([k,s]) => { const t = s.g + s.r; return `${k} ${Math.round(s.g/t*100)}% (${s.g}G/${s.r}R)`; })
+    .join(' | ') || 'sem dados suficientes';
+
+  const quebradoresTxt = hist.quebradoresFrequentes.map(([k,s]) => `${k} (${s.r}x red de ${s.g+s.r})`).join(', ') || 'nenhum padrão identificado ainda';
+  const vencedoresTxt  = hist.vencedoresFrequentes.map(([k,s]) => `${k} (${s.g}x green de ${s.g+s.r})`).join(', ') || 'nenhum padrão identificado ainda';
+  const timesQuebrTxt  = hist.timesQuebradores.map(([t,s]) => `${t} (${s.r}x red)`).join(', ') || 'nenhum time identificado como quebrador recorrente';
+
+  return `HISTÓRICO MÚLTIPLA ${tipo} (últimos 30 dias): ${g}G / ${r}R
+ÚLTIMAS MÚLTIPLAS ${tipo}:
+${recentesTxt}
+
+ASSERTIVIDADE POR MERCADO: ${fmtStats(hist.mercadoStats)}
+ASSERTIVIDADE POR LIGA: ${fmtStats(hist.ligaStats)}
+APOSTAS/MERCADOS QUE MAIS QUEBRARAM (evite priorizar): ${quebradoresTxt}
+APOSTAS/MERCADOS QUE MAIS DERAM GREEN (priorize): ${vencedoresTxt}
+TIMES QUE MAIS APARECERAM EM QUEBRAS: ${timesQuebrTxt}`;
+}
+
+// Montar pool de opções por jogo do dia — aposta principal + alternativas do coordenador
+// + outputs brutos dos 4 agentes especializados (com probabilidade exata), quando disponíveis
+function montarPoolJogosDia(jogosDodia, agentesRawMap) {
+  return jogosDodia.map(j => {
+    const key = `${(j.time_casa||'').toLowerCase()}|${(j.time_fora||'').toLowerCase()}`;
+    const raw = agentesRawMap?.get(key);
+    const opcoes = [];
+    if (j.aposta && j.mercado) opcoes.push({ mercado: j.mercado, aposta: j.aposta, probabilidade: j.probabilidade_estimada ?? null, fonte: 'principal' });
+    for (const a of (j.alternativas || [])) {
+      if (a.aposta && a.mercado && !(a.mercado === j.mercado && a.aposta === j.aposta)) {
+        opcoes.push({ mercado: a.mercado, aposta: a.aposta, confianca: a.confianca, fonte: 'alternativa' });
+      }
+    }
+    if (raw?.length) {
+      for (const ag of raw) {
+        if (ag.opcao_1?.aposta) opcoes.push({ mercado: ag.mercado, aposta: ag.opcao_1.aposta, probabilidade: ag.opcao_1.probabilidade, fonte: 'agente_especializado' });
+        if (ag.opcao_2?.aposta) opcoes.push({ mercado: ag.mercado, aposta: ag.opcao_2.aposta, probabilidade: ag.opcao_2.probabilidade, fonte: 'agente_especializado' });
+      }
+    }
+    return { time_casa: j.time_casa, time_fora: j.time_fora, liga: j.liga, horario: j.horario, odd_mercado: j.odd_mercado || null, opcoes };
+  }).filter(j => j.opcoes.length);
+}
+
+function montarBlocoJogosDia(pool) {
+  return pool.map((j, i) => {
+    const opcoesTxt = j.opcoes.map(o => {
+      const p = o.probabilidade != null ? `${Math.round(o.probabilidade*100)}%` : (o.confianca || '?');
+      return `${o.mercado}: "${o.aposta}" (${p})`;
+    }).join(' | ');
+    return `${i+1}. ${j.time_casa} x ${j.time_fora} | ${j.liga} | ${j.horario}\n   Opções: ${opcoesTxt}`;
+  }).join('\n');
+}
+
+function _promptAgenteMultiplaA(digest, blocoJogos) {
+  return `Você é o AGENTE MÚLTIPLA A. Objetivo: montar a múltipla de MAIOR ODD com segurança razoável (3-4 jogos).
+
+${digest}
+
+JOGOS DISPONÍVEIS HOJE (com todas as opções identificadas pelos agentes especializados — pode escolher QUALQUER uma, não precisa ser a aposta principal):
+${blocoJogos}
+
+RACIOCÍNIO OBRIGATÓRIO (siga os 4 passos antes de responder):
+Passo 1 — Analisar histórico: quais mercados/ligas têm maior % de GREEN nas múltiplas A? Quais foram os quebradores mais frequentes?
+Passo 2 — Filtrar jogos elegíveis: elimine jogos de times que foram quebradores frequentes. Priorize mercados com melhor histórico. Priorize opções com probabilidade > 70%. Evite opções com indício de value < 1.0.
+Passo 3 — Montar a múltipla: selecione 3-4 jogos que maximizem a probabilidade conjunta. NÃO priorize odd alta — priorize segurança. Justifique cada jogo com base no histórico E nos dados de hoje.
+Passo 4 — Calcular probabilidade conjunta: P(múltipla) = P(jogo1) × P(jogo2) × P(jogo3) [× P(jogo4)]. Só inclua o 4º jogo se P(jogo4) > 65% e não for quebrador histórico.
+
+Retorne SOMENTE JSON (sem comentários, sem texto fora do JSON):
+{"tipo":"A","jogos":[{"time_casa":"...","time_fora":"...","liga":"...","horario":"...","aposta":"...","mercado":"...","odd":1.65,"razao_inclusao":"..."}],"odd_total":4.15,"probabilidade_conjunta":0.38,"justificativa":"..."}`;
+}
+
+function _promptAgenteMultiplaB(digest, blocoJogos) {
+  return `Você é o AGENTE MÚLTIPLA B. Objetivo: montar a múltipla MAIS SEGURA do dia (2-3 jogos, odd menor).
+
+${digest}
+
+JOGOS DISPONÍVEIS HOJE (com todas as opções identificadas pelos agentes especializados — pode escolher QUALQUER uma, não precisa ser a aposta principal):
+${blocoJogos}
+
+DIFERENÇA EM RELAÇÃO AO AGENTE A: selecione os jogos com MAIOR probabilidade individual (não precisa ser os mesmos do A). Máximo 3 jogos. Foco em P(conjunta) > 45% — segurança acima de tudo. Pode repetir 1 jogo do A se for o mais seguro disponível, mas evite repetir todos.
+
+RACIOCÍNIO OBRIGATÓRIO (mesmos 4 passos do Agente A, com threshold mais conservador):
+Passo 1 — Analisar histórico (mercados/ligas com melhor % GREEN, quebradores frequentes)
+Passo 2 — Filtrar jogos elegíveis (eliminar quebradores, priorizar probabilidade alta, threshold ainda mais exigente)
+Passo 3 — Montar a múltipla com 2-3 jogos de máxima probabilidade individual
+Passo 4 — Calcular P(múltipla) = produto das probabilidades — deve ser > 45%
+
+Retorne SOMENTE JSON:
+{"tipo":"B","jogos":[{"time_casa":"...","time_fora":"...","liga":"...","horario":"...","aposta":"...","mercado":"...","odd":1.65,"razao_inclusao":"..."}],"odd_total":2.85,"probabilidade_conjunta":0.52,"justificativa":"..."}`;
+}
+
+function _validarMultiplaAgente(obj, { minJogos = 2, minOdd = 1.8 } = {}) {
+  if (!obj?.jogos?.length || obj.jogos.length < minJogos) return false;
+  if (!obj.odd_total || obj.odd_total < minOdd) return false;
+  if (obj.jogos.some(j => !j.time_casa || !j.time_fora || !j.aposta || !j.mercado || !j.odd || j.odd < 1.20)) return false;
+  return true;
+}
+
+// Nova função: agentes especializados analisam o histórico de 30 dias antes de montar as múltiplas
+// Substitui gerarMultiplas como ponto de entrada — fallback automático para gerarMultiplas se falhar
+async function gerarMultiplasComAgentes(data, jogosDodia) {
+  try {
+    console.log('\n🎯 Agentes de múltiplas rodando...');
+    const histRows = await buscarHistoricoMultiplas(data, 30);
+    const hist = processarHistoricoMultiplas(histRows);
+    const gA = hist.porTipo.A.filter(l => l.resultado === 'green').length, rA = hist.porTipo.A.length - gA;
+    const gB = hist.porTipo.B.filter(l => l.resultado === 'green').length, rB = hist.porTipo.B.length - gB;
+    console.log(`  📊 Histórico: ${hist.porTipo.A.length + hist.porTipo.B.length} múltiplas analisadas (${gA}G/${rA}R múltipla A | ${gB}G/${rB}R múltipla B)`);
+    if (hist.quebradoresFrequentes.length) console.log(`  📋 Quebradores frequentes: ${hist.quebradoresFrequentes.slice(0,3).map(([k,s])=>`${k} (${s.r}x)`).join(', ')}`);
+    if (hist.vencedoresFrequentes.length) console.log(`  📋 Mercados GREEN: ${hist.vencedoresFrequentes.slice(0,3).map(([k,s])=>`${k} (${s.g}x)`).join(', ')}`);
+
+    const agentesRawMap = _agentesRawCache.get(data) || null;
+    const pool = montarPoolJogosDia(jogosDodia, agentesRawMap);
+    if (pool.length < 2) { console.log('  ⚠️ Pool insuficiente de jogos — fallback gerarMultiplas'); return await gerarMultiplas(data, jogosDodia); }
+    const blocoJogos = montarBlocoJogosDia(pool);
+
+    const [txtA, txtB] = await Promise.all([
+      chamarIASonnet(_promptAgenteMultiplaA(montarDigestHistorico(hist, 'A'), blocoJogos), 2000),
+      chamarIASonnet(_promptAgenteMultiplaB(montarDigestHistorico(hist, 'B'), blocoJogos), 2000),
+    ]);
+
+    const objA = _parseAgenteJson(txtA);
+    const objB = _parseAgenteJson(txtB);
+    const validA = _validarMultiplaAgente(objA, { minJogos: 2, minOdd: 2.5 });
+    const validB = _validarMultiplaAgente(objB, { minJogos: 2, minOdd: 1.8 });
+
+    if (!validA || !validB) {
+      console.log(`  ⚠️ Agentes retornaram inválido (A:${validA?'ok':'falhou'} B:${validB?'ok':'falhou'}) — fallback gerarMultiplas`);
+      return await gerarMultiplas(data, jogosDodia);
+    }
+
+    console.log(`✅ Múltipla A: ${objA.jogos.length} jogos | odd ${objA.odd_total} | P(conjunta) ${Math.round((objA.probabilidade_conjunta||0)*100)}%`);
+    console.log(`  → ${objA.jogos.map(j=>j.aposta).join(' | ')}`);
+    console.log(`✅ Múltipla B: ${objB.jogos.length} jogos | odd ${objB.odd_total} | P(conjunta) ${Math.round((objB.probabilidade_conjunta||0)*100)}%`);
+    console.log(`  → ${objB.jogos.map(j=>j.aposta).join(' | ')}`);
+
+    const fmt = arr => arr.map(j => ({ liga: j.liga, time_casa: j.time_casa, time_fora: j.time_fora, horario: j.horario, aposta: j.aposta, mercado: j.mercado, odd: j.odd, justificativa: j.razao_inclusao || '' }));
+    return {
+      multipla_a: { odd_total: objA.odd_total, jogos: fmt(objA.jogos) },
+      multipla_b: { odd_total: objB.odd_total, jogos: fmt(objB.jogos) },
+    };
+  } catch(e) {
+    console.error('❌ gerarMultiplasComAgentes falhou:', e.message, '— fallback gerarMultiplas');
+    return await gerarMultiplas(data, jogosDodia);
   }
 }
 
@@ -3643,7 +3889,7 @@ async function rotina04h() {
     setTimeout(async () => {
       try {
         const rowAtual = await dbGet(diaAlvo);
-        const multiplas = await gerarMultiplas(diaAlvo, rowAtual?.apostas?.jogos || []);
+        const multiplas = await gerarMultiplasComAgentes(diaAlvo, rowAtual?.apostas?.jogos || []);
         if (multiplas) {
           await dbSaveMultiplas(diaAlvo, multiplas);
           console.log(`✅ ${diaAlvo}: múltiplas geradas — A:${multiplas.multipla_a?.odd_total} B:${multiplas.multipla_b?.odd_total}`);
@@ -3691,7 +3937,7 @@ async function rotina05h() {
     if (!multiplas?.multipla_a || !multiplas?.multipla_b) {
       console.log(`⚠️ ${diaAlvo}: múltiplas ausentes — gerando`);
       const rowAtual = await dbGet(diaAlvo);
-      const novasMultiplas = await gerarMultiplas(diaAlvo, rowAtual?.apostas?.jogos || []);
+      const novasMultiplas = await gerarMultiplasComAgentes(diaAlvo, rowAtual?.apostas?.jogos || []);
       if (novasMultiplas) {
         await dbSaveMultiplas(diaAlvo, novasMultiplas);
         console.log(`✅ ${diaAlvo}: múltiplas OK — A:${novasMultiplas.multipla_a?.odd_total} B:${novasMultiplas.multipla_b?.odd_total}`);
@@ -3842,7 +4088,7 @@ app.post('/analisar', async (req, res) => {
       setTimeout(async () => {
         try {
           console.log('\n🎯 Gerando múltiplas em background...');
-          const multiplas = await gerarMultiplas(data, resultado.jogos);
+          const multiplas = await gerarMultiplasComAgentes(data, resultado.jogos);
           if (multiplas) {
             await dbSaveMultiplas(data, multiplas);
             console.log(`✅ Múltiplas salvas — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
@@ -3907,7 +4153,7 @@ async function rotinaMultiplas() {
 
     console.log(`🔄 ${diaAlvo}: ${!multiplas ? 'sem múltiplas' : 'múltiplas inválidas'} — gerando...`);
     try {
-      const novasMultiplas = await gerarMultiplas(diaAlvo, jogos);
+      const novasMultiplas = await gerarMultiplasComAgentes(diaAlvo, jogos);
       if (novasMultiplas?.multipla_a?.odd_total > 0) {
         await dbSaveMultiplas(diaAlvo, novasMultiplas);
         console.log(`✅ ${diaAlvo}: múltiplas geradas — A:${novasMultiplas.multipla_a.odd_total} B:${novasMultiplas.multipla_b?.odd_total}`);
@@ -4429,7 +4675,7 @@ app.post('/confirmar-jogo-manual', async (req, res) => {
     setTimeout(async () => {
       try {
         const rowAtual = await dbGet(data);
-        const multiplas = await gerarMultiplas(data, rowAtual?.apostas?.jogos || []);
+        const multiplas = await gerarMultiplasComAgentes(data, rowAtual?.apostas?.jogos || []);
         if (multiplas) await dbSaveMultiplas(data, multiplas);
       } catch(e) { console.error('❌ Múltiplas após add manual:', e.message); }
     }, 5000);
@@ -4611,7 +4857,7 @@ app.post('/gerar-multiplas/:data', async (req, res) => {
       pri: j.tipo_liga === 'a' ? 1 : j.tipo_liga === 'b' ? 2 : j.tipo_liga === 'copa' ? 3 : j.tipo_liga === 'it' ? 4 : j.tipo_liga === 'es' ? 4 : j.tipo_liga === 'eu' ? 5 : 6
     }));
 
-    const multiplas = await gerarMultiplas(data, jogosComPri);
+    const multiplas = await gerarMultiplasComAgentes(data, jogosComPri);
     if (multiplas) {
       await dbSaveMultiplas(data, multiplas);
       console.log(`✅ Múltiplas geradas para ${data} — A: ${multiplas.multipla_a?.odd_total} | B: ${multiplas.multipla_b?.odd_total}`);
