@@ -71,9 +71,8 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .mkt-card.border-amber{border-left:3px solid var(--amber);}
 .mkt-card.border-red{border-left:3px solid var(--red);}
 
-/* 3-COLUMN BOTTOM */
-.bottom-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
-@media(max-width:1000px){.bottom-grid{grid-template-columns:1fr 1fr;}}
+/* 2-COLUMN BOTTOM */
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 @media(max-width:640px){.bottom-grid{grid-template-columns:1fr;}}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
 .panel-hd{padding:18px 22px;border-bottom:1px solid var(--border);}
@@ -108,14 +107,51 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .conf-bar{height:100%;border-radius:3px;}
 .conf-sub{font-size:12px;color:var(--text3);}
 
-/* MÚLTIPLAS histórico */
-.mult-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:8px;}
-.mult-row:last-child{border-bottom:none;}
-.mult-left{}
-.mult-data{font-size:13px;font-weight:600;color:var(--text);}
-.mult-tipo{font-size:12px;color:var(--text3);}
-.mult-odd{font-size:12px;color:var(--amber);font-weight:600;}
-.mult-badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;}
+/* MÚLTIPLAS SECTION */
+.mult-section{margin-top:20px;}
+.mult-section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+.mult-section-title{font-size:16px;font-weight:800;color:var(--text);letter-spacing:-.3px;}
+.mult-filters{display:flex;gap:6px;}
+.mult-filter{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;transition:all .15s;font-family:inherit;}
+.mult-filter.active{background:var(--text);color:#fff;border-color:var(--text);}
+.mult-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:900px){.mult-cols{grid-template-columns:1fr;}}
+
+.mult-col{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.mult-col-hd{padding:18px 20px;border-bottom:1px solid var(--border);}
+.mult-col-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px;}
+.mult-col-summary{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;}
+.mult-col-pct{font-size:34px;font-weight:800;line-height:1;}
+.mult-col-gr{font-size:12px;color:var(--text3);}
+.mult-col-extra{font-size:12px;color:var(--text2);margin-bottom:12px;}
+.mult-col-extra b{color:var(--text);}
+.mult-timeline{display:flex;flex-wrap:wrap;gap:3px;}
+.tdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.tdot.g{background:var(--green);}
+.tdot.r{background:var(--red);}
+.tdot.p{background:var(--amber);}
+.tdot.n{background:var(--surface3);}
+
+.mult-col-list{max-height:480px;overflow-y:auto;}
+.mrow{border-bottom:1px solid var(--border);}
+.mrow:last-child{border-bottom:none;}
+.mrow-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;cursor:pointer;gap:10px;transition:background .1s;}
+.mrow-hd:hover{background:var(--surface2);}
+.mrow-left{display:flex;flex-direction:column;gap:2px;}
+.mrow-data{font-size:13px;font-weight:600;color:var(--text);}
+.mrow-sub{font-size:11px;color:var(--text3);}
+.mrow-right{display:flex;align-items:center;gap:8px;}
+.mrow-chev{font-size:11px;color:var(--text3);transition:transform .15s;display:inline-block;}
+.mrow-chev.open{transform:rotate(90deg);}
+.mrow-body{display:none;padding:0 20px 14px 20px;background:var(--surface2);}
+.mrow-body.open{display:block;}
+.mrow-jogo{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;}
+.mrow-jogo:last-child{border-bottom:none;}
+.mrow-jogo.broke{background:var(--red-lt);margin:0 -8px;padding:8px 8px;border-radius:6px;}
+.mrow-jogo-info{min-width:0;}
+.mrow-jogo-teams{font-size:12px;font-weight:600;color:var(--text);}
+.mrow-jogo-aposta{font-size:11px;color:var(--text3);}
+.mrow-jogo-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;flex-shrink:0;white-space:nowrap;}
 .mb-green{background:var(--green-lt);color:var(--green);border:1px solid var(--green-bd);}
 .mb-red{background:var(--red-lt);color:var(--red);border:1px solid var(--red-bd);}
 .mb-pend{background:var(--amber-lt);color:var(--amber);border:1px solid var(--amber-bd);}
@@ -213,15 +249,20 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
       </div>
       <div class="panel-body" id="por-confianca"><div class="spin"></div></div>
     </div>
+  </div>
 
-    <!-- Múltiplas histórico -->
-    <div class="panel">
-      <div class="panel-hd">
-        <div class="panel-title">Múltiplas · histórico</div>
-        <div class="panel-sub">últimas múltiplas geradas</div>
+  <!-- Múltiplas -->
+  <div class="mult-section">
+    <div class="mult-section-hd">
+      <div class="mult-section-title">Múltiplas</div>
+      <div class="mult-filters">
+        <button class="mult-filter active" onclick="filtrarMult('todos',this)">Todos</button>
+        <button class="mult-filter" onclick="filtrarMult('green',this)">Green</button>
+        <button class="mult-filter" onclick="filtrarMult('red',this)">Red</button>
+        <button class="mult-filter" onclick="filtrarMult('pendente',this)">Pendente</button>
       </div>
-      <div class="panel-body" id="multiplas-hist"><div class="spin"></div></div>
     </div>
+    <div class="mult-cols" id="mult-cols"><div class="spin"></div></div>
   </div>
 
   <!-- Admin (colapsável) -->
@@ -516,58 +557,131 @@ function renderConfianca(conf){
   }).join('');
 }
 
-function renderMultiplas(){
+let _multFiltro = 'todos';
+
+function construirLinhasMult(key){
   const recentes = _multiplasDias.slice().sort((a,b)=>b.data.localeCompare(a.data));
-  if(!recentes.length){ document.getElementById('multiplas-hist').innerHTML='<div class="empty">Sem múltiplas ainda</div>'; return; }
-
-  // Calcular assertividade das múltiplas (excluir pendentes)
-  let mG=0, mR=0;
-  const linhas=[];
+  const linhas = [];
   for(const d of recentes){
-    const m=d.multiplas;
-    for(const [tipo,key] of [['A','multipla_a'],['B','multipla_b']]){
-      if(!m?.[key]) continue;
-      const r=d.res?.[key]?.resultado||(m[key]?'pendente':null);
-      const odd=m[key].odd_total?Number(m[key].odd_total).toFixed(2):'--';
-      const njogos=m[key].jogos?.length||'?';
-      if(r==='green') mG++;
-      else if(r==='red') mR++;
-      linhas.push({data:d.data,tipo:`Múltipla ${tipo}`,sub:`${njogos} jogos · odd ${odd}`,resultado:r});
-    }
+    const m = d.multiplas?.[key];
+    if(!m) continue;
+    const r = d.res?.[key];
+    const resultado = r?.resultado || 'pendente';
+    const odd = m.odd_total ? Number(m.odd_total) : null;
+    const jogos = m.jogos || [];
+    const jogosResultado = (r?.jogos_resultado && r.jogos_resultado.length) ? r.jogos_resultado : jogos.map(j=>({...j, resultado:'pendente'}));
+    linhas.push({data:d.data, resultado, odd, njogos:jogos.length, jogosResultado});
   }
-  const total=mG+mR;
-  const pct=total>0?Math.round(mG/total*100):null;
-  const cor=pct===null?'var(--text3)':pct>=60?'var(--green)':pct>=45?'var(--amber)':'var(--red)';
-
-  const listHtml=linhas.slice(0,16).map(l=>{
-    const badge=l.resultado==='green'?'<span class="mult-badge mb-green">GREEN</span>'
-               :l.resultado==='red'?'<span class="mult-badge mb-red">RED</span>'
-               :'<span class="mult-badge mb-pend">pendente</span>';
-    return `<div class="mult-row"><div class="mult-left"><div class="mult-data">${fmtD(l.data)} · ${l.tipo}</div><div class="mult-tipo">${l.sub}</div></div>${badge}</div>`;
-  }).join('');
-
-  document.getElementById('multiplas-hist').innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;padding:8px 0 14px;border-bottom:1px solid var(--border);margin-bottom:4px">
-      <div style="font-size:32px;font-weight:800;line-height:1;color:${cor}">${pct!==null?pct+'%':'--'}</div>
-      <div>
-        <div style="font-size:12px;font-weight:600;color:var(--text)">assertividade</div>
-        <div style="font-size:11px;color:var(--text3)">${mG}G · ${mR}R · ${total} resolvidas</div>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;cursor:pointer" onclick="toggleMultLista()" id="mult-lista-hd">
-      <span style="font-size:12px;font-weight:600;color:var(--text2)">Histórico (${linhas.length})</span>
-      <span style="font-size:11px;color:var(--text3)" id="mult-lista-toggle">▼ ver</span>
-    </div>
-    <div id="mult-lista" style="display:none">${listHtml}</div>`;
+  return linhas;
 }
 
-function toggleMultLista(){
-  const el=document.getElementById('mult-lista');
-  const btn=document.getElementById('mult-lista-toggle');
-  if(!el) return;
-  const open=el.style.display!=='none';
-  el.style.display=open?'none':'block';
-  if(btn) btn.textContent=open?'▼ ver':'▲ ocultar';
+function resumoMult(linhas){
+  let g=0, r=0, oddSum=0, oddCount=0, melhorData=null;
+  for(const l of linhas){
+    if(l.resultado==='green'){ g++; if(!melhorData) melhorData=l.data; }
+    else if(l.resultado==='red') r++;
+    if(l.odd!=null && (l.resultado==='green'||l.resultado==='red')){ oddSum+=l.odd; oddCount++; }
+  }
+  const total=g+r;
+  const pct = total>0?Math.round(g/total*100):null;
+  return {g, r, pct, melhorData, oddMedia: oddCount?(oddSum/oddCount).toFixed(2):'--'};
+}
+
+function timelineMult(linhas, dias=30){
+  const mapa={};
+  for(const l of linhas) mapa[l.data]=l.resultado;
+  const h=hoje();
+  const arr=[];
+  for(let i=dias-1;i>=0;i--){
+    const d=off(h,-i);
+    arr.push({data:d, resultado: mapa[d]||null});
+  }
+  return arr;
+}
+
+function badgeMult(resultado){
+  if(resultado==='green') return '<span class="mrow-jogo-badge mb-green">GREEN</span>';
+  if(resultado==='red') return '<span class="mrow-jogo-badge mb-red">RED</span>';
+  return '<span class="mrow-jogo-badge mb-pend">pendente</span>';
+}
+
+function renderMultColuna(linhas, tipo){
+  const r = resumoMult(linhas);
+  const cor = r.pct===null?'var(--text3)':r.pct>=60?'var(--green)':r.pct>=45?'var(--amber)':'var(--red)';
+  const tl = timelineMult(linhas);
+  const tlHtml = tl.map(t=>{
+    const cls = t.resultado==='green'?'g':t.resultado==='red'?'r':t.resultado==='pendente'?'p':'n';
+    const title = t.resultado ? `${fmtD(t.data)} · ${t.resultado}` : `${fmtD(t.data)} · sem múltipla`;
+    return `<div class="tdot ${cls}" title="${title}"></div>`;
+  }).join('');
+
+  const filtradas = linhas.filter(l => _multFiltro==='todos' || l.resultado===_multFiltro);
+
+  const listHtml = filtradas.length ? filtradas.map((l,i)=>{
+    const id = `${tipo}-${i}`;
+    const jogosHtml = l.jogosResultado.map(j=>{
+      const jr = j.resultado || 'pendente';
+      const broke = jr==='red';
+      return `<div class="mrow-jogo${broke?' broke':''}">
+        <div class="mrow-jogo-info">
+          <div class="mrow-jogo-teams">${j.time_casa} x ${j.time_fora}${broke?' · quebrou aqui':''}</div>
+          <div class="mrow-jogo-aposta">${j.aposta||''} · ${j.mercado||''}</div>
+        </div>
+        ${badgeMult(jr)}
+      </div>`;
+    }).join('');
+    return `<div class="mrow">
+      <div class="mrow-hd" onclick="toggleMrow('${id}')">
+        <div class="mrow-left">
+          <div class="mrow-data">${fmtD(l.data)}</div>
+          <div class="mrow-sub">${l.njogos} jogos · odd ${l.odd?l.odd.toFixed(2):'--'}</div>
+        </div>
+        <div class="mrow-right">${badgeMult(l.resultado)}<span class="mrow-chev" id="chev-${id}">›</span></div>
+      </div>
+      <div class="mrow-body" id="body-${id}">${jogosHtml}</div>
+    </div>`;
+  }).join('') : '<div class="empty">Nenhuma múltipla neste filtro</div>';
+
+  return `<div class="mult-col">
+    <div class="mult-col-hd">
+      <div class="mult-col-title">Múltipla ${tipo}</div>
+      <div class="mult-col-summary">
+        <div class="mult-col-pct" style="color:${cor}">${r.pct!==null?r.pct+'%':'--'}</div>
+        <div class="mult-col-gr">${r.g}G / ${r.r}R</div>
+      </div>
+      <div class="mult-col-extra">Melhor: ${r.melhorData?fmtD(r.melhorData)+' ✅':'--'} · Odd média: <b>${r.oddMedia}</b></div>
+      <div class="mult-timeline">${tlHtml}</div>
+    </div>
+    <div class="mult-col-list">${listHtml}</div>
+  </div>`;
+}
+
+function renderMultiplas(){
+  const linhasA = construirLinhasMult('multipla_a');
+  const linhasB = construirLinhasMult('multipla_b');
+  if(!linhasA.length && !linhasB.length){
+    document.getElementById('mult-cols').innerHTML = '<div class="empty">Sem múltiplas ainda</div>';
+    return;
+  }
+  document.getElementById('mult-cols').innerHTML =
+    renderMultColuna(linhasA, 'A') +
+    renderMultColuna(linhasB, 'B');
+}
+
+function filtrarMult(f, btn){
+  _multFiltro = f;
+  document.querySelectorAll('.mult-filter').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMultiplas();
+}
+
+function toggleMrow(id){
+  const body = document.getElementById('body-'+id);
+  const chev = document.getElementById('chev-'+id);
+  if(!body) return;
+  const open = body.classList.contains('open');
+  body.classList.toggle('open', !open);
+  if(chev) chev.classList.toggle('open', !open);
 }
 
 function toggleAdmin(){
