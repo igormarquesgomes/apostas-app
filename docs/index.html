@@ -858,6 +858,25 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
   const ap=(alt.aposta||'').toLowerCase();
   if(merc==='gols'){
     const n=parseFloat(ap.match(/[\d.]+/)?.[0]);
+    const normAccG=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const apNG=normAccG(ap);
+    const nomeCasaG=normAccG((timeCasa||'').toLowerCase()),nomeForaG=normAccG((timeFora||'').toLowerCase());
+    const primCasaG=nomeCasaG.split(' ')[0],primForaG=nomeForaG.split(' ')[0];
+    if(apNG.includes('marca')){
+      // "Time marca" / "Time marca Over X gols" — usa gols do time específico, não o total
+      let golsTime=null;
+      if(apNG.includes('fora')||apNG.includes('away')) golsTime=gf;
+      else if(apNG.includes('casa')||apNG.includes('home')) golsTime=gc;
+      else if(primForaG&&apNG.includes(primForaG)) golsTime=gf;
+      else if(primCasaG&&apNG.includes(primCasaG)) golsTime=gc;
+      if(golsTime!==null){
+        if(!isNaN(n)){
+          if(apNG.includes('over')||apNG.includes('mais')) return golsTime>n?'green':'red';
+          if(apNG.includes('under')||apNG.includes('menos')) return golsTime<n?'green':'red';
+        }
+        return golsTime>0?'green':'red';
+      }
+    }
     if(ap.includes('over')||ap.includes('mais')) return total>n?'green':'red';
     if(ap.includes('under')||ap.includes('menos')) return total<n?'green':'red';
     if(ap.includes('ambas')||ap.includes('btts')) return(gc>0&&gf>0)?'green':'red';

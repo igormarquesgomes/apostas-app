@@ -3324,7 +3324,10 @@ async function agentValidar(data, opcoes = {}) {
             };
           }
           // Escanteios e cartões — só se a API trouxe stats reais (não zeradas)
-          if (stats?.escanteiosTotal != null) {
+          // Zero em casa E fora simultaneamente = liga sem cobertura de stats na API, não um 0 real
+          const escSemCobertura = stats && stats.escanteiosTotal === 0 && stats.escanteiosCasa === 0 && stats.escanteiosFora === 0;
+          const cartSemCobertura = stats && stats.cartoesTotal === 0 && stats.cartoesCasa === 0 && stats.cartoesFora === 0;
+          if (stats?.escanteiosTotal != null && !escSemCobertura) {
             const esc = stats.escanteiosTotal;
             mercadosResult.escanteios = {};
             for (const linha of ['4.5','5.5','6.5','7.5','8.5','9.5','10.5','11.5','12.5','13.5','14.5']) {
@@ -3333,7 +3336,7 @@ async function agentValidar(data, opcoes = {}) {
               mercadosResult.escanteios[`Under ${linha}`] = esc < l ? 'green' : 'red';
             }
           }
-          if (stats?.cartoesTotal != null) {
+          if (stats?.cartoesTotal != null && !cartSemCobertura) {
             const cart = stats.cartoesTotal;
             mercadosResult.cartoes = {};
             for (const linha of ['0.5','1.5','2.5','3.5','4.5','5.5','6.5','7.5']) {
