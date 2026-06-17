@@ -3064,6 +3064,12 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
 
     // Empate simples — só se não houver indicação de dupla chance (ou empate, X2, 1X)
     if (aposta.includes('empate') && !aposta.includes('vence') && !aposta.includes('vitoria') && !aposta.includes('vitória') && !aposta.includes('dupla') && !aposta.includes('ou empat') && !aposta.includes('x2') && !aposta.includes('1x')) return empate ? 'green' : 'red';
+    // DNB (Draw No Bet): empate = cancelado, vitória = green, derrota = red
+    if (aposta.includes('dnb') || aposta.includes('draw no bet')) {
+      if (empate) return 'cancelado';
+      if (apostaMencCasa) return casaVence ? 'green' : 'red';
+      if (apostaMencFora) return foraVence ? 'green' : 'red';
+    }
     if (aposta.includes('ou empat') || aposta.includes('vence ou empat') || aposta.includes('dupla chance') || aposta.includes('nao perde') || aposta.includes('não perde') || aposta.includes('x2') || aposta.includes('1x') || aposta.includes('12')) {
       if (aposta.includes('x2') || apostaMencFora) return (foraVence || empate) ? 'green' : 'red';
       if (aposta.includes('1x') || apostaMencCasa) return (casaVence || empate) ? 'green' : 'red';

@@ -944,9 +944,9 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
     }
     const nomeCasa=normAcc((timeCasa||'').toLowerCase()),nomeFora=normAcc((timeFora||'').toLowerCase());
     const primCasa=nomeCasa.split(' ')[0],primFora=nomeFora.split(' ')[0];
-    if(apN.includes('ou empat')||apN.includes('nao perde')){
-      if(primCasa&&apN.includes(primCasa)) return(casaVence||empate)?'green':'red';
-      if(primFora&&apN.includes(primFora)) return(foraVence||empate)?'green':'red';
+    if(apN.includes('ou empat')||apN.includes('nao perde')||apN.includes('dnb')){
+      if(primCasa&&apN.includes(primCasa)) return empate?'cancelado':(casaVence?'green':'red');
+      if(primFora&&apN.includes(primFora)) return empate?'cancelado':(foraVence?'green':'red');
     }
     if(apN.includes('vence')||apN.includes('vitoria')){
       if(primCasa&&apN.includes(primCasa)) return casaVence?'green':'red';
