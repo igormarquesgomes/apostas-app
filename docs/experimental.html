@@ -59,48 +59,36 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 .tool-body{padding:24px;}
 
 /* TELEGRAM TOOL */
-.tg-controls{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
-.tg-canal-wrap{display:flex;align-items:center;gap:8px;background:#F0FDF9;border:1px solid #99F6E4;border-radius:8px;padding:8px 12px;flex:1;min-width:200px;}
-.tg-canal-wrap label{font-size:11px;font-weight:700;color:#0F766E;white-space:nowrap;}
-.tg-canal-input{flex:1;font-family:inherit;font-size:13px;border:none;background:transparent;color:#1E293B;outline:none;}
 .btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#475569;transition:all .15s;font-family:inherit;}
 .btn:hover{border-color:#CBD5E1;color:#1E293B;}
 .btn.primary{background:#0F766E;color:#fff;border-color:#0F766E;}
 .btn.primary:hover{background:#0d6b63;}
-.btn.tg{background:#229ED9;color:#fff;border-color:#229ED9;}
-.btn.tg:hover{background:#1a8bbf;}
+.btn.danger{background:#EF4444;color:#fff;border-color:#EF4444;}
+.btn.danger:hover{background:#DC2626;}
 .btn.sm{padding:6px 12px;font-size:12px;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
 
-.day-tabs{display:flex;gap:6px;margin-bottom:20px;}
+.day-tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
 .day-tab{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid #E2E8F0;background:#fff;color:#475569;cursor:pointer;transition:all .15s;}
 .day-tab.active{background:#0F766E;color:#fff;border-color:#0F766E;}
 .day-tab:hover:not(.active){border-color:#CBD5E1;}
 .day-inp{font-family:inherit;font-size:12px;border:1px solid #E2E8F0;border-radius:7px;padding:6px 10px;background:#fff;outline:none;margin-left:auto;}
 
-.tg-bulk{display:flex;gap:8px;align-items:center;margin-bottom:16px;}
-.tg-bulk-info{font-size:12px;color:#94A3B8;margin-left:auto;}
-
-.tg-list{display:flex;flex-direction:column;gap:8px;}
-.tg-item{border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px;transition:border-color .15s;}
+.tg-item{border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;margin-bottom:10px;transition:border-color .15s;}
 .tg-item:hover{border-color:#CBD5E1;}
-.tg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.tg-dot.alta{background:#10B981;}
-.tg-dot.media{background:#F59E0B;}
-.tg-dot.baixa{background:#EF4444;}
 .tg-info{flex:1;min-width:0;}
 .tg-teams{font-size:14px;font-weight:700;color:#1E293B;margin-bottom:2px;}
 .tg-bet{font-size:13px;color:#0F766E;font-weight:600;margin-bottom:1px;}
-.tg-meta{font-size:11px;color:#94A3B8;}
-.tg-btns{display:flex;gap:6px;flex-shrink:0;}
-.copy-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;background:#F8FAFC;color:#475569;transition:all .15s;}
-.copy-btn:hover{border-color:#CBD5E1;color:#1E293B;}
-.copy-btn.done{background:#F0FDF9;border-color:#6EE7B7;color:#0F766E;}
-.tg-link{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;font-size:11px;font-weight:700;background:#229ED9;color:#fff;text-decoration:none;transition:background .15s;border:none;}
-.tg-link:hover{background:#1a8bbf;}
-.preview-box{margin-top:10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;font-size:11px;color:#475569;line-height:1.7;white-space:pre-wrap;font-family:monospace;display:none;}
-.tg-item.show-prev .preview-box{display:block;}
-.eye-btn{padding:6px 10px;border-radius:7px;font-size:13px;cursor:pointer;border:1px solid #E2E8F0;background:#F8FAFC;transition:all .15s;}
-.eye-btn:hover{border-color:#CBD5E1;}
+.tg-meta{font-size:11px;color:#94A3B8;margin-bottom:6px;}
+.tg-link-input{width:100%;padding:8px 10px;border:1px solid #E2E8F0;border-radius:6px;font-family:monospace;font-size:11px;outline:none;transition:border-color .15s;color:#1E293B;}
+.tg-link-input:focus{border-color:#0F766E;}
+
+.tg-status-box{margin-top:16px;padding:12px 16px;border-radius:10px;font-size:13px;display:none;}
+.tg-status-box.salvo{background:#F0FDF9;border:1px solid #6EE7B7;color:#065F46;}
+.tg-status-box.agendado{background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;}
+.tg-status-box.enviado{background:#F0FDF9;border:1px solid #6EE7B7;color:#065F46;}
+
+.tg-actions{margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;}
 
 .empty-state{text-align:center;padding:48px 20px;color:#94A3B8;}
 .empty-state svg{width:40px;height:40px;margin:0 auto 12px;display:block;opacity:.35;}
@@ -173,43 +161,36 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
       <button class="tool-close" onclick="fecharTelegram()">×</button>
     </div>
     <div class="tool-body">
-      <!-- Canal config -->
-      <div class="tg-controls">
-        <div class="tg-canal-wrap">
-          <label>Canal:</label>
-          <input class="tg-canal-input" id="tg-canal" placeholder="@seucanal ou https://t.me/..." type="text">
-        </div>
-        <button class="btn sm" onclick="salvarCanal()">Salvar</button>
-      </div>
-
       <!-- Seletor de data -->
       <div class="day-tabs">
-        <button class="day-tab" onclick="selDia('ontem',this)">Ontem</button>
-        <button class="day-tab active" onclick="selDia('hoje',this)">Hoje</button>
-        <button class="day-tab" onclick="selDia('amanha',this)">Amanhã</button>
-        <input class="day-inp" type="date" id="tg-data" onchange="carregarApostas(this.value)">
+        <button class="day-tab" onclick="selDiaTg('amanha',this)">Amanhã</button>
+        <button class="day-tab active" onclick="selDiaTg('depois',this)">Depois de amanhã</button>
+        <input class="day-inp" type="date" id="tg-data-agenda" onchange="carregarJogosParaAgendar(this.value)">
       </div>
 
-      <!-- Bulk actions -->
-      <div class="tg-bulk" id="tg-bulk" style="display:none">
-        <button class="btn tg sm" onclick="abrirTodos()">📤 Abrir todas no Telegram</button>
-        <button class="btn sm" onclick="copiarTodas()">📋 Copiar todas</button>
-        <span class="tg-bulk-info" id="tg-bulk-info"></span>
+      <!-- Lista de jogos com inputs de link -->
+      <div id="tg-jobs-list"><div class="loading-state">Selecione uma data para começar.</div></div>
+
+      <!-- Botões de ação -->
+      <div class="tg-actions">
+        <button class="btn" id="btn-salvar" onclick="salvarLinks()">💾 Salvar</button>
+        <button class="btn primary" id="btn-agendar" onclick="agendarLinks()">📅 Agendar envio</button>
       </div>
 
-      <div id="tg-list"><div class="loading-state">Carregando apostas...</div></div>
+      <!-- Status do agendo -->
+      <div class="tg-status-box" id="tg-status"></div>
     </div>
   </div>
 </div>
 
 <script>
 const BACKEND_URL = 'https://apostas-app.onrender.com';
-let _apostas = [], _data = '';
+
+let _agendoAtual = null;
+let _dataAtualTg = '';
 
 function hoje(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function offset(base,n){ const d=new Date(base+'T12:00:00'); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-function fmtD(iso){ const[a,m,d]=iso.split('-'); return `${d}/${m}/${a}`; }
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function toggleTelegram(){
   const panel = document.getElementById('tool-tg');
@@ -218,11 +199,10 @@ function toggleTelegram(){
   panel.classList.add('open');
   document.getElementById('card-tg').classList.add('selected');
   document.getElementById('tg-card-label').textContent = '→ fechar ferramenta';
-  document.getElementById('tg-canal').value = localStorage.getItem('tg_canal') || '';
-  const d = hoje();
-  document.getElementById('tg-data').value = d;
-  _data = d;
-  carregarApostas(d);
+  // Padrão: depois de amanhã (dia seguinte ao amanhã já gerado)
+  const d = offset(hoje(), 2);
+  document.getElementById('tg-data-agenda').value = d;
+  carregarJogosParaAgendar(d);
 }
 
 function fecharTelegram(){
@@ -231,112 +211,183 @@ function fecharTelegram(){
   document.getElementById('tg-card-label').textContent = '→ abrir ferramenta';
 }
 
-function selDia(periodo, btn){
+function selDiaTg(periodo, btn){
   document.querySelectorAll('.day-tab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   const base = hoje();
-  const d = periodo==='ontem'?offset(base,-1):periodo==='amanha'?offset(base,1):base;
-  document.getElementById('tg-data').value = d;
-  carregarApostas(d);
+  const d = periodo === 'amanha' ? offset(base, 1) : offset(base, 2);
+  document.getElementById('tg-data-agenda').value = d;
+  carregarJogosParaAgendar(d);
 }
 
-function salvarCanal(){
-  const v = document.getElementById('tg-canal').value.trim();
-  if(v) localStorage.setItem('tg_canal', v);
-}
+async function carregarJogosParaAgendar(data){
+  if(!data) return;
+  _dataAtualTg = data;
+  document.getElementById('tg-jobs-list').innerHTML = '<div class="loading-state">Carregando...</div>';
+  atualizarBotoes(null);
 
-function getCanal(){ return localStorage.getItem('tg_canal') || ''; }
-
-function formatarMsg(j, data){
-  const conf = j.confianca==='alta'?'🟢':j.confianca==='media'?'🟡':'🔴';
-  const odd = j.odd_mercado ? `@${Number(j.odd_mercado).toFixed(2)}` : j.odd_sugerida ? `@${j.odd_sugerida}` : '';
-  const pais = j.tipo_liga==='br'?'🇧🇷':j.tipo_liga==='eu'?'🇪🇺':'🌍';
-  return `${conf} *${j.time_casa} x ${j.time_fora}*\n${pais} ${j.liga||''} · ${j.horario||''} (${fmtD(data)})\n\n🎯 *${j.aposta}* ${odd}\n📌 Confiança: ${(j.confianca||'').toUpperCase()}\n\n${j.justificativa||''}\n\n_Análise: OddLab AI_`;
-}
-
-function linkTg(msg){
-  const canal = getCanal();
-  const txt = encodeURIComponent(msg);
-  if(canal){
-    const c = canal.startsWith('@') ? canal.slice(1) : canal.replace('https://t.me/','');
-    return `https://t.me/${c}?text=${txt}`;
-  }
-  return `https://t.me/share/url?url=OddLab&text=${txt}`;
-}
-
-async function carregarApostas(data){
-  _data = data;
-  document.getElementById('tg-data').value = data;
-  document.getElementById('tg-list').innerHTML = '<div class="loading-state">Buscando apostas...</div>';
-  document.getElementById('tg-bulk').style.display = 'none';
   try{
-    const r = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const r = await fetch(`${BACKEND_URL}/api/telegram/lista/${data}`);
     const d = await r.json();
-    _apostas = d.apostas?.jogos || [];
-    renderTgList();
+    if(d.error) throw new Error(d.error);
+
+    _agendoAtual = d.agendo_id ? { id: d.agendo_id, status: d.status, enviado_em: d.enviado_em, jogos: d.jogos } : null;
+
+    renderJogosParaAgendar(d.apostas, d.jogos);
+    mostrarStatusAgendo(_agendoAtual, d.enviado_em);
+    atualizarBotoes(_agendoAtual);
   }catch(e){
-    document.getElementById('tg-list').innerHTML = `<div class="empty-state">Erro: ${e.message}</div>`;
+    document.getElementById('tg-jobs-list').innerHTML = `<div class="empty-state">Erro: ${e.message}</div>`;
   }
 }
 
-function renderTgList(){
-  if(!_apostas.length){
-    document.getElementById('tg-list').innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>Sem apostas para esta data</div>';
+function renderJogosParaAgendar(apostas, jogosAgendados){
+  if(!apostas || !apostas.length){
+    document.getElementById('tg-jobs-list').innerHTML =
+      '<div class="empty-state">Sem apostas geradas para esta data.<br><small>A rotina das 3h30 precisa ter rodado.</small></div>';
     return;
   }
-  document.getElementById('tg-bulk').style.display = 'flex';
-  document.getElementById('tg-bulk-info').textContent = `${_apostas.length} aposta${_apostas.length!==1?'s':''}`;
 
-  document.getElementById('tg-list').innerHTML = `<div class="tg-list">${_apostas.map((j,i)=>{
-    const msg = formatarMsg(j, _data);
-    const link = linkTg(msg);
-    const conf = j.confianca || 'media';
-    const odd = j.odd_mercado ? `@${Number(j.odd_mercado).toFixed(2)}` : j.odd_sugerida ? `@${j.odd_sugerida}` : '';
-    return `<div class="tg-item" id="tgi-${i}">
-      <div class="tg-dot ${conf}"></div>
-      <div class="tg-info">
-        <div class="tg-teams">${j.time_casa} × ${j.time_fora}</div>
-        <div class="tg-bet">${j.aposta} ${odd}</div>
-        <div class="tg-meta">${j.liga||''} · ${j.horario||''} · ${conf}</div>
-        <div class="preview-box" id="prev-${i}">${esc(msg)}</div>
-      </div>
-      <div class="tg-btns">
-        <button class="eye-btn" onclick="togglePrev(${i})" title="Preview">👁</button>
-        <button class="copy-btn" id="cp-${i}" onclick="copiarMsg(${i})">📋 Copiar</button>
-        <a class="tg-link" href="${esc(link)}" target="_blank" rel="noopener">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.44.7-.9.44l-2.5-1.84-1.2 1.16c-.14.14-.26.26-.52.26l.18-2.6 4.72-4.26c.2-.18-.04-.28-.32-.1L7.6 14.4l-2.46-.76c-.54-.16-.54-.54.12-.8l9.62-3.7c.44-.16.84.1.76.66z"/></svg>
-          Telegram
-        </a>
-      </div>
+  const html = apostas.map(aposta => {
+    const linkAnterior = (jogosAgendados || []).find(j => j.jogo_id === aposta.id)?.link_afiliado || '';
+    const odd = aposta.odd_mercado || aposta.odd_sugerida || '-';
+    return `<div class="tg-item">
+      <div class="tg-teams">${aposta.time_casa} × ${aposta.time_fora}</div>
+      <div class="tg-bet">${aposta.aposta} @ ${odd}</div>
+      <div class="tg-meta">${aposta.liga || ''} · ${aposta.horario || '--:--'}</div>
+      <input
+        type="url"
+        class="tg-link-input"
+        data-jogo-id="${aposta.id}"
+        data-time-casa="${aposta.time_casa}"
+        data-time-fora="${aposta.time_fora}"
+        data-aposta="${aposta.aposta}"
+        data-odd="${odd}"
+        data-horario="${aposta.horario || ''}"
+        placeholder="Cole o link de afiliado aqui (opcional)"
+        value="${linkAnterior}"
+      >
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
+
+  document.getElementById('tg-jobs-list').innerHTML = html;
 }
 
-function togglePrev(i){
-  document.getElementById(`tgi-${i}`).classList.toggle('show-prev');
+function mostrarStatusAgendo(agendo, enviadoEm){
+  const el = document.getElementById('tg-status');
+  if(!agendo){ el.style.display='none'; el.className='tg-status-box'; return; }
+
+  if(enviadoEm){
+    el.className = 'tg-status-box enviado';
+    el.style.display = 'block';
+    el.textContent = `✅ Mensagem já enviada ao Telegram em ${new Date(enviadoEm).toLocaleString('pt-BR')}.`;
+    return;
+  }
+
+  if(agendo.status === 'agendado'){
+    el.className = 'tg-status-box agendado';
+    el.style.display = 'block';
+    el.innerHTML = '🔒 <b>Agendado!</b> Será enviado às 8h. Links não podem mais ser editados pela UI.';
+    return;
+  }
+
+  el.className = 'tg-status-box salvo';
+  el.style.display = 'block';
+  el.textContent = '💾 Salvo. Você pode editar os links e salvar novamente ou confirmar o agendamento.';
 }
 
-async function copiarMsg(i){
-  const msg = formatarMsg(_apostas[i], _data);
+function atualizarBotoes(agendo){
+  const btnSalvar  = document.getElementById('btn-salvar');
+  const btnAgendar = document.getElementById('btn-agendar');
+  const bloqueado  = agendo?.status === 'agendado' || !!agendo?.enviado_em;
+
+  btnSalvar.disabled  = bloqueado;
+  btnAgendar.disabled = bloqueado;
+
+  if(agendo?.status === 'agendado'){
+    btnAgendar.textContent = '✅ Já agendado';
+  } else {
+    btnAgendar.textContent = '📅 Agendar envio';
+  }
+}
+
+function coletarJogos(){
+  const inputs = document.querySelectorAll('.tg-link-input');
+  return Array.from(inputs).map(inp => ({
+    jogo_id:       inp.dataset.jogoId,
+    time_casa:     inp.dataset.timeCasa,
+    time_fora:     inp.dataset.timeFora,
+    aposta:        inp.dataset.aposta,
+    odd:           inp.dataset.odd,
+    horario:       inp.dataset.horario,
+    link_afiliado: inp.value.trim(),
+  }));
+}
+
+async function salvarLinks(){
+  const jogos = coletarJogos();
+  if(!jogos.length){ alert('Sem jogos para salvar.'); return; }
+
+  const btnSalvar = document.getElementById('btn-salvar');
+  btnSalvar.disabled = true;
+  btnSalvar.textContent = 'Salvando...';
+
   try{
-    await navigator.clipboard.writeText(msg);
-    const btn = document.getElementById(`cp-${i}`);
-    const orig = btn.innerHTML;
-    btn.className='copy-btn done'; btn.textContent='✓ Copiado';
-    setTimeout(()=>{ btn.className='copy-btn'; btn.innerHTML=orig; }, 2000);
-  }catch(e){ alert('Erro: '+e.message); }
+    const r = await fetch(`${BACKEND_URL}/api/telegram/salvar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: _dataAtualTg, jogos }),
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+
+    alert('✅ Salvo! Edite os links quando quiser ou clique em "Agendar envio".');
+    await carregarJogosParaAgendar(_dataAtualTg);
+  }catch(e){
+    alert('❌ Erro ao salvar: ' + e.message);
+    btnSalvar.disabled = false;
+    btnSalvar.textContent = '💾 Salvar';
+  }
 }
 
-async function copiarTodas(){
-  const todas = _apostas.map(j=>formatarMsg(j,_data)).join('\n\n---\n\n');
-  await navigator.clipboard.writeText(todas);
-  alert(`✅ ${_apostas.length} mensagens copiadas!`);
-}
+async function agendarLinks(){
+  if(!_agendoAtual){
+    alert('⚠️ Salve os jogos primeiro antes de agendar!');
+    return;
+  }
+  if(_agendoAtual.status === 'agendado'){
+    alert('⚠️ Já está agendado!');
+    return;
+  }
 
-function abrirTodos(){
-  const canal = getCanal();
-  if(!canal){ alert('Configure o canal do Telegram primeiro.'); return; }
-  _apostas.forEach((j,i)=>{ setTimeout(()=>window.open(linkTg(formatarMsg(j,_data)),'_blank'), i*500); });
+  const ok = confirm(
+    '⚠️ Confirmar agendamento?\n\n' +
+    'A lista será enviada para o Telegram às 8h do dia ' + _dataAtualTg + '.\n\n' +
+    'Esta ação NÃO pode ser desfeita pela interface.\n' +
+    'Para cancelar, será necessário acessar o banco de dados.'
+  );
+  if(!ok) return;
+
+  const btnAgendar = document.getElementById('btn-agendar');
+  btnAgendar.disabled = true;
+  btnAgendar.textContent = 'Agendando...';
+
+  try{
+    const r = await fetch(`${BACKEND_URL}/api/telegram/agendar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agendo_id: _agendoAtual.id }),
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+
+    alert('✅ Agendado! Será enviado às 8h do dia ' + _dataAtualTg + '.');
+    await carregarJogosParaAgendar(_dataAtualTg);
+  }catch(e){
+    alert('❌ Erro ao agendar: ' + e.message);
+    btnAgendar.disabled = false;
+    btnAgendar.textContent = '📅 Agendar envio';
+  }
 }
 </script>
 <nav class="bottom-nav">
