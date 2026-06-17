@@ -2099,7 +2099,13 @@ async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df, _gerar
       let erroMsg = 'sem JSON válido';
       if (txt) {
         const s = txt.indexOf('{'), e2 = txt.lastIndexOf('}');
-        if (s !== -1 && e2 !== -1) { try { JSON.parse(txt.slice(s, e2+1)); erroMsg = 'JSON ok mas sem opcao_1'; } catch(ex) { erroMsg = ex.message.substring(0,80); } }
+        if (s !== -1 && e2 !== -1) {
+          try {
+            const parsed = JSON.parse(txt.slice(s, e2+1));
+            const campos = Object.keys(parsed).join(', ');
+            erroMsg = `JSON ok mas sem opcao_1 | campos encontrados: [${campos}]`;
+          } catch(ex) { erroMsg = ex.message.substring(0,80); }
+        }
         else erroMsg = `sem chaves — raw: ${txt.substring(0,60)}`;
       }
       console.log(`  ❌ ${nome}: falhou — ${erroMsg}`);
@@ -2612,6 +2618,19 @@ async function gerarMultiplasComAgentes(data, jogosDodia) {
     const validB = _validarMultiplaAgente(objB, { minJogos: 2, minOdd: 1.8 });
 
     if (!validA || !validB) {
+      const diagnosticar = (obj, txt, nome) => {
+        if (!obj) return `sem JSON válido | raw: ${(txt||'').substring(0, 200)}`;
+        if (!obj.jogos?.length) return `sem campo "jogos" | campos: [${Object.keys(obj).join(', ')}]`;
+        if (obj.jogos.length < 2) return `jogos insuficientes (${obj.jogos.length} < 2)`;
+        if (!obj.odd_total) return `sem odd_total | campos: [${Object.keys(obj).join(', ')}]`;
+        const minOdd = nome === 'A' ? 2.5 : 1.8;
+        if (obj.odd_total < minOdd) return `odd_total ${obj.odd_total} < mínimo ${minOdd}`;
+        const jogoInvalido = obj.jogos.find(j => !j.time_casa || !j.time_fora || !j.aposta || !j.mercado || !j.odd || j.odd < 1.20);
+        if (jogoInvalido) return `jogo inválido: ${JSON.stringify(jogoInvalido).substring(0, 150)}`;
+        return 'válido';
+      };
+      if (!validA) console.log(`  ❌ Agente Múltipla A falhou — motivo: ${diagnosticar(objA, txtA, 'A')}`);
+      if (!validB) console.log(`  ❌ Agente Múltipla B falhou — motivo: ${diagnosticar(objB, txtB, 'B')}`);
       console.log(`  ⚠️ Agentes retornaram inválido (A:${validA?'ok':'falhou'} B:${validB?'ok':'falhou'}) — fallback gerarMultiplas`);
       return await gerarMultiplas(data, jogosDodia);
     }
@@ -3384,9 +3403,9 @@ async function agentValidar(data, opcoes = {}) {
         return isStats ? `${r.time_casa} x ${r.time_fora} (incluir total escanteios e total cartoes)` : `${r.time_casa} x ${r.time_fora}`;
       }).join(', ');
       console.log(`\n🔍 Web search em lote: ${pendentesWS.length} jogos (${pendentesStats.length} precisam de stats)`);
-      const txt = await chamarIA(
+      const txt = await chamarIAComBusca(
         `Resultados futebol ${data}. Para cada jogo: "Time1 N-M Time2". Se escanteios/cartoes pedidos inclua "esc:X cart:Y". Se cancelado: "cancelado". Jogos: ${lista}`,
-        300
+        800
       );
       if (txt) {
         for (const pend of pendentesWS) {
