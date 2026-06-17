@@ -4775,7 +4775,7 @@ app.post('/informar-stats', async (req, res) => {
     }
     if (cartoes != null) {
       mercadosResultExtra.cartoes = {};
-      for (const linha of ['2.5','3.5','4.5','5.5']) {
+      for (const linha of ['1.5','2.5','3.5','4.5','5.5','6.5']) {
         const l = parseFloat(linha);
         mercadosResultExtra.cartoes[`Over ${linha}`] = cartoes > l ? 'green' : 'red';
         mercadosResultExtra.cartoes[`Under ${linha}`] = cartoes < l ? 'green' : 'red';
