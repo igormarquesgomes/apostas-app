@@ -292,6 +292,30 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
   /* Mobile-just: 2 linhas de justificativa */
   .mobile-just{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px;color:var(--text3);margin-top:3px;line-height:1.4;}
 }
+/* ── Múltiplas mobile ──────────────────────────────── */
+.mob-mult-section{display:none;}
+@media(max-width:900px){
+  .mob-mult-section{
+    display:block;
+    margin:.75rem 0 0;
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow:hidden;
+    background:var(--surface);
+  }
+  .mob-mult-toggle{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px;cursor:pointer;user-select:none;
+    font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);
+    background:var(--surface2);
+  }
+  .mob-mult-toggle svg{transition:transform .2s;}
+  .mob-mult-section.open .mob-mult-toggle svg{transform:rotate(180deg);}
+  .mob-mult-body{display:none;padding:12px;}
+  .mob-mult-section.open .mob-mult-body{display:block;}
+  .mob-mult-day-bar{display:flex;gap:4px;margin-bottom:10px;}
+  .mob-mult-day-bar .mult-day-btn{flex:1;}
+}
 @media(max-width:640px){
   .main{padding:.75rem;}
   .day-date-wrap{display:none;}
@@ -400,6 +424,26 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
       <div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
         <p>Selecione a data ou use os atalhos acima</p>
+      </div>
+    </div>
+
+    <!-- Múltiplas mobile (oculto em desktop, sidebar cuida disso) -->
+    <div class="mob-mult-section" id="mob-mult-section">
+      <div class="mob-mult-toggle" onclick="toggleMobMult()">
+        <span>Múltiplas</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="mob-mult-body">
+        <div class="mob-mult-day-bar">
+          <button class="mult-day-btn" onclick="carregarMultiplas(offsetData(hojeStr,-1),'Ontem')">Ontem</button>
+          <button class="mult-day-btn" onclick="carregarMultiplas(hojeStr,'Hoje')">Hoje</button>
+          <button class="mult-day-btn" onclick="carregarMultiplas(offsetData(hojeStr,1),'Amanhã')">Amanhã</button>
+        </div>
+        <div id="mob-mult-content">
+          <div class="empty-state" style="padding:1.5rem 0">
+            <p>Selecione um dia</p>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -602,6 +646,16 @@ async function buscar(){
 // ─── Múltiplas (sidebar) ──────────────────────────────────────────────────────
 let dataMultAtual=null;
 
+function toggleMobMult(){
+  document.getElementById('mob-mult-section').classList.toggle('open');
+}
+
+function _setMultHTML(html){
+  document.getElementById('mult-content').innerHTML=html;
+  const mob=document.getElementById('mob-mult-content');
+  if(mob) mob.innerHTML=html;
+}
+
 function setMultDayActive(dt){
   document.querySelectorAll('[data-dtm]').forEach(b=>b.classList.toggle('active',b.getAttribute('data-dtm')===dt));
 }
@@ -609,7 +663,7 @@ function setMultDayActive(dt){
 async function carregarMultiplas(data,label){
   dataMultAtual=data;
   setMultDayActive(data);
-  document.getElementById('mult-content').innerHTML=`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Carregando...</div></div>`;
+  _setMultHTML(`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Carregando...</div></div>`);
   try{
     const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
     const j=await r.json();
@@ -618,40 +672,36 @@ async function carregarMultiplas(data,label){
         const ra=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
         const ja=await ra.json();
         if(!ja.apostas?.jogos?.length){
-          document.getElementById('mult-content').innerHTML=`<div class="empty-state" style="padding:1.5rem 0"><p>Sem apostas para ${fmtDL(data)}</p></div>`;
+          _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Sem apostas para ${fmtDL(data)}</p></div>`);
           return;
         }
       }catch(e){}
-      document.getElementById('mult-content').innerHTML=`
-        <div class="empty-state" style="padding:1.5rem 0"><p>Múltiplas não geradas</p></div>
-        <button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🎯 Gerar múltiplas</button>`;
+      _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Múltiplas não geradas</p></div><button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🎯 Gerar múltiplas</button>`);
       return;
     }
     const mA=j.multiplas?.multipla_a,mB=j.multiplas?.multipla_b;
     const validas=mA?.odd_total>0&&mB?.odd_total>0&&mA?.jogos?.length>0;
     if(!validas){
-      document.getElementById('mult-content').innerHTML=`
-        <div class="empty-state" style="padding:1.5rem 0"><p>Odds inválidas</p></div>
-        <button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🔄 Regerar</button>`;
+      _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Odds inválidas</p></div><button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🔄 Regerar</button>`);
       return;
     }
     renderMultiplas(j.multiplas,j.resultados_multiplas);
   }catch(e){
-    document.getElementById('mult-content').innerHTML=`<div class="empty-state" style="padding:1.5rem 0"><p>Erro ao carregar</p></div>`;
+    _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Erro ao carregar</p></div>`);
   }
 }
 
 async function gerarMultiplasManual(data){
-  document.getElementById('mult-content').innerHTML=`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Gerando...</div></div>`;
+  _setMultHTML(`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Gerando...</div></div>`);
   try{
     await fetch(`${BACKEND_URL}/gerar-multiplas/${data}`,{method:'POST'});
     await new Promise(r=>setTimeout(r,35000));
     const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
     const j=await r.json();
     if(j.multiplas) renderMultiplas(j.multiplas,j.resultados_multiplas);
-    else document.getElementById('mult-content').innerHTML=`<div class="empty-state" style="padding:1.5rem 0"><p>Não foi possível gerar.</p></div>`;
+    else _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Não foi possível gerar.</p></div>`);
   }catch(e){
-    document.getElementById('mult-content').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
+    _setMultHTML(`<div class="errmsg">❌ ${e.message}</div>`);
   }
 }
 
@@ -691,9 +741,9 @@ function renderMultiplas(multiplas,resultados){
       ${(mult.jogos||[]).map(j=>renderJogo(j,res?.jogos_resultado)).join('')}
     </div>`;
   };
-  document.getElementById('mult-content').innerHTML=
-    renderCard(multiplas.multipla_a,rA,'Múltipla A — Maior odd','red-odd')+
+  const html=renderCard(multiplas.multipla_a,rA,'Múltipla A — Maior odd','red-odd')+
     renderCard(multiplas.multipla_b,rB,'Múltipla B — Mais segura','amber-odd');
+  _setMultHTML(html);
 }
 
 // ─── Render apostas ────────────────────────────────────────────────────────────
