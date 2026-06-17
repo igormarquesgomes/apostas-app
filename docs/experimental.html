@@ -249,7 +249,9 @@ function renderJogosParaAgendar(apostas, jogosAgendados){
   }
 
   const html = apostas.map(aposta => {
-    const linkAnterior = (jogosAgendados || []).find(j => j.jogo_id === aposta.id)?.link_afiliado || '';
+    const BASE_AFILIADO = 'https://go.aff.estrelabetpartners.com/j2um212c?utm_campaign=aposta_lista&aposta=';
+    const linkSalvo = (jogosAgendados || []).find(j => j.jogo_id === aposta.id)?.link_afiliado || '';
+    const linkAnterior = linkSalvo || BASE_AFILIADO;
     const odd = aposta.odd_mercado || aposta.odd_sugerida || '-';
     return `<div class="tg-item">
       <div class="tg-teams">${aposta.time_casa} × ${aposta.time_fora}</div>
@@ -264,7 +266,7 @@ function renderJogosParaAgendar(apostas, jogosAgendados){
         data-aposta="${aposta.aposta}"
         data-odd="${odd}"
         data-horario="${aposta.horario || ''}"
-        placeholder="Cole o link de afiliado aqui (opcional)"
+        placeholder="Cole o código da aposta ao final da URL"
         value="${linkAnterior}"
       >
     </div>`;
