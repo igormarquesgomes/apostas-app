@@ -2913,14 +2913,16 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   const total = golsCasa + golsFora;
   const aposta = jogo.aposta?.toLowerCase() || '';
   // Inferir mercado pela aposta — evita erro quando mercado salvo está errado
+  // IMPORTANTE: checar escanteios/cartões ANTES de over/under genérico,
+  // pois "Over 2.5 cartões" contém "over" mas é cartoes, não gols.
   const inferirMercadoVerif = (m, a) => {
-    const al = (a||'').toLowerCase();
+    const al = (a||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if (al.includes('escanteio') || al.includes('corner') || al.includes('canto')) return 'escanteios';
+    if (al.includes('cartao') || al.includes('amarelo') || al.includes('card') || al.includes('yellow')) return 'cartoes';
     if (al.includes('marca') || al.includes('to score') || al.includes('anytime') ||
         al.includes('over') || al.includes('under') || al.includes('ambas') ||
         al.includes('ambos') || al.includes('btts') || al.includes('menos de') ||
         al.includes('mais de')) return 'gols';
-    if (al.includes('escanteio') || al.includes('corner')) return 'escanteios';
-    if (al.includes('cartao') || al.includes('cartao') || al.includes('amarelo')) return 'cartoes';
     return m || 'resultado';
   };
   const mercado = inferirMercadoVerif(jogo.mercado?.toLowerCase(), jogo.aposta);
