@@ -163,6 +163,7 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
     <div class="tool-body">
       <!-- Seletor de data -->
       <div class="day-tabs">
+        <button class="day-tab" onclick="selDiaTg('hoje',this)">Hoje</button>
         <button class="day-tab" onclick="selDiaTg('amanha',this)">Amanhã</button>
         <button class="day-tab active" onclick="selDiaTg('depois',this)">Depois de amanhã</button>
         <input class="day-inp" type="date" id="tg-data-agenda" onchange="carregarJogosParaAgendar(this.value)">
@@ -215,7 +216,7 @@ function selDiaTg(periodo, btn){
   document.querySelectorAll('.day-tab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   const base = hoje();
-  const d = periodo === 'amanha' ? offset(base, 1) : offset(base, 2);
+  const d = periodo === 'hoje' ? base : periodo === 'amanha' ? offset(base, 1) : offset(base, 2);
   document.getElementById('tg-data-agenda').value = d;
   carregarJogosParaAgendar(d);
 }
