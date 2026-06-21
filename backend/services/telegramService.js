@@ -92,15 +92,21 @@ function formatarListaDia(data, jogos) {
 function formatarRelatorioLista(data, jogos) {
   let acertos = 0, erros = 0, pendentes = 0;
 
-  const linhas = jogos
+  const blocos = jogos
     .slice()
     .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''))
     .map(j => {
-      const icone = j.resultado === 'green' ? '✅' : j.resultado === 'red' ? '❌' : '⏳';
+      const icone = j.resultado === 'green' ? '✅ GREEN' : j.resultado === 'red' ? '❌ RED' : '⏳ Pendente';
       if (j.resultado === 'green') acertos++;
       else if (j.resultado === 'red') erros++;
       else pendentes++;
-      return `${icone} ${j.time_casa} x ${j.time_fora} — ${j.aposta} @ ${j.odd || '-'}`;
+      return [
+        `🕐 <b>${j.horario || '--:--'}</b>`,
+        `⚽ <b>${j.time_casa} x ${j.time_fora}</b>`,
+        `📊 ${j.aposta}`,
+        `📈 Odd: <b>${j.odd || '-'}</b>`,
+        icone,
+      ].join('\n');
     });
 
   const total = acertos + erros;
@@ -109,13 +115,10 @@ function formatarRelatorioLista(data, jogos) {
   return [
     `<b>${fmtData(data)} — RELATÓRIO FINAL</b>`,
     '',
-    linhas.join('\n'),
+    blocos.join('\n\n'),
     '',
     '──────────────────────',
-    `✅ Acertos: ${acertos}`,
-    `❌ Erros: ${erros}`,
-    `⏳ Pendentes: ${pendentes}`,
-    `📊 Taxa: ${taxa}%`,
+    `✅ ${acertos}  ❌ ${erros}  ⏳ ${pendentes}  📊 ${taxa}%`,
   ].join('\n');
 }
 
