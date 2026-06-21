@@ -249,18 +249,44 @@ async function carregarDia(data){
 
 // ── renderização unificada ─────────────────────────────────────────────────
 
+function toMin(h){ if(!h) return null; const [hh,mm]=h.split(':').map(Number); return hh*60+(mm||0); }
+function fromMin(m){ return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
+
+// Calcula horários de envio relativo ao horário de início de cada jogo.
+// Regras:
+//   - Ordena por horário do jogo
+//   - Começa 60 min antes do 1º jogo (mínimo 12h)
+//   - Intervalo baseado no gap para o PRÓXIMO jogo:
+//       gap=0  → +5 min
+//       gap≤30 → +10 min
+//       gap≤60 → +15 min
+//       gap>60 → +30 min
+//   - NUNCA envia depois que o jogo começa (cap: jogo - 5 min)
 function calcularHorariosEscalonados(apostas){
-  let minutos = 12 * 60;
-  return apostas.map((a, i) => {
-    const prox = apostas[i+1];
-    const hAtual = a.horario ? parseInt(a.horario)*60 + parseInt(a.horario.split(':')[1]||0) : minutos + 120;
-    const hProx  = prox?.horario ? parseInt(prox.horario)*60 + parseInt(prox.horario.split(':')[1]||0) : hAtual + 120;
-    const dist   = hProx - hAtual;
-    const intervalo = dist < 60 ? 5 : dist < 120 ? 15 : 30;
-    const val = `${String(Math.floor(minutos/60)).padStart(2,'0')}:${String(minutos%60).padStart(2,'0')}`;
-    minutos += intervalo;
-    return val;
-  });
+  const sorted = [...apostas].sort((a,b)=>(a.horario||'').localeCompare(b.horario||''));
+  const mapa = {};
+  const primeiroJogo = toMin(sorted[0]?.horario);
+  if(primeiroJogo === null) return mapa;
+
+  let envioMin = Math.max(12*60, primeiroJogo - 60);
+
+  for(let i=0; i<sorted.length; i++){
+    const a    = sorted[i];
+    const next = sorted[i+1];
+    const jogoMin = toMin(a.horario);
+
+    // Garante que nunca envia depois que o jogo começa
+    if(jogoMin !== null && envioMin >= jogoMin - 5) envioMin = jogoMin - 5;
+
+    mapa[a.id] = fromMin(envioMin);
+
+    // Intervalo baseado no gap para o próximo jogo
+    const gapProx = (next && toMin(next.horario) !== null && jogoMin !== null)
+      ? toMin(next.horario) - jogoMin : 999;
+    const intervalo = gapProx === 0 ? 5 : gapProx <= 30 ? 10 : gapProx <= 60 ? 15 : 30;
+    envioMin += intervalo;
+  }
+  return mapa; // { jogo_id → "HH:MM" }
 }
 
 function renderUnificado(apostas, jogosLista, analisesExistentes){
@@ -270,14 +296,16 @@ function renderUnificado(apostas, jogosLista, analisesExistentes){
     return;
   }
 
-  const horariosAuto = calcularHorariosEscalonados(apostas);
+  // Ordena por horário do jogo
+  const apostasOrdenadas = [...apostas].sort((a,b)=>(a.horario||'').localeCompare(b.horario||''));
+  const horariosAuto = calcularHorariosEscalonados(apostasOrdenadas);
 
-  const html = apostas.map((a, idx) => {
+  const html = apostasOrdenadas.map((a) => {
     const odd        = a.odd_mercado || a.odd_sugerida || '-';
     const linkSalvo  = (jogosLista||[]).find(j=>j.jogo_id===a.id)?.link_afiliado || '';
     const link       = linkSalvo || BASE_AFILIADO;
     const analise    = analisesExistentes.find(x => x.jogo_id === a.id);
-    const horEnvio   = analise?.horario_envio?.slice(0,5) || horariosAuto[idx] || '';
+    const horEnvio   = analise?.horario_envio?.slice(0,5) || horariosAuto[a.id] || '';
     const enviado    = analise?.status === 'enviado';
     const badge      = enviado
       ? ' <span style="font-size:10px;font-weight:700;color:#0F766E;background:#F0FDF9;border:1px solid #6EE7B7;border-radius:20px;padding:1px 7px;">Enviado</span>'
