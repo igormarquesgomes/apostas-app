@@ -929,7 +929,7 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
     }
     if(ap.includes('over')||ap.includes('mais')) return total>n?'green':'red';
     if(ap.includes('under')||ap.includes('menos')) return total<n?'green':'red';
-    if(ap.includes('ambas')||ap.includes('btts')) return(gc>0&&gf>0)?'green':'red';
+    if(ap.includes('ambas')||ap.includes('ambos')||ap.includes('btts')) return(gc>0&&gf>0)?'green':'red';
   }
   if(merc==='resultado'){
     const casaVence=gc>gf,foraVence=gf>gc,empate=gc===gf;
