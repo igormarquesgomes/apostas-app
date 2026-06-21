@@ -933,6 +933,8 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
   }
   if(merc==='resultado'){
     const casaVence=gc>gf,foraVence=gf>gc,empate=gc===gf;
+    // BTTS pode cair aqui quando a IA salva com mercado='resultado'
+    if(ap.includes('ambas')||ap.includes('ambos')||ap.includes('btts')) return(gc>0&&gf>0)?'green':'red';
     const normAcc=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'');
     const apN=normAcc(ap);
     if((apN.includes('empate')||apN==='x')&&!apN.includes('dupla')&&!apN.includes('ou empat')&&!apN.includes('1x')&&!apN.includes('x2')) return empate?'green':'red';
