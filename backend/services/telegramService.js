@@ -64,7 +64,23 @@ async function tgCall(token, method, body) {
     body: JSON.stringify(body),
   });
   const json = await res.json();
-  if (!json.ok) throw new Error(`Telegram ${method}: ${json.description}`);
+  if (!json.ok) {
+    // Grupo foi convertido para supergrupo — novo chat_id fornecido pelo Telegram
+    if (json.parameters?.migrate_to_chat_id) {
+      const novoChatId = json.parameters.migrate_to_chat_id;
+      console.log(`⚠️ Grupo migrou para supergrupo. Novo chat_id: ${novoChatId}. Reenviando...`);
+      const retry = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, chat_id: novoChatId }),
+      });
+      const retryJson = await retry.json();
+      if (!retryJson.ok) throw new Error(`Telegram ${method} (retry): ${retryJson.description}`);
+      retryJson.result._migrated_chat_id = novoChatId;
+      return retryJson.result;
+    }
+    throw new Error(`Telegram ${method}: ${json.description}`);
+  }
   return json.result;
 }
 
@@ -211,6 +227,10 @@ async function enviarListaDeDia() {
     disable_web_page_preview: false,
   });
 
+  // Se o grupo migrou para supergrupo, persiste o novo chat_id
+  const novoChatId = msg._migrated_chat_id || null;
+  if (novoChatId) console.log(`📌 [Lista] chat_id atualizado para ${novoChatId} (supergrupo)`);
+
   await supaFetch(`agendos_telegram?id=eq.${agendo.id}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
@@ -218,6 +238,7 @@ async function enviarListaDeDia() {
       message_id: msg.message_id,
       enviado_em: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      ...(novoChatId ? { chat_id: novoChatId } : {}),
     }),
   });
 
