@@ -4225,15 +4225,22 @@ app.post('/rotina-04h', async (req, res) => {
 
 // Gatilhos manuais para crons do Telegram (para teste)
 app.post('/telegram/testar-envio', async (req, res) => {
-  const { enviarListaDeHoje } = require('./services/telegramService');
-  res.json({ mensagem: 'Disparando enviarListaDeHoje...' });
-  enviarListaDeHoje().catch(console.error);
+  const svc = require('./services/telegramService');
+  res.json({ mensagem: 'Disparando enviarListaDeDia...' });
+  svc.enviarListaDeDia().catch(console.error);
 });
 
 app.post('/telegram/testar-edicao', async (req, res) => {
-  const { editarMensagemAnterior } = require('./services/telegramService');
-  res.json({ mensagem: 'Disparando editarMensagemAnterior...' });
-  editarMensagemAnterior().catch(console.error);
+  const svc = require('./services/telegramService');
+  res.json({ mensagem: 'Disparando editarMensagemListaAnterior + responderValidacoesAnalises...' });
+  svc.editarMensagemListaAnterior().catch(console.error);
+  svc.responderValidacoesAnalises().catch(console.error);
+});
+
+app.post('/telegram/testar-analises', async (req, res) => {
+  const svc = require('./services/telegramService');
+  res.json({ mensagem: 'Disparando enviarMensagensAnalisesAgendasPremium...' });
+  svc.enviarMensagensAnalisesAgendasPremium().catch(console.error);
 });
 
 app.post('/rotina-04h30', async (req, res) => {

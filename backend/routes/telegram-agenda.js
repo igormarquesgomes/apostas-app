@@ -1,19 +1,24 @@
 /**
- * Rotas para agendamento de listas Telegram
+ * Rotas Telegram
  *
- * POST /api/telegram/salvar      — cria ou atualiza agendo (status=salvo)
- * POST /api/telegram/agendar     — confirma agendo (status=agendado, irreversível via UI)
- * GET  /api/telegram/lista/:data — busca agendo + apostas do dia
+ * OddLab Lista (tabela: agendos_telegram)
+ *   POST /api/telegram/lista/salvar
+ *   POST /api/telegram/lista/agendar
+ *   GET  /api/telegram/lista/:data
+ *
+ * OddLab Análises (tabela: agendos_telegram_analises)
+ *   POST /api/telegram/analises/agendar
+ *   POST /api/telegram/analises/editar
+ *   GET  /api/telegram/analises/:data
  */
 
 const express = require('express');
 const router  = express.Router();
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const DEFAULT_CHAT_ID = process.env.TELEGRAM_CHAT_ID
-  ? Number(process.env.TELEGRAM_CHAT_ID)
-  : null;
+const SUPABASE_URL        = process.env.SUPABASE_URL;
+const SUPABASE_KEY        = process.env.SUPABASE_KEY;
+const DEFAULT_CHAT_LISTA  = process.env.TELEGRAM_CHAT_ID_LISTA   || process.env.TELEGRAM_CHAT_ID   || null;
+const DEFAULT_CHAT_ANALISES = process.env.TELEGRAM_CHAT_ID_ANALISES || process.env.TELEGRAM_CHAT_ID || null;
 
 async function supaFetch(path, opts = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -33,96 +38,61 @@ async function supaFetch(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-// POST /api/telegram/salvar
-// Body: { data: 'YYYY-MM-DD', jogos: [{jogo_id, time_casa, time_fora, aposta, odd, horario, link_afiliado}] }
-router.post('/salvar', async (req, res) => {
+// ══════════════════════════════════════════════════════════════════════════
+// OddLab Lista
+// ══════════════════════════════════════════════════════════════════════════
+
+// POST /api/telegram/lista/salvar
+router.post('/lista/salvar', async (req, res) => {
   try {
     const { data, jogos } = req.body;
-    if (!data || !Array.isArray(jogos)) {
-      return res.status(400).json({ error: 'data e jogos são obrigatórios' });
-    }
+    if (!data || !Array.isArray(jogos)) return res.status(400).json({ error: 'data e jogos obrigatórios' });
 
-    // Verifica se já existe um agendo para esta data
-    const existing = await supaFetch(
-      `agendos_telegram?data_envio=eq.${data}&select=id,status`
-    );
+    const existing = await supaFetch(`agendos_telegram?data_envio=eq.${data}&select=id,status`);
     const agendo = existing?.[0];
 
     if (agendo?.status === 'agendado') {
-      return res.status(409).json({
-        error: 'Este agendo já está confirmado e não pode ser editado pela UI',
-        agendo_id: agendo.id,
-      });
+      return res.status(409).json({ error: 'Já agendado — edição bloqueada pela UI', agendo_id: agendo.id });
     }
 
     if (agendo?.id) {
-      // UPDATE
       await supaFetch(`agendos_telegram?id=eq.${agendo.id}`, {
         method: 'PATCH',
         headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          jogos,
-          status: 'salvo',
-          updated_at: new Date().toISOString(),
-        }),
+        body: JSON.stringify({ jogos, status: 'salvo', updated_at: new Date().toISOString() }),
       });
       return res.json({ success: true, agendo_id: agendo.id, action: 'updated' });
     }
 
-    // INSERT
     const inserted = await supaFetch('agendos_telegram', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        data_envio: data,
-        jogos,
-        status: 'salvo',
-        chat_id: DEFAULT_CHAT_ID,
-      }),
+      body: JSON.stringify({ data_envio: data, jogos, status: 'salvo', chat_id: DEFAULT_CHAT_LISTA ? Number(DEFAULT_CHAT_LISTA) : null }),
     });
-    const novoId = inserted?.[0]?.id;
-    return res.json({ success: true, agendo_id: novoId, action: 'created' });
-
+    return res.json({ success: true, agendo_id: inserted?.[0]?.id, action: 'created' });
   } catch (err) {
-    console.error('Erro /api/telegram/salvar:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/telegram/agendar
-// Body: { agendo_id: 'uuid' }
-router.post('/agendar', async (req, res) => {
+// POST /api/telegram/lista/agendar
+router.post('/lista/agendar', async (req, res) => {
   try {
     const { agendo_id } = req.body;
     if (!agendo_id) return res.status(400).json({ error: 'agendo_id obrigatório' });
 
-    const rows = await supaFetch(
-      `agendos_telegram?id=eq.${agendo_id}&select=id,status,data_envio`
-    );
+    const rows = await supaFetch(`agendos_telegram?id=eq.${agendo_id}&select=id,status`);
     const agendo = rows?.[0];
-
     if (!agendo) return res.status(404).json({ error: 'Agendo não encontrado' });
-    if (agendo.status === 'agendado') {
-      return res.json({ success: true, warning: 'Já estava agendado', agendo_id });
-    }
+    if (agendo.status === 'agendado') return res.json({ success: true, warning: 'Já estava agendado' });
 
     await supaFetch(`agendos_telegram?id=eq.${agendo_id}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        status: 'agendado',
-        updated_at: new Date().toISOString(),
-      }),
+      body: JSON.stringify({ status: 'agendado', updated_at: new Date().toISOString() }),
     });
-
-    res.json({
-      success: true,
-      agendo_id,
-      warning: 'Agendado! Será enviado no horário configurado. Cancelamento apenas via banco de dados.',
-    });
-
+    res.json({ success: true, agendo_id, warning: 'Agendado! Cancelamento apenas via banco de dados.' });
   } catch (err) {
-    console.error('Erro /api/telegram/agendar:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -131,30 +101,94 @@ router.post('/agendar', async (req, res) => {
 router.get('/lista/:data', async (req, res) => {
   try {
     const { data } = req.params;
-
-    // Busca agendo
-    const agendoRows = await supaFetch(
-      `agendos_telegram?data_envio=eq.${data}&select=*`
-    );
+    const [agendoRows, diasRows] = await Promise.all([
+      supaFetch(`agendos_telegram?data_envio=eq.${data}&select=*`),
+      supaFetch(`apostas_dia?data=eq.${data}&select=apostas`),
+    ]);
     const agendo = agendoRows?.[0] || null;
-
-    // Busca apostas do dia (para exibir jogos disponíveis)
-    const diasRows = await supaFetch(
-      `apostas_dia?data=eq.${data}&select=apostas`
-    );
     const apostas = diasRows?.[0]?.apostas?.jogos || [];
+    res.json({ data, apostas, agendo_id: agendo?.id || null, status: agendo?.status || null, jogos: agendo?.jogos || [], enviado_em: agendo?.enviado_em || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    res.json({
-      data,
-      apostas,
-      agendo_id: agendo?.id || null,
-      status: agendo?.status || null,
-      jogos: agendo?.jogos || [],
-      enviado_em: agendo?.enviado_em || null,
+// ══════════════════════════════════════════════════════════════════════════
+// OddLab Análises
+// ══════════════════════════════════════════════════════════════════════════
+
+// POST /api/telegram/analises/agendar
+// Body: { data, jogos: [{jogo_id, time_casa, time_fora, aposta, odd, horario, link_afiliado, horario_envio}] }
+router.post('/analises/agendar', async (req, res) => {
+  try {
+    const { data, jogos } = req.body;
+    if (!data || !Array.isArray(jogos)) return res.status(400).json({ error: 'data e jogos obrigatórios' });
+
+    // Apaga registros existentes para esta data antes de reinserir
+    await supaFetch(`agendos_telegram_analises?data_envio=eq.${data}&status=eq.pendente`, { method: 'DELETE' });
+
+    const rows = jogos.map(j => ({
+      data_envio: data,
+      jogo_id: j.jogo_id,
+      jogo: {
+        jogo_id:       j.jogo_id,
+        time_casa:     j.time_casa,
+        time_fora:     j.time_fora,
+        aposta:        j.aposta,
+        odd:           j.odd,
+        horario:       j.horario,
+        link_afiliado: j.link_afiliado || '',
+      },
+      horario_envio: j.horario_envio,
+      status: 'pendente',
+      chat_id: DEFAULT_CHAT_ANALISES ? Number(DEFAULT_CHAT_ANALISES) : null,
+    }));
+
+    const inserted = await supaFetch('agendos_telegram_analises', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify(rows),
     });
 
+    res.json({ success: true, agendo_ids: (inserted || []).map(r => r.id) });
   } catch (err) {
-    console.error('Erro /api/telegram/lista:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/telegram/analises/editar
+// Body: { agendo_id, horario_envio }
+router.post('/analises/editar', async (req, res) => {
+  try {
+    const { agendo_id, horario_envio } = req.body;
+    if (!agendo_id || !horario_envio) return res.status(400).json({ error: 'agendo_id e horario_envio obrigatórios' });
+
+    const rows = await supaFetch(`agendos_telegram_analises?id=eq.${agendo_id}&select=id,status`);
+    if (!rows?.[0]) return res.status(404).json({ error: 'Agendo não encontrado' });
+    if (rows[0].status === 'enviado') return res.status(409).json({ error: 'Já enviado — não pode editar' });
+
+    await supaFetch(`agendos_telegram_analises?id=eq.${agendo_id}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ horario_envio, updated_at: new Date().toISOString() }),
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/telegram/analises/:data
+router.get('/analises/:data', async (req, res) => {
+  try {
+    const { data } = req.params;
+    const [analisesRows, diasRows] = await Promise.all([
+      supaFetch(`agendos_telegram_analises?data_envio=eq.${data}&select=*&order=horario_envio.asc`),
+      supaFetch(`apostas_dia?data=eq.${data}&select=apostas`),
+    ]);
+    const apostas = diasRows?.[0]?.apostas?.jogos || [];
+    res.json({ data, apostas, analises: analisesRows || [] });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,10 +1,10 @@
 /**
- * Crons do Telegram — agendados em UTC para bater no horário BRT
+ * Crons Telegram — mesmo padrão setTimeout/setInterval do server.js
  *
- *   09h UTC = 06h BRT → editar mensagem anterior com ✅/❌
- *   11h UTC = 08h BRT → enviar lista de hoje
- *
- * Usa o mesmo padrão setTimeout/setInterval do server.js principal.
+ * Horários BRT → UTC:
+ *   06h BRT = 09h UTC — editar lista anterior + reply análises
+ *   08h BRT = 11h UTC — enviar lista de hoje
+ *   12h-23h BRT = 15h-02h UTC — enviar análises individuais (a cada minuto)
  */
 
 const telegramService = require('../services/telegramService');
@@ -12,37 +12,47 @@ const telegramService = require('../services/telegramService');
 function msAteProxima(horaUTC, minUTC = 0) {
   const agora = new Date();
   const prox = new Date(Date.UTC(
-    agora.getUTCFullYear(),
-    agora.getUTCMonth(),
-    agora.getUTCDate(),
-    horaUTC,
-    minUTC,
-    0
+    agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(),
+    horaUTC, minUTC, 0
   ));
   if (prox <= agora) prox.setUTCDate(prox.getUTCDate() + 1);
   return prox.getTime() - agora.getTime();
 }
 
+// Hora atual em BRT (número 0-23)
+function horaBRT() {
+  return parseInt(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }), 10);
+}
+
 function agendarCronTelegram() {
-  // ── 09h UTC (06h BRT) — editar mensagem anterior ──────────────────────
-  const msEditar = msAteProxima(9, 0);
-  console.log(`⏰ [Telegram] Próxima edição de mensagem em ${Math.round(msEditar / 60000)} min`);
-  setTimeout(function tick() {
-    telegramService.editarMensagemAnterior()
-      .then(() => console.log('✅ [Telegram 06h] editarMensagemAnterior concluído'))
-      .catch(err => console.error('❌ [Telegram 06h] editarMensagemAnterior:', err.message));
-    setTimeout(tick, 24 * 60 * 60 * 1000);
-  }, msEditar);
+  // ── 09h UTC (06h BRT) — editar lista + reply análises ─────────────────
+  const ms06h = msAteProxima(9, 0);
+  console.log(`⏰ [Telegram] Edição/reply em ${Math.round(ms06h / 60000)} min`);
+  setTimeout(function tick06h() {
+    Promise.all([
+      telegramService.editarMensagemListaAnterior(),
+      telegramService.responderValidacoesAnalises(),
+    ]).catch(err => console.error('❌ [Telegram 06h]:', err.message));
+    setTimeout(tick06h, 24 * 60 * 60 * 1000);
+  }, ms06h);
 
   // ── 11h UTC (08h BRT) — enviar lista de hoje ──────────────────────────
-  const msEnviar = msAteProxima(11, 0);
-  console.log(`⏰ [Telegram] Próximo envio de lista em ${Math.round(msEnviar / 60000)} min`);
-  setTimeout(function tick() {
-    telegramService.enviarListaDeHoje()
-      .then(() => console.log('✅ [Telegram 08h] enviarListaDeHoje concluído'))
-      .catch(err => console.error('❌ [Telegram 08h] enviarListaDeHoje:', err.message));
-    setTimeout(tick, 24 * 60 * 60 * 1000);
-  }, msEnviar);
+  const ms08h = msAteProxima(11, 0);
+  console.log(`⏰ [Telegram] Envio lista em ${Math.round(ms08h / 60000)} min`);
+  setTimeout(function tick08h() {
+    telegramService.enviarListaDeDia()
+      .catch(err => console.error('❌ [Telegram 08h]:', err.message));
+    setTimeout(tick08h, 24 * 60 * 60 * 1000);
+  }, ms08h);
+
+  // ── A cada minuto (ativo 12h-23h BRT) — análises individuais ──────────
+  console.log(`⏰ [Telegram] Poll análises a cada minuto`);
+  setInterval(() => {
+    const hora = horaBRT();
+    if (hora < 12 || hora > 23) return; // só ativa na janela 12h-23h BRT
+    telegramService.enviarMensagensAnalisesAgendasPremium()
+      .catch(err => console.error('❌ [Telegram Análises]:', err.message));
+  }, 60 * 1000);
 }
 
 module.exports = { agendarCronTelegram };

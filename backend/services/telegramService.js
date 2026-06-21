@@ -1,26 +1,27 @@
 /**
- * Telegram Service — envio e edição de mensagens no canal
+ * Telegram Service
  *
- * Crons que usam este serviço:
- *   09h UTC (06h BRT) — editarMensagemAnterior: adiciona ✅/❌ na lista de ontem
- *   11h UTC (08h BRT) — enviarListaDeHoje: envia apostas agendadas para hoje
+ * Grupos:
+ *   OddLab Lista    → TELEGRAM_CHAT_ID_LISTA    — lista consolidada 08h + relatório 06h
+ *   OddLab Análises → TELEGRAM_CHAT_ID_ANALISES — mensagens individuais 12h-23h + reply 06h
  */
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
-const SUPABASE_URL       = process.env.SUPABASE_URL;
-const SUPABASE_KEY       = process.env.SUPABASE_KEY;
+const TELEGRAM_BOT_TOKEN     = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID_LISTA          = process.env.TELEGRAM_CHAT_ID_LISTA   || process.env.TELEGRAM_CHAT_ID;
+const CHAT_ID_ANALISES       = process.env.TELEGRAM_CHAT_ID_ANALISES || process.env.TELEGRAM_CHAT_ID;
+const SUPABASE_URL           = process.env.SUPABASE_URL;
+const SUPABASE_KEY           = process.env.SUPABASE_KEY;
 
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function hoje() {
+function dataHoje() {
   return new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     .split('/').reverse().join('-');
 }
 
-function ontem() {
+function dataOntem() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
@@ -30,6 +31,11 @@ function ontem() {
 function fmtData(iso) {
   const [a, m, d] = iso.split('-');
   return `${d}/${m}`;
+}
+
+// Hora atual em BRT no formato HH:MM
+function horaBRT() {
+  return new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 }
 
 async function supaFetch(path, opts = {}) {
@@ -82,7 +88,7 @@ function formatarListaDia(data, jogos) {
   return `<b>${fmtData(data)} — ANÁLISES DO DIA</b>\n\n${linhas.join('\n\n')}`;
 }
 
-function formatarRelatorio(data, jogos) {
+function formatarRelatorioLista(data, jogos) {
   let acertos = 0, erros = 0, pendentes = 0;
 
   const linhas = jogos
@@ -112,80 +118,87 @@ function formatarRelatorio(data, jogos) {
   ].join('\n');
 }
 
-// ── busca resultados do apostas_dia para enriquecer os jogos agendados ─────
+function formatarMensagemAnalise(jogo) {
+  const linkParte = jogo.link_afiliado
+    ? `<a href="${jogo.link_afiliado}">🔗 Link da Aposta Pronta ✅</a>`
+    : '🔗 Link da Aposta Pronta ✅';
 
-async function enriquecerComResultados(data, jogos) {
-  const rows = await supaFetch(
-    `apostas_dia?data=eq.${data}&select=resultados`
-  );
-  const resultados = rows?.[0]?.resultados?.jogos || [];
-
-  return jogos.map(j => {
-    const res = resultados.find(
-      r => r.time_casa === j.time_casa && r.time_fora === j.time_fora
-    );
-    return { ...j, resultado: res?.resultado || null };
-  });
+  return [
+    '🚨 ATENÇÃO 🚨',
+    '',
+    '⚽ Oportunidade identificada no jogo',
+    `👥 <b>${jogo.time_casa} x ${jogo.time_fora}</b>`,
+    '',
+    '💡 Sugestão dos nossos Analistas para esse jogo:',
+    `📊 <b>${jogo.aposta}</b>`,
+    '',
+    '💰 Gestão de Banca: 3%',
+    '',
+    linkParte,
+    '',
+    '🎰 Jogue com Responsabilidade',
+  ].join('\n');
 }
 
-// ── funções públicas ────────────────────────────────────────────────────────
+// ── busca resultados do apostas_dia para enriquecer os jogos ───────────────
+
+async function buscarResultados(data) {
+  const rows = await supaFetch(`apostas_dia?data=eq.${data}&select=resultados`);
+  return rows?.[0]?.resultados?.apostas || [];
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GRUPO: OddLab Lista
+// ══════════════════════════════════════════════════════════════════════════
 
 /**
- * 06h BRT — edita a mensagem de ontem com os resultados ✅/❌
+ * 06h BRT — edita a mensagem de ontem com resultados ✅/❌
  */
-async function editarMensagemAnterior() {
-  if (!TELEGRAM_BOT_TOKEN) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente — skip editarMensagemAnterior'); return; }
+async function editarMensagemListaAnterior() {
+  if (!TELEGRAM_BOT_TOKEN) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente'); return; }
 
-  const dataOntem = ontem();
-  const rows = await supaFetch(
-    `agendos_telegram?data_envio=eq.${dataOntem}&status=eq.agendado&select=*`
-  );
+  const data = dataOntem();
+  const rows = await supaFetch(`agendos_telegram?data_envio=eq.${data}&status=eq.agendado&select=*`);
   const agendo = rows?.[0];
 
   if (!agendo?.message_id) {
-    console.log(`📭 Nenhum agendo com message_id para ${dataOntem}`);
+    console.log(`📭 [Lista] Sem message_id para ${data}`);
     return;
   }
 
-  const jogosComRes = await enriquecerComResultados(dataOntem, agendo.jogos);
-  const texto = formatarRelatorio(dataOntem, jogosComRes);
-  const chatId = agendo.chat_id || TELEGRAM_CHAT_ID;
+  const resultados = await buscarResultados(data);
+  const jogosComRes = agendo.jogos.map(j => {
+    const res = resultados.find(r => r.time_casa === j.time_casa && r.time_fora === j.time_fora);
+    return { ...j, resultado: res?.resultado_aposta || null };
+  });
 
+  const texto = formatarRelatorioLista(data, jogosComRes);
   await tgCall('editMessageText', {
-    chat_id: chatId,
+    chat_id: agendo.chat_id || CHAT_ID_LISTA,
     message_id: agendo.message_id,
     text: texto,
     parse_mode: 'HTML',
     disable_web_page_preview: true,
   });
 
-  console.log(`✅ Mensagem editada para ${dataOntem}`);
+  console.log(`✅ [Lista] Mensagem editada para ${data}`);
 }
 
 /**
- * 08h BRT — envia a lista de hoje para o canal
+ * 08h BRT — envia a lista consolidada de hoje
  */
-async function enviarListaDeHoje() {
-  if (!TELEGRAM_BOT_TOKEN) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente — skip enviarListaDeHoje'); return; }
+async function enviarListaDeDia() {
+  if (!TELEGRAM_BOT_TOKEN) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente'); return; }
 
-  const dataHoje = hoje();
-  const rows = await supaFetch(
-    `agendos_telegram?data_envio=eq.${dataHoje}&status=eq.agendado&select=*`
-  );
+  const data = dataHoje();
+  const rows = await supaFetch(`agendos_telegram?data_envio=eq.${data}&status=eq.agendado&select=*`);
   const agendo = rows?.[0];
 
-  if (!agendo) {
-    console.log(`📭 Nenhum agendo para ${dataHoje}`);
-    return;
-  }
+  if (!agendo) { console.log(`📭 [Lista] Sem agendo para ${data}`); return; }
+  if (agendo.enviado_em) { console.log(`⚠️ [Lista] Já enviado às ${agendo.enviado_em}`); return; }
 
-  if (agendo.enviado_em) {
-    console.log(`⚠️ Lista de ${dataHoje} já foi enviada às ${agendo.enviado_em}`);
-    return;
-  }
-
-  const texto = formatarListaDia(dataHoje, agendo.jogos);
-  const chatId = agendo.chat_id || TELEGRAM_CHAT_ID;
+  const texto = formatarListaDia(data, agendo.jogos);
+  const chatId = agendo.chat_id || CHAT_ID_LISTA;
 
   const msg = await tgCall('sendMessage', {
     chat_id: chatId,
@@ -194,21 +207,116 @@ async function enviarListaDeHoje() {
     disable_web_page_preview: false,
   });
 
-  // Persiste message_id para edição posterior
-  await supaFetch(
-    `agendos_telegram?id=eq.${agendo.id}`,
-    {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        message_id: msg.message_id,
-        enviado_em: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }),
-    }
-  );
+  await supaFetch(`agendos_telegram?id=eq.${agendo.id}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      message_id: msg.message_id,
+      enviado_em: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+  });
 
-  console.log(`✅ Lista enviada para ${dataHoje} — message_id: ${msg.message_id}`);
+  console.log(`✅ [Lista] Enviada para ${data} — message_id: ${msg.message_id}`);
 }
 
-module.exports = { editarMensagemAnterior, enviarListaDeHoje };
+// ══════════════════════════════════════════════════════════════════════════
+// GRUPO: OddLab Análises
+// ══════════════════════════════════════════════════════════════════════════
+
+/**
+ * A cada minuto (12h-23h BRT) — envia mensagens individuais cujo horario_envio já passou
+ */
+async function enviarMensagensAnalisesAgendasPremium() {
+  if (!TELEGRAM_BOT_TOKEN) return;
+
+  const data = dataHoje();
+  const horaAgora = horaBRT(); // HH:MM
+
+  // Busca pendentes com horario_envio <= agora
+  const rows = await supaFetch(
+    `agendos_telegram_analises?data_envio=eq.${data}&status=eq.pendente&horario_envio=lte.${horaAgora}&select=*&order=horario_envio.asc`
+  );
+
+  if (!rows?.length) return;
+
+  console.log(`📤 [Análises] ${rows.length} mensagem(ns) para enviar`);
+
+  for (const agendo of rows) {
+    try {
+      const texto = formatarMensagemAnalise(agendo.jogo);
+      const chatId = agendo.chat_id || CHAT_ID_ANALISES;
+
+      const msg = await tgCall('sendMessage', {
+        chat_id: chatId,
+        text: texto,
+        parse_mode: 'HTML',
+        disable_web_page_preview: false,
+      });
+
+      await supaFetch(`agendos_telegram_analises?id=eq.${agendo.id}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          status: 'enviado',
+          message_id: msg.message_id,
+          enviado_em: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      console.log(`  ✅ [Análises] ${agendo.jogo.time_casa} x ${agendo.jogo.time_fora} — msg_id: ${msg.message_id}`);
+    } catch (err) {
+      console.error(`  ❌ [Análises] Erro ${agendo.jogo?.time_casa}: ${err.message}`);
+    }
+  }
+}
+
+/**
+ * 06h BRT — responde às mensagens de ontem com ✅✅✅ ou ❌❌❌
+ */
+async function responderValidacoesAnalises() {
+  if (!TELEGRAM_BOT_TOKEN) return;
+
+  const data = dataOntem();
+  const rows = await supaFetch(
+    `agendos_telegram_analises?data_envio=eq.${data}&status=eq.enviado&select=*`
+  );
+
+  if (!rows?.length) { console.log(`📭 [Análises] Sem enviados para ${data}`); return; }
+
+  const resultados = await buscarResultados(data);
+
+  for (const agendo of rows) {
+    if (!agendo.message_id) continue;
+
+    const res = resultados.find(r =>
+      r.time_casa === agendo.jogo.time_casa && r.time_fora === agendo.jogo.time_fora
+    );
+    const resultado = res?.resultado_aposta;
+    if (!resultado || resultado === 'pendente') continue;
+
+    const reply = resultado === 'green' ? '✅ ✅ ✅ ✅' : '❌ ❌ ❌';
+    const chatId = agendo.chat_id || CHAT_ID_ANALISES;
+
+    try {
+      await tgCall('sendMessage', {
+        chat_id: chatId,
+        text: reply,
+        reply_to_message_id: agendo.message_id,
+      });
+      console.log(`  ↩️ [Análises] Reply ${agendo.jogo.time_casa} x ${agendo.jogo.time_fora}: ${reply}`);
+    } catch (err) {
+      console.error(`  ❌ [Análises] Reply erro: ${err.message}`);
+    }
+  }
+}
+
+module.exports = {
+  // Lista
+  editarMensagemListaAnterior,
+  enviarListaDeDia,
+  // Análises
+  enviarMensagensAnalisesAgendasPremium,
+  responderValidacoesAnalises,
+};

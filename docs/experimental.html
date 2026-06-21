@@ -90,6 +90,21 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 
 .tg-actions{margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;}
 
+/* sub-tabs Lista / Análises */
+.tg-subtabs{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #E2E8F0;}
+.tg-subtab{padding:8px 20px;font-size:13px;font-weight:600;color:#94A3B8;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;transition:color .15s;}
+.tg-subtab.active{color:#0F766E;border-bottom-color:#0F766E;}
+.tg-subtab:hover:not(.active){color:#475569;}
+.tg-section{display:none;}.tg-section.active{display:block;}
+
+/* análises — horário de envio por jogo */
+.tg-time-input{width:100px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;outline:none;transition:border-color .15s;}
+.tg-time-input:focus{border-color:#0F766E;}
+.tg-item-row{display:flex;align-items:flex-start;gap:12px;}
+.tg-item-row .tg-info{flex:1;}
+.tg-item-row .tg-time-wrap{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.tg-time-label{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;}
+
 .empty-state{text-align:center;padding:48px 20px;color:#94A3B8;}
 .empty-state svg{width:40px;height:40px;margin:0 auto 12px;display:block;opacity:.35;}
 .loading-state{text-align:center;padding:40px;color:#94A3B8;font-size:13px;}
@@ -161,37 +176,55 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
       <button class="tool-close" onclick="fecharTelegram()">×</button>
     </div>
     <div class="tool-body">
-      <!-- Seletor de data -->
+      <!-- Sub-tabs -->
+      <div class="tg-subtabs">
+        <button class="tg-subtab active" onclick="mudarSubtab('lista',this)">📋 OddLab Lista</button>
+        <button class="tg-subtab" onclick="mudarSubtab('analises',this)">📣 OddLab Análises</button>
+      </div>
+
+      <!-- Seletor de data (compartilhado) -->
       <div class="day-tabs">
         <button class="day-tab" onclick="selDiaTg('hoje',this)">Hoje</button>
         <button class="day-tab" onclick="selDiaTg('amanha',this)">Amanhã</button>
         <button class="day-tab active" onclick="selDiaTg('depois',this)">Depois de amanhã</button>
-        <input class="day-inp" type="date" id="tg-data-agenda" onchange="carregarJogosParaAgendar(this.value)">
+        <input class="day-inp" type="date" id="tg-data-agenda" onchange="carregarDia(this.value)">
       </div>
 
-      <!-- Lista de jogos com inputs de link -->
-      <div id="tg-jobs-list"><div class="loading-state">Selecione uma data para começar.</div></div>
-
-      <!-- Botões de ação -->
-      <div class="tg-actions">
-        <button class="btn" id="btn-salvar" onclick="salvarLinks()">💾 Salvar</button>
-        <button class="btn primary" id="btn-agendar" onclick="agendarLinks()">📅 Agendar envio</button>
+      <!-- ── SEÇÃO LISTA ── -->
+      <div class="tg-section active" id="sec-lista">
+        <div id="tg-jobs-list"><div class="loading-state">Selecione uma data para começar.</div></div>
+        <div class="tg-actions">
+          <button class="btn" id="btn-salvar" onclick="salvarLinks()">💾 Salvar</button>
+          <button class="btn primary" id="btn-agendar" onclick="agendarLinks()">📅 Agendar envio</button>
+        </div>
+        <div class="tg-status-box" id="tg-status"></div>
       </div>
 
-      <!-- Status do agendo -->
-      <div class="tg-status-box" id="tg-status"></div>
+      <!-- ── SEÇÃO ANÁLISES ── -->
+      <div class="tg-section" id="sec-analises">
+        <div id="tg-analises-list"><div class="loading-state">Selecione uma data para começar.</div></div>
+        <div class="tg-actions">
+          <button class="btn primary" id="btn-agendar-analises" onclick="agendarAnalises()">📣 Agendar Análises</button>
+        </div>
+        <div class="tg-status-box" id="tg-status-analises"></div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
 const BACKEND_URL = 'https://apostas-app.onrender.com';
+const BASE_AFILIADO = 'https://go.aff.estrelabetpartners.com/j2um212c?utm_campaign=aposta_lista&aposta=';
 
-let _agendoAtual = null;
-let _dataAtualTg = '';
+let _agendoAtual  = null;
+let _dataAtualTg  = '';
+let _subtabAtiva  = 'lista';
+let _apostasCache = [];
 
 function hoje(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function offset(base,n){ const d=new Date(base+'T12:00:00'); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+// ── abertura/fechamento ────────────────────────────────────────────────────
 
 function toggleTelegram(){
   const panel = document.getElementById('tool-tg');
@@ -200,10 +233,9 @@ function toggleTelegram(){
   panel.classList.add('open');
   document.getElementById('card-tg').classList.add('selected');
   document.getElementById('tg-card-label').textContent = '→ fechar ferramenta';
-  // Padrão: depois de amanhã (dia seguinte ao amanhã já gerado)
   const d = offset(hoje(), 2);
   document.getElementById('tg-data-agenda').value = d;
-  carregarJogosParaAgendar(d);
+  carregarDia(d);
 }
 
 function fecharTelegram(){
@@ -212,184 +244,257 @@ function fecharTelegram(){
   document.getElementById('tg-card-label').textContent = '→ abrir ferramenta';
 }
 
-function selDiaTg(periodo, btn){
-  document.querySelectorAll('.day-tab').forEach(b=>b.classList.remove('active'));
+// ── sub-tabs ───────────────────────────────────────────────────────────────
+
+function mudarSubtab(nome, btn){
+  _subtabAtiva = nome;
+  document.querySelectorAll('.tg-subtab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  const base = hoje();
-  const d = periodo === 'hoje' ? base : periodo === 'amanha' ? offset(base, 1) : offset(base, 2);
-  document.getElementById('tg-data-agenda').value = d;
-  carregarJogosParaAgendar(d);
+  document.querySelectorAll('.tg-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-' + nome).classList.add('active');
+  if(_dataAtualTg) carregarDia(_dataAtualTg);
 }
 
-async function carregarJogosParaAgendar(data){
+// ── seletor de data ────────────────────────────────────────────────────────
+
+function selDiaTg(periodo, btn){
+  document.querySelectorAll('.day-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const base = hoje();
+  const d = periodo==='hoje' ? base : periodo==='amanha' ? offset(base,1) : offset(base,2);
+  document.getElementById('tg-data-agenda').value = d;
+  carregarDia(d);
+}
+
+function carregarDia(data){
   if(!data) return;
   _dataAtualTg = data;
-  document.getElementById('tg-jobs-list').innerHTML = '<div class="loading-state">Carregando...</div>';
-  atualizarBotoes(null);
+  if(_subtabAtiva === 'lista') carregarLista(data);
+  else carregarAnalises(data);
+}
 
+// ══════════════════════════════════════════════════════════════════════════
+// LISTA
+// ══════════════════════════════════════════════════════════════════════════
+
+async function carregarLista(data){
+  document.getElementById('tg-jobs-list').innerHTML = '<div class="loading-state">Carregando...</div>';
+  atualizarBotoesLista(null);
   try{
     const r = await fetch(`${BACKEND_URL}/api/telegram/lista/${data}`);
     const d = await r.json();
     if(d.error) throw new Error(d.error);
-
-    _agendoAtual = d.agendo_id ? { id: d.agendo_id, status: d.status, enviado_em: d.enviado_em, jogos: d.jogos } : null;
-
-    renderJogosParaAgendar(d.apostas, d.jogos);
-    mostrarStatusAgendo(_agendoAtual, d.enviado_em);
-    atualizarBotoes(_agendoAtual);
+    _apostasCache = d.apostas || [];
+    _agendoAtual  = d.agendo_id ? { id: d.agendo_id, status: d.status, enviado_em: d.enviado_em, jogos: d.jogos } : null;
+    renderLista(d.apostas, d.jogos);
+    mostrarStatus('tg-status', _agendoAtual, d.enviado_em, '8h');
+    atualizarBotoesLista(_agendoAtual);
   }catch(e){
     document.getElementById('tg-jobs-list').innerHTML = `<div class="empty-state">Erro: ${e.message}</div>`;
   }
 }
 
-function renderJogosParaAgendar(apostas, jogosAgendados){
-  if(!apostas || !apostas.length){
+function renderLista(apostas, jogosAgendados){
+  if(!apostas?.length){
     document.getElementById('tg-jobs-list').innerHTML =
-      '<div class="empty-state">Sem apostas geradas para esta data.<br><small>A rotina das 3h30 precisa ter rodado.</small></div>';
+      '<div class="empty-state">Sem apostas para esta data.<br><small>A rotina das 3h30 precisa ter rodado.</small></div>';
     return;
   }
-
-  const html = apostas.map(aposta => {
-    const BASE_AFILIADO = 'https://go.aff.estrelabetpartners.com/j2um212c?utm_campaign=aposta_lista&aposta=';
-    const linkSalvo = (jogosAgendados || []).find(j => j.jogo_id === aposta.id)?.link_afiliado || '';
-    const linkAnterior = linkSalvo || BASE_AFILIADO;
-    const odd = aposta.odd_mercado || aposta.odd_sugerida || '-';
+  const html = apostas.map(a => {
+    const linkSalvo = (jogosAgendados||[]).find(j=>j.jogo_id===a.id)?.link_afiliado || '';
+    const link = linkSalvo || BASE_AFILIADO;
+    const odd  = a.odd_mercado || a.odd_sugerida || '-';
     return `<div class="tg-item">
-      <div class="tg-teams">${aposta.time_casa} × ${aposta.time_fora}</div>
-      <div class="tg-bet">${aposta.aposta} @ ${odd}</div>
-      <div class="tg-meta">${aposta.liga || ''} · ${aposta.horario || '--:--'}</div>
-      <input
-        type="url"
-        class="tg-link-input"
-        data-jogo-id="${aposta.id}"
-        data-time-casa="${aposta.time_casa}"
-        data-time-fora="${aposta.time_fora}"
-        data-aposta="${aposta.aposta}"
-        data-odd="${odd}"
-        data-horario="${aposta.horario || ''}"
-        placeholder="Cole o código da aposta ao final da URL"
-        value="${linkAnterior}"
-      >
+      <div class="tg-teams">${a.time_casa} × ${a.time_fora}</div>
+      <div class="tg-bet">${a.aposta} @ ${odd}</div>
+      <div class="tg-meta">${a.liga||''} · ${a.horario||'--:--'}</div>
+      <input type="url" class="tg-link-input"
+        data-jogo-id="${a.id}" data-time-casa="${a.time_casa}" data-time-fora="${a.time_fora}"
+        data-aposta="${a.aposta}" data-odd="${odd}" data-horario="${a.horario||''}"
+        placeholder="Cole o código da aposta ao final da URL" value="${link}">
     </div>`;
   }).join('');
-
   document.getElementById('tg-jobs-list').innerHTML = html;
 }
 
-function mostrarStatusAgendo(agendo, enviadoEm){
-  const el = document.getElementById('tg-status');
-  if(!agendo){ el.style.display='none'; el.className='tg-status-box'; return; }
-
-  if(enviadoEm){
-    el.className = 'tg-status-box enviado';
-    el.style.display = 'block';
-    el.textContent = `✅ Mensagem já enviada ao Telegram em ${new Date(enviadoEm).toLocaleString('pt-BR')}.`;
-    return;
-  }
-
-  if(agendo.status === 'agendado'){
-    el.className = 'tg-status-box agendado';
-    el.style.display = 'block';
-    el.innerHTML = '🔒 <b>Agendado!</b> Será enviado às 8h. Links não podem mais ser editados pela UI.';
-    return;
-  }
-
-  el.className = 'tg-status-box salvo';
-  el.style.display = 'block';
-  el.textContent = '💾 Salvo. Você pode editar os links e salvar novamente ou confirmar o agendamento.';
-}
-
-function atualizarBotoes(agendo){
-  const btnSalvar  = document.getElementById('btn-salvar');
-  const btnAgendar = document.getElementById('btn-agendar');
-  const bloqueado  = agendo?.status === 'agendado' || !!agendo?.enviado_em;
-
-  btnSalvar.disabled  = bloqueado;
-  btnAgendar.disabled = bloqueado;
-
-  if(agendo?.status === 'agendado'){
-    btnAgendar.textContent = '✅ Já agendado';
-  } else {
-    btnAgendar.textContent = '📅 Agendar envio';
-  }
-}
-
-function coletarJogos(){
-  const inputs = document.querySelectorAll('.tg-link-input');
-  return Array.from(inputs).map(inp => ({
-    jogo_id:       inp.dataset.jogoId,
-    time_casa:     inp.dataset.timeCasa,
-    time_fora:     inp.dataset.timeFora,
-    aposta:        inp.dataset.aposta,
-    odd:           inp.dataset.odd,
-    horario:       inp.dataset.horario,
-    link_afiliado: inp.value.trim(),
-  }));
+function atualizarBotoesLista(agendo){
+  const bloqueado = agendo?.status==='agendado' || !!agendo?.enviado_em;
+  document.getElementById('btn-salvar').disabled  = bloqueado;
+  document.getElementById('btn-agendar').disabled = bloqueado;
+  document.getElementById('btn-agendar').textContent = agendo?.status==='agendado' ? '✅ Já agendado' : '📅 Agendar envio';
 }
 
 async function salvarLinks(){
-  const jogos = coletarJogos();
-  if(!jogos.length){ alert('Sem jogos para salvar.'); return; }
-
-  const btnSalvar = document.getElementById('btn-salvar');
-  btnSalvar.disabled = true;
-  btnSalvar.textContent = 'Salvando...';
-
+  const inputs = document.querySelectorAll('#sec-lista .tg-link-input');
+  const jogos  = Array.from(inputs).map(i=>({
+    jogo_id: i.dataset.jogoId, time_casa: i.dataset.timeCasa, time_fora: i.dataset.timeFora,
+    aposta: i.dataset.aposta, odd: i.dataset.odd, horario: i.dataset.horario, link_afiliado: i.value.trim(),
+  }));
+  if(!jogos.length){ alert('Sem jogos.'); return; }
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
   try{
-    const r = await fetch(`${BACKEND_URL}/api/telegram/salvar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: _dataAtualTg, jogos }),
-    });
+    const r = await fetch(`${BACKEND_URL}/api/telegram/lista/salvar`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({data:_dataAtualTg,jogos}) });
     const d = await r.json();
-    if(!r.ok) throw new Error(d.error || r.statusText);
-
-    alert('✅ Salvo! Edite os links quando quiser ou clique em "Agendar envio".');
-    await carregarJogosParaAgendar(_dataAtualTg);
+    if(!r.ok) throw new Error(d.error||r.statusText);
+    alert('✅ Salvo!');
+    await carregarLista(_dataAtualTg);
   }catch(e){
-    alert('❌ Erro ao salvar: ' + e.message);
-    btnSalvar.disabled = false;
-    btnSalvar.textContent = '💾 Salvar';
+    alert('❌ '+e.message);
+    btn.disabled=false; btn.textContent='💾 Salvar';
   }
 }
 
 async function agendarLinks(){
-  if(!_agendoAtual){
-    alert('⚠️ Salve os jogos primeiro antes de agendar!');
-    return;
+  if(!_agendoAtual){ alert('⚠️ Salve primeiro!'); return; }
+  if(_agendoAtual.status==='agendado'){ alert('⚠️ Já agendado!'); return; }
+  if(!confirm('⚠️ Confirmar?\nA lista vai para o Telegram às 8h do dia '+_dataAtualTg+'.\nNÃO pode ser desfeito pela UI.')) return;
+  const btn = document.getElementById('btn-agendar');
+  btn.disabled=true; btn.textContent='Agendando...';
+  try{
+    const r = await fetch(`${BACKEND_URL}/api/telegram/lista/agendar`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agendo_id:_agendoAtual.id}) });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error||r.statusText);
+    alert('✅ Agendado para '+_dataAtualTg+' às 8h!');
+    await carregarLista(_dataAtualTg);
+  }catch(e){
+    alert('❌ '+e.message);
+    btn.disabled=false; btn.textContent='📅 Agendar envio';
   }
-  if(_agendoAtual.status === 'agendado'){
-    alert('⚠️ Já está agendado!');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ANÁLISES
+// ══════════════════════════════════════════════════════════════════════════
+
+async function carregarAnalises(data){
+  document.getElementById('tg-analises-list').innerHTML = '<div class="loading-state">Carregando...</div>';
+  document.getElementById('btn-agendar-analises').disabled = false;
+  try{
+    const r = await fetch(`${BACKEND_URL}/api/telegram/analises/${data}`);
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    _apostasCache = d.apostas || [];
+    renderAnalises(d.apostas, d.analises || []);
+    mostrarStatusAnalises(d.analises || []);
+  }catch(e){
+    document.getElementById('tg-analises-list').innerHTML = `<div class="empty-state">Erro: ${e.message}</div>`;
+  }
+}
+
+function renderAnalises(apostas, analisesExistentes){
+  if(!apostas?.length){
+    document.getElementById('tg-analises-list').innerHTML =
+      '<div class="empty-state">Sem apostas para esta data.<br><small>A rotina das 3h30 precisa ter rodado.</small></div>';
     return;
   }
 
-  const ok = confirm(
-    '⚠️ Confirmar agendamento?\n\n' +
-    'A lista será enviada para o Telegram às 8h do dia ' + _dataAtualTg + '.\n\n' +
-    'Esta ação NÃO pode ser desfeita pela interface.\n' +
-    'Para cancelar, será necessário acessar o banco de dados.'
-  );
-  if(!ok) return;
+  const html = apostas.map(a => {
+    const existente = analisesExistentes.find(x => x.jogo_id === a.id);
+    const horarioEnvio = existente?.horario_envio?.slice(0,5) || '';
+    const status = existente?.status || '';
+    const enviado = status === 'enviado';
+    const odd = a.odd_mercado || a.odd_sugerida || '-';
 
-  const btnAgendar = document.getElementById('btn-agendar');
-  btnAgendar.disabled = true;
-  btnAgendar.textContent = 'Agendando...';
+    // horario do jogo - 2h como sugestão padrão
+    let sugestao = '';
+    if(a.horario && !horarioEnvio){
+      const [h,m] = a.horario.split(':').map(Number);
+      const sugeH = h - 2; if(sugeH >= 12) sugestao = `${String(sugeH).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+
+    const valorTime = horarioEnvio || sugestao;
+    const badge = enviado ? '<span style="font-size:10px;font-weight:700;color:#0F766E;background:#F0FDF9;border:1px solid #6EE7B7;border-radius:20px;padding:1px 8px;">Enviado</span>' : '';
+
+    return `<div class="tg-item">
+      <div class="tg-item-row">
+        <div class="tg-info">
+          <div class="tg-teams">${a.time_casa} × ${a.time_fora} ${badge}</div>
+          <div class="tg-bet">${a.aposta} @ ${odd}</div>
+          <div class="tg-meta">Jogo: ${a.horario||'--:--'}</div>
+        </div>
+        <div class="tg-time-wrap">
+          <span class="tg-time-label">Enviar às</span>
+          <input type="time" class="tg-time-input analise-time"
+            data-jogo-id="${a.id}" data-time-casa="${a.time_casa}" data-time-fora="${a.time_fora}"
+            data-aposta="${a.aposta}" data-odd="${odd}" data-horario="${a.horario||''}"
+            data-analise-id="${existente?.id||''}"
+            value="${valorTime}" ${enviado?'disabled':''}>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('tg-analises-list').innerHTML = html;
+}
+
+function mostrarStatusAnalises(analises){
+  const el = document.getElementById('tg-status-analises');
+  if(!analises.length){ el.style.display='none'; return; }
+  const pendentes = analises.filter(a=>a.status==='pendente').length;
+  const enviados  = analises.filter(a=>a.status==='enviado').length;
+  el.className = 'tg-status-box salvo';
+  el.style.display = 'block';
+  el.textContent = `📣 ${analises.length} jogo(s) agendados — ${enviados} enviado(s), ${pendentes} pendente(s).`;
+}
+
+async function agendarAnalises(){
+  const inputs = document.querySelectorAll('.analise-time:not(:disabled)');
+  if(!inputs.length){ alert('Sem jogos para agendar.'); return; }
+
+  // Pegar links da aba Lista (se existir agendo salvo) ou direto dos inputs
+  const linksLista = _agendoAtual?.jogos || [];
+
+  const jogos = Array.from(inputs)
+    .filter(i => i.value)
+    .map(i => {
+      const linkSalvo = linksLista.find(l=>l.jogo_id==i.dataset.jogoId)?.link_afiliado || BASE_AFILIADO;
+      return {
+        jogo_id:      Number(i.dataset.jogoId),
+        time_casa:    i.dataset.timeCasa,
+        time_fora:    i.dataset.timeFora,
+        aposta:       i.dataset.aposta,
+        odd:          i.dataset.odd,
+        horario:      i.dataset.horario,
+        link_afiliado: linkSalvo,
+        horario_envio: i.value + ':00',
+      };
+    });
+
+  if(!jogos.length){ alert('⚠️ Defina o horário de envio para pelo menos um jogo.'); return; }
+
+  const btn = document.getElementById('btn-agendar-analises');
+  btn.disabled = true; btn.textContent = 'Agendando...';
 
   try{
-    const r = await fetch(`${BACKEND_URL}/api/telegram/agendar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agendo_id: _agendoAtual.id }),
-    });
+    const r = await fetch(`${BACKEND_URL}/api/telegram/analises/agendar`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({data:_dataAtualTg,jogos}) });
     const d = await r.json();
-    if(!r.ok) throw new Error(d.error || r.statusText);
-
-    alert('✅ Agendado! Será enviado às 8h do dia ' + _dataAtualTg + '.');
-    await carregarJogosParaAgendar(_dataAtualTg);
+    if(!r.ok) throw new Error(d.error||r.statusText);
+    alert(`✅ ${jogos.length} análise(s) agendada(s)! Serão enviadas nos horários definidos.`);
+    await carregarAnalises(_dataAtualTg);
   }catch(e){
-    alert('❌ Erro ao agendar: ' + e.message);
-    btnAgendar.disabled = false;
-    btnAgendar.textContent = '📅 Agendar envio';
+    alert('❌ '+e.message);
+    btn.disabled=false; btn.textContent='📣 Agendar Análises';
+  }
+}
+
+// ── status genérico ────────────────────────────────────────────────────────
+
+function mostrarStatus(elId, agendo, enviadoEm, hora){
+  const el = document.getElementById(elId);
+  if(!agendo){ el.style.display='none'; el.className='tg-status-box'; return; }
+  if(enviadoEm){
+    el.className='tg-status-box enviado'; el.style.display='block';
+    el.textContent=`✅ Enviado em ${new Date(enviadoEm).toLocaleString('pt-BR')}.`;
+  } else if(agendo.status==='agendado'){
+    el.className='tg-status-box agendado'; el.style.display='block';
+    el.innerHTML=`🔒 <b>Agendado!</b> Será enviado às ${hora}. Edição bloqueada pela UI.`;
+  } else {
+    el.className='tg-status-box salvo'; el.style.display='block';
+    el.textContent='💾 Salvo. Edite quando quiser ou confirme o agendamento.';
   }
 }
 </script>
