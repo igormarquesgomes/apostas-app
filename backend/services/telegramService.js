@@ -156,7 +156,7 @@ async function buscarResultados(data) {
  * 06h BRT — edita a mensagem de ontem com resultados ✅/❌
  */
 async function editarMensagemListaAnterior() {
-  if (!TELEGRAM_BOT_TOKEN) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente'); return; }
+  if (!BOT_TOKEN_LISTA) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente'); return; }
 
   const data = dataOntem();
   const rows = await supaFetch(`agendos_telegram?data_envio=eq.${data}&status=eq.agendado&select=*`);
@@ -189,7 +189,7 @@ async function editarMensagemListaAnterior() {
  * 08h BRT — envia a lista consolidada de hoje
  */
 async function enviarListaDeDia() {
-  if (!TELEGRAM_BOT_TOKEN) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente'); return; }
+  if (!BOT_TOKEN_LISTA) { console.log('⚠️ TELEGRAM_BOT_TOKEN ausente'); return; }
 
   const data = dataHoje();
   const rows = await supaFetch(`agendos_telegram?data_envio=eq.${data}&status=eq.agendado&select=*`);
@@ -229,7 +229,7 @@ async function enviarListaDeDia() {
  * A cada minuto (12h-23h BRT) — envia mensagens individuais cujo horario_envio já passou
  */
 async function enviarMensagensAnalisesAgendasPremium() {
-  if (!TELEGRAM_BOT_TOKEN) return;
+  if (!BOT_TOKEN_LISTA) return;
 
   const data = dataHoje();
   const horaAgora = horaBRT(); // HH:MM
@@ -277,7 +277,7 @@ async function enviarMensagensAnalisesAgendasPremium() {
  * 06h BRT — responde às mensagens de ontem com ✅✅✅ ou ❌❌❌
  */
 async function responderValidacoesAnalises() {
-  if (!TELEGRAM_BOT_TOKEN) return;
+  if (!BOT_TOKEN_LISTA) return;
 
   const data = dataOntem();
   const rows = await supaFetch(
