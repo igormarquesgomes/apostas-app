@@ -6,13 +6,14 @@
  *   OddLab Análises → TELEGRAM_CHAT_ID_ANALISES — mensagens individuais 12h-23h + reply 06h
  */
 
-const TELEGRAM_BOT_TOKEN     = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID_LISTA          = process.env.TELEGRAM_CHAT_ID_LISTA   || process.env.TELEGRAM_CHAT_ID;
-const CHAT_ID_ANALISES       = process.env.TELEGRAM_CHAT_ID_ANALISES || process.env.TELEGRAM_CHAT_ID;
+// Suporte a dois bots com nomes diferentes (um por grupo)
+// Se só tiver um token, os dois grupos usam o mesmo bot
+const BOT_TOKEN_LISTA     = process.env.TELEGRAM_BOT_TOKEN_LISTA    || process.env.TELEGRAM_BOT_TOKEN;
+const BOT_TOKEN_ANALISES  = process.env.TELEGRAM_BOT_TOKEN_ANALISES || process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID_LISTA       = process.env.TELEGRAM_CHAT_ID_LISTA      || process.env.TELEGRAM_CHAT_ID;
+const CHAT_ID_ANALISES    = process.env.TELEGRAM_CHAT_ID_ANALISES   || process.env.TELEGRAM_CHAT_ID;
 const SUPABASE_URL           = process.env.SUPABASE_URL;
 const SUPABASE_KEY           = process.env.SUPABASE_KEY;
-
-const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -56,8 +57,8 @@ async function supaFetch(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function tgCall(method, body) {
-  const res = await fetch(`${TELEGRAM_API}/${method}`, {
+async function tgCall(token, method, body) {
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -173,7 +174,7 @@ async function editarMensagemListaAnterior() {
   });
 
   const texto = formatarRelatorioLista(data, jogosComRes);
-  await tgCall('editMessageText', {
+  await tgCall(BOT_TOKEN_LISTA, 'editMessageText', {
     chat_id: agendo.chat_id || CHAT_ID_LISTA,
     message_id: agendo.message_id,
     text: texto,
@@ -200,7 +201,7 @@ async function enviarListaDeDia() {
   const texto = formatarListaDia(data, agendo.jogos);
   const chatId = agendo.chat_id || CHAT_ID_LISTA;
 
-  const msg = await tgCall('sendMessage', {
+  const msg = await tgCall(BOT_TOKEN_LISTA, 'sendMessage', {
     chat_id: chatId,
     text: texto,
     parse_mode: 'HTML',
@@ -247,7 +248,7 @@ async function enviarMensagensAnalisesAgendasPremium() {
       const texto = formatarMensagemAnalise(agendo.jogo);
       const chatId = agendo.chat_id || CHAT_ID_ANALISES;
 
-      const msg = await tgCall('sendMessage', {
+      const msg = await tgCall(BOT_TOKEN_ANALISES, 'sendMessage', {
         chat_id: chatId,
         text: texto,
         parse_mode: 'HTML',
@@ -300,7 +301,7 @@ async function responderValidacoesAnalises() {
     const chatId = agendo.chat_id || CHAT_ID_ANALISES;
 
     try {
-      await tgCall('sendMessage', {
+      await tgCall(BOT_TOKEN_ANALISES, 'sendMessage', {
         chat_id: chatId,
         text: reply,
         reply_to_message_id: agendo.message_id,
