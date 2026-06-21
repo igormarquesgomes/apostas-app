@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="version" content="202606040949">
+<title>OddLab</title>
+<meta name="application-name" content="OddLab">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="OddLab">
+<meta name="theme-color" content="#FAF7F2">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="oddlab-manifest.json">
+<link rel="apple-touch-icon" href="oddlab-icon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #F0EDEA; min-height: 100vh; display: flex; justify-content: center; }
+  .app { background: #FAF7F2; width: 100%; max-width: 430px; min-height: 100vh; display: flex; flex-direction: column; }
+
+  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 28px; background: #FAF7F2; }
+  .logo-big { font-size: 30px; font-weight: 700; letter-spacing: -0.8px; color: #1E293B; text-align: center; }
+  .logo-big span { color: #0F766E; font-weight: 300; }
+  .welcome-sub { font-size: 13px; color: #94A3B8; text-align: center; line-height: 1.7; }
+  .welcome-input { width: 100%; padding: 13px 16px; border: 1px solid #D1D5DB; border-radius: 12px; font-size: 15px; background: #fff; color: #1E293B; outline: none; font-family: 'Inter', sans-serif; }
+  .welcome-input:focus { border-color: #0F766E; }
+  .welcome-input::placeholder { color: #CBD5E1; }
+  .btn-entrar { width: 100%; padding: 13px; background: #0F766E; color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
+  .btn-entrar:active { opacity: 0.9; }
+
+  .header { padding: 24px 20px 20px; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .logo-sm { display: flex; align-items: center; gap: 8px; }
+  .logo-sm-name { font-size: 16px; font-weight: 700; letter-spacing: -0.4px; color: #1E293B; }
+  .logo-sm-name span { color: #0F766E; font-weight: 300; }
+  .live-dot { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #94A3B8; }
+  .live-dot-circle { width: 5px; height: 5px; border-radius: 50%; background: #0F766E; opacity: 0.6; }
+  .pre-label { font-size: 11px; color: #94A3B8; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
+  .greeting { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; color: #1E293B; line-height: 1.1; }
+  .greeting-nome { color: #0F766E; font-weight: 300; }
+  .dateline { font-size: 13px; font-weight: 300; color: #94A3B8; margin-top: 8px; }
+  .rule { height: 1px; background: #E2E8F0; margin: 16px 0; }
+
+  .day-sel { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
+  .day-btn { flex: 1; padding: 7px 4px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 12px; color: #94A3B8; background: transparent; cursor: pointer; text-align: center; font-family: 'Inter', sans-serif; }
+  .day-btn.active { background: #0F766E; color: #fff; border-color: #0F766E; font-weight: 600; }
+
+  .tabs { display: flex; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
+  .tab { flex: 1; padding: 11px; text-align: center; font-size: 13px; color: #94A3B8; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: #0F766E; border-bottom-color: #0F766E; font-weight: 600; }
+
+  .subtabs { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #E2E8F0; background: #FAF7F2; }
+  .subtab { font-size: 11px; padding: 4px 14px; border-radius: 20px; border: 1px solid #D1D5DB; color: #94A3B8; cursor: pointer; background: transparent; font-family: 'Inter', sans-serif; }
+  .subtab.active { background: #0F766E; color: #fff; border-color: #0F766E; font-weight: 500; }
+
+  .content { flex: 1; overflow-y: auto; background: #FAF7F2; }
+  .section { padding: 14px 16px; }
+  .section-title { font-size: 9px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+  .card { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #E2E8F0; border-left-width: 3px; }
+  .card.gc { border-left-color: #0F766E; }
+  .card.rc { border-left-color: #E11D48; }
+  .card.pc { border-left-color: #E2E8F0; }
+  .card.ac { border-left-color: #CBD5E1; }
+  .jogo-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 8px; }
+  .jogo-nome { font-size: 12px; font-weight: 600; color: #1E293B; flex: 1; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+  .b-green { color: #0F766E; background: #CCFBF1; }
+  .b-red { color: #BE123C; background: #FFE4E6; opacity: 0.85; }
+  .b-pending { color: #94A3B8; background: #F1F5F9; }
+  .b-amanha { color: #94A3B8; background: #F8FAFC; border: 1px solid #E2E8F0; }
+  .jogo-aposta { font-size: 11px; color: #64748B; }
+  .jogo-meta { font-size: 10px; color: #94A3B8; margin-top: 3px; }
+
+  .mult-card { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #E2E8F0; }
+  .mult-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .mult-title { font-size: 12px; font-weight: 600; color: #1E293B; }
+  .mult-odd { font-size: 15px; font-weight: 700; }
+  .mult-odd.green { color: #0F766E; }
+  .mult-odd.red { color: #BE123C; opacity: 0.8; }
+  .mult-odd.pending { color: #94A3B8; }
+  .mult-jogo { font-size: 11px; color: #64748B; padding: 5px 0; border-bottom: 1px solid #F1F5F9; display: flex; justify-content: space-between; gap: 8px; }
+  .mult-jogo:last-child { border-bottom: none; padding-bottom: 0; }
+  .mj-nome { flex: 1; }
+  .mj-badge { font-size: 9px; padding: 1px 5px; border-radius: 5px; }
+  .mj-badge.g { color: #0F766E; background: #CCFBF1; }
+  .mj-badge.r { color: #BE123C; background: #FFE4E6; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat { background: #fff; border-radius: 12px; padding: 12px 8px; text-align: center; border: 1px solid #E2E8F0; }
+  .stat.hl { border-color: #99F6E4; background: #F0FDFA; }
+  .stat-val { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .stat-lbl { font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: .8px; margin-top: 4px; }
+  .bar-wrap { margin-bottom: 16px; }
+  .bar-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .bar-title { font-size: 9px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; }
+  .bar-pct { font-size: 18px; font-weight: 800; color: #0F766E; letter-spacing: -0.5px; }
+  .bar-pct span { font-size: 12px; font-weight: 300; color: #94A3B8; }
+  .bar-bg { height: 4px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 4px; background: #0F766E; border-radius: 4px; }
+  .bar-sub { display: flex; justify-content: space-between; margin-top: 6px; }
+
+  .rel-card { background: #fff; border-radius: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; margin-bottom: 10px; }
+  .rel-title { font-size: 11px; font-weight: 600; color: #1E293B; margin-bottom: 10px; }
+  .rel-item { font-size: 11px; color: #64748B; padding: 6px 0; border-bottom: 1px solid #F1F5F9; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+  .rel-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .dot-green { background: #0F766E; }
+  .dot-amber { background: #D97706; }
+
+  .nav { display: flex; border-top: 1px solid #E2E8F0; padding: 10px 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #FAF7F2; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #94A3B8; cursor: pointer; padding: 4px 0; }
+  .nav-item.active { color: #0F766E; }
+  .nav-icon { font-size: 20px; }
+  .empty { text-align: center; padding: 40px 20px; color: #94A3B8; font-size: 13px; }
+  .loading { text-align: center; padding: 30px; color: #CBD5E1; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Tela de boas-vindas -->
+  <div id="v-welcome" style="display:flex;flex-direction:column;flex:1;">
+    <div class="welcome">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 44 44" fill="none" style="display:block;margin:0 auto 12px">
+          <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="1.2"/>
+          <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.2"/>
+          <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#0F766E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="34" cy="17.5" r="2.2" fill="#0F766E"/>
+          <circle cx="34" cy="17.5" r="4" stroke="#0F766E" stroke-width="0.5" opacity="0.2"/>
+        </svg>
+        <div class="logo-big">Odd<span>Lab</span></div>
+      </div>
+      <div class="welcome-sub">análise de apostas esportivas<br>para te ajudar a apostar melhor</div>
+      <div style="width:100%;display:flex;flex-direction:column;gap:12px;">
+        <input class="welcome-input" type="text" id="inp-nome" placeholder="qual é o seu nome?" maxlength="30" />
+        <button class="btn-entrar" onclick="entrar()">entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App principal -->
+  <div id="v-app" style="display:none;flex-direction:column;flex:1;">
+    <div class="header">
+      <div class="header-top">
+        <div class="logo-sm">
+          <svg width="26" height="26" viewBox="0 0 44 44" fill="none">
+            <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="1.2"/>
+            <circle cx="22" cy="22" r="20.5" stroke="#0F766E" stroke-width="0.8" stroke-dasharray="1.5 6" opacity="0.2"/>
+            <path d="M10 28 L15.5 21.5 L19.5 24.5 L25.5 16 L34 17.5" stroke="#0F766E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="34" cy="17.5" r="2.2" fill="#0F766E"/>
+          </svg>
+          <div class="logo-sm-name">Odd<span>Lab</span></div>
+        </div>
+        <div class="live-dot"><div class="live-dot-circle"></div>ao vivo</div>
+      </div>
+      <div class="pre-label">bem-vindo de volta</div>
+      <div class="greeting" id="greeting">olá!</div>
+      <div class="dateline" id="dateline"></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('apostas')">apostas</div>
+      <div class="tab" onclick="switchTab('relatorio')">relatório</div>
+    </div>
+
+    <!-- Aba apostas -->
+    <div id="tab-apostas" class="content">
+      <div class="day-sel">
+        <button class="day-btn" onclick="switchDay('ontem')">ontem</button>
+        <button class="day-btn active" onclick="switchDay('hoje')">hoje</button>
+        <button class="day-btn" onclick="switchDay('amanha')">amanhã</button>
+      </div>
+      <div class="subtabs">
+        <button class="subtab active" onclick="switchSub('simples')">simples</button>
+        <button class="subtab" onclick="switchSub('multiplas')">múltiplas</button>
+      </div>
+
+      <div id="sub-simples">
+        <div class="section">
+          <div class="section-title" id="day-label">hoje</div>
+          <div id="lista-jogos"><div class="loading">carregando...</div></div>
+        </div>
+      </div>
+
+      <div id="sub-multiplas" style="display:none">
+        <div class="section">
+          <div class="section-title" id="mult-label">múltiplas de hoje</div>
+          <div id="lista-multiplas"><div class="loading">carregando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aba relatório -->
+    <div id="tab-relatorio" class="content" style="display:none">
+      <div class="section">
+        <div id="stats-rel"><div class="loading">carregando...</div></div>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-item active" onclick="switchTab('apostas')" id="nav-apostas">
+        <span class="nav-icon">⚽</span>apostas
+      </div>
+      <div class="nav-item" onclick="switchTab('relatorio')" id="nav-relatorio">
+        <span class="nav-icon">📊</span>relatório
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const B = 'https://apostas-app.onrender.com';
+const DIAS_PT = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+const MESES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+let diaAtivo = 'hoje';
+let subAtivo = 'simples';
+let cacheData = {};
+
+function hojeStr() {
+  const d = new Date();
+  const br = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  return br.toISOString().substring(0, 10);
+}
+function offsetStr(dias) {
+  const d = new Date();
+  const br = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  br.setDate(br.getDate() + dias);
+  return br.toISOString().substring(0, 10);
+}
+function fmtData(str) {
+  const [y,m,d] = str.split('-');
+  return `${d}/${m}`;
+}
+
+// Device ID persistente
+function getDeviceId() {
+  let id = localStorage.getItem('oddlab_device');
+  if (!id) { id = 'dev_' + Math.random().toString(36).substr(2, 12) + Date.now(); localStorage.setItem('oddlab_device', id); }
+  return id;
+}
+
+async function entrar() {
+  const nome = document.getElementById('inp-nome').value.trim();
+  if (!nome) { document.getElementById('inp-nome').focus(); return; }
+  const deviceId = getDeviceId();
+  try {
+    await fetch(`${B}/oddlab/registrar`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome, device_id: deviceId })
+    });
+  } catch(e) {}
+  localStorage.setItem('oddlab_nome', nome);
+  iniciarApp(nome);
+}
+
+async function verificarUsuario() {
+  const deviceId = getDeviceId();
+  const nomeSalvo = localStorage.getItem('oddlab_nome');
+  if (nomeSalvo) {
+    // Atualizar ultimo_acesso em background mesmo com nome salvo
+    fetch(`${B}/oddlab/usuario/${deviceId}`).catch(()=>{});
+    iniciarApp(nomeSalvo);
+    return;
+  }
+  try {
+    const r = await fetch(`${B}/oddlab/usuario/${deviceId}`);
+    const d = await r.json();
+    if (d.ok && d.nome) { localStorage.setItem('oddlab_nome', d.nome); iniciarApp(d.nome); }
+  } catch(e) {}
+}
+
+function iniciarApp(nome) {
+  document.getElementById('v-welcome').style.display = 'none';
+  document.getElementById('v-app').style.display = 'flex';
+
+  document.getElementById('greeting').innerHTML = `olá, <span class="greeting-nome">${nome}</span>`;
+  const hoje = new Date();
+  const br = new Date(hoje.getTime() - 3 * 60 * 60 * 1000);
+  const d = String(br.getDate()).padStart(2,'0');
+  const m = String(br.getMonth()+1).padStart(2,'0');
+  document.getElementById('dateline').textContent = `${d}/${m} · ${DIAS_PT[br.getDay()]}`;
+
+  carregarDia('hoje');
+  carregarRelatorio();
+}
+
+async function carregarDia(dia) {
+  const dataStr = dia === 'hoje' ? hojeStr() : dia === 'ontem' ? offsetStr(-1) : offsetStr(1);
+  // Cache só para dias futuros (amanhã) — ontem/hoje sempre busca fresco pra refletir validações
+  if (dia === 'amanha' && cacheData[dia]) { renderDia(dia, cacheData[dia]); return; }
+  try {
+    const ts = Date.now();
+    const [rAp, rMult] = await Promise.all([
+      fetch(`${B}/apostas-resultado/${dataStr}?t=${ts}`).then(r=>r.json()),
+      fetch(`${B}/multiplas/${dataStr}?t=${ts}`).then(r=>r.json()).catch(()=>null)
+    ]);
+    if (rMult) {
+      rAp.multiplas = rMult.multiplas;
+      rAp.resultados_multiplas = rMult.resultados_multiplas;
+    }
+    cacheData[dia] = rAp;
+    renderDia(dia, rAp);
+  } catch(e) {
+    document.getElementById('lista-jogos').innerHTML = '<div class="empty">erro ao carregar</div>';
+  }
+}
+
+function renderDia(dia, data) {
+  const jogos = data.apostas?.jogos || [];
+  const resultados = data.resultados?.apostas || [];
+  const dataStr = dia === 'hoje' ? hojeStr() : dia === 'ontem' ? offsetStr(-1) : offsetStr(1);
+
+  const labels = { ontem: `ontem — ${fmtData(offsetStr(-1))}`, hoje: `hoje — ${fmtData(hojeStr())}`, amanha: `amanhã — ${fmtData(offsetStr(1))}` };
+  const mlabels = { ontem: `múltiplas de ontem`, hoje: `múltiplas de hoje`, amanha: `múltiplas de amanhã` };
+  document.getElementById('day-label').textContent = labels[dia];
+  document.getElementById('mult-label').textContent = mlabels[dia];
+
+  if (!jogos.length) {
+    document.getElementById('lista-jogos').innerHTML = `<div class="empty">sem apostas para ${labels[dia].split('—')[0].trim()}</div>`;
+  } else {
+    // Ordenar por horário — só no público
+    const jogosOrdenados = [...jogos].sort((a, b) => (a.horario || '00:00').localeCompare(b.horario || '00:00'));
+    document.getElementById('lista-jogos').innerHTML = jogosOrdenados.map(j => {
+      const res = resultados.find(r => r.jogo_id === j.id);
+      const rv = res?.resultado_aposta || 'pendente';
+      const placar = res?.placar ? ` · ${res.placar}` : '';
+      let badgeHtml = '', cardCls = 'pc';
+      if (rv === 'green') { badgeHtml = `<span class="badge b-green">✓ green${placar}</span>`; cardCls = 'gc'; }
+      else if (rv === 'red') { badgeHtml = `<span class="badge b-red">✗ red${placar}</span>`; cardCls = 'rc'; }
+      else if (rv === 'cancelado') { badgeHtml = `<span class="badge" style="color:#92400E;background:#FEF3C7">↩ reembolso</span>`; cardCls = 'pc'; }
+      else if (dia === 'amanha') { badgeHtml = `<span class="badge b-amanha">${fmtData(dataStr)}</span>`; cardCls = 'ac'; }
+      else badgeHtml = `<span class="badge b-pending">⏳</span>`;
+      const odd = j.odd_mercado || j.odd_sugerida || j.odd;
+      const oddStr = odd && odd > 0 ? `odd ${parseFloat(odd).toFixed(2)}` : '';
+      const conf = j.confianca || '';
+      const confHtml = conf === 'alta'
+        ? `<span style="font-size:9px;font-weight:600;color:#0F766E;background:#CCFBF1;padding:1px 6px;border-radius:4px">alta</span>`
+        : conf === 'media' || conf === 'média'
+        ? `<span style="font-size:9px;font-weight:600;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:4px">média</span>`
+        : conf === 'baixa'
+        ? `<span style="font-size:9px;font-weight:600;color:#9F1239;background:#FFE4E6;padding:1px 6px;border-radius:4px">baixa</span>`
+        : '';
+      return `<div class="card ${cardCls}">
+        <div class="jogo-top"><div class="jogo-nome">${j.time_casa} x ${j.time_fora}</div>${badgeHtml}</div>
+        <div class="jogo-aposta" style="margin-bottom:5px">${j.aposta}</div>
+        ${j.justificativa ? `
+        <div style="margin-bottom:5px">
+          <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.arr').textContent=this.nextElementSibling.style.display==='none'?'▸':'▾'"
+            style="font-size:10px;color:#0F766E;background:none;border:none;cursor:pointer;padding:0;font-family:Inter,sans-serif;display:flex;align-items:center;gap:4px">
+            <span class="arr">▸</span> por que essa aposta?
+          </button>
+          <div style="display:none;font-size:10px;color:#64748B;line-height:1.5;margin-top:5px;padding:6px 8px;background:#F0FDFA;border-radius:6px;border-left:2px solid #99F6E4">${j.justificativa}</div>
+        </div>` : ''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${oddStr ? `<span style="font-size:10px;font-weight:600;color:#0F766E;background:#F0FDFA;padding:1px 7px;border-radius:5px;border:1px solid #99F6E4">${oddStr}</span>` : ''}
+          ${confHtml}
+          <span style="font-size:10px;color:#94A3B8">${j.liga} · ${j.horario}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Múltiplas
+  const mult = data.multiplas;
+  const resM = data.resultados_multiplas;
+  if (!mult?.multipla_a) {
+    document.getElementById('lista-multiplas').innerHTML = '<div class="empty">sem múltiplas para este dia</div>';
+  } else {
+    const renderMult = (m, res, label) => {
+      if (!m) return '';
+      const rv = res?.resultado || 'pendente';
+      const oddCls = rv === 'green' ? 'green' : rv === 'red' ? 'red' : 'pending';
+      const icon = rv === 'green' ? ' ✓' : rv === 'red' ? ' ✗' : ' ⏳';
+      const jogosHtml = (m.jogos || []).map(j => {
+        const jr = res?.jogos_resultado?.find(x => x.time_casa === j.time_casa);
+        const jrv = jr?.resultado || 'pendente';
+        const jbadge = jrv === 'green' ? `<span class="mj-badge b-green">✓</span>` : jrv === 'red' ? `<span class="mj-badge b-red">✗</span>` : jrv === 'cancelado' ? `<span class="mj-badge" style="color:#92400E;background:#FEF3C7">↩</span>` : '';
+        const oddJ = j.odd && j.odd > 0 ? `<span style="font-size:9px;font-weight:600;color:#0F766E;background:#F0FDFA;padding:1px 5px;border-radius:4px;border:1px solid #99F6E4;margin-left:4px">${parseFloat(j.odd).toFixed(2)}</span>` : '';
+        return `<div class="mult-jogo"><span class="mj-nome">${j.time_casa} x ${j.time_fora} · ${j.aposta}${oddJ}</span>${jbadge}</div>`;
+      }).join('');
+      return `<div class="mult-card">
+        <div class="mult-header">
+          <div class="mult-title">${label}</div>
+          <div class="mult-odd ${oddCls}">@${m.odd_total}${icon}</div>
+        </div>
+        ${jogosHtml}
+      </div>`;
+    };
+    document.getElementById('lista-multiplas').innerHTML =
+      renderMult(mult.multipla_a, resM?.multipla_a, 'múltipla A') +
+      renderMult(mult.multipla_b, resM?.multipla_b, 'múltipla B');
+  }
+}
+
+async function carregarRelatorio() {
+  try {
+    // Buscar últimos 7 dias (da segunda-feira até hoje)
+    const hoje_d = new Date();
+    const br_d = new Date(hoje_d.getTime() - 3*60*60*1000);
+    const diaSem = br_d.getDay();
+    const diasDesdeSegunda = diaSem === 0 ? 6 : diaSem - 1;
+    const offsets = Array.from({length: diasDesdeSegunda + 1}, (_,i) => -diasDesdeSegunda + i);
+    const tsRel = Date.now();
+    const promises = offsets.map(i => fetch(`${B}/apostas-resultado/${offsetStr(i)}?t=${tsRel}`).then(r=>r.json()).catch(()=>null));
+    const dias = await Promise.all(promises);
+
+    // Calcular stats da semana
+    let tG=0, tR=0;
+    const statsPorDia = [];
+    for (const dia of dias.filter(Boolean)) {
+      const res = dia.resultados?.apostas || [];
+      const g = res.filter(r=>r.resultado_aposta==='green').length;
+      const r = res.filter(r=>r.resultado_aposta==='red').length;
+      tG += g; tR += r;
+      if (g+r > 0) statsPorDia.push({ g, r, pct: Math.round(g/(g+r)*100) });
+    }
+    const assert = tG+tR > 0 ? Math.round(tG/(tG+tR)*100) : null;
+    const meta = 70;
+    const tendencia = statsPorDia.length >= 2
+      ? statsPorDia[statsPorDia.length-1].pct - statsPorDia[0].pct
+      : 0;
+
+    // Buscar relatório calibração — diário de ontem preferido, semanal como fallback
+    let relTexto = '', tipoRel = '';
+    try {
+      const rSem = await fetch(`${B}/calibracao?t=${Date.now()}`, {cache:'no-store'});
+      const dSem = await rSem.json();
+      if (dSem?.diario?.relatorio) { relTexto = dSem.diario.relatorio; tipoRel = 'diário'; }
+      else if (dSem?.semanal?.relatorio) { relTexto = dSem.semanal.relatorio; tipoRel = 'semanal'; }
+      if (!relTexto) {
+        const rDia = await fetch(`${B}/calibracao/diario/${offsetStr(-1)}?t=${Date.now()}`, {cache:'no-store'});
+        if (rDia.ok) { const dDia = await rDia.json(); if (dDia?.relatorio) { relTexto = dDia.relatorio; tipoRel = 'diário'; } }
+      }
+    } catch(e) {}
+
+    // Extrair seções estruturadas do novo formato de relatório
+    const extrairSecao = (texto, cabecalho) => {
+      if (!texto) return [];
+      const linhas = texto.split('\n');
+      const idx = linhas.findIndex(l => l.toUpperCase().includes(cabecalho.toUpperCase()));
+      if (idx === -1) return [];
+      const resultado = [];
+      for (let i = idx+1; i < linhas.length && resultado.length < 3; i++) {
+        const l = linhas[i].replace(/^[-*•]\s*/, '').replace(/\*\*(.*?)\*\*/g,'$1').trim();
+        // Parar se encontrou outro cabeçalho de seção
+        if (l.match(/^[A-ZÁÉÍÓÚ\s]{4,}:$/) || l.startsWith('---')) break;
+        if (l.length > 15) resultado.push(l);
+      }
+      return resultado;
+    };
+
+    // Limpar texto simples removendo markdown
+    const limpar = t => t
+      .replace(/#{1,4}\s*/g,'')
+      .replace(/\*\*(.*?)\*\*/g,'$1')
+      .replace(/^[-*•]\s*/,'')
+      .trim();
+
+    // Extrair seções do formato estruturado do relatório diário
+    let positivos = extrairSecao(relTexto, 'O QUE FIZ');
+    const padroes  = extrairSecao(relTexto, 'PADRÃO IDENTIFICADO');
+    const instrucoes = extrairSecao(relTexto, 'INSTRUÇÃO PARA AMANHÃ');
+    // "pontos de ajuste" = padrões identificados + instruções para amanhã (sem duplicatas)
+    const ajustes = [...padroes, ...instrucoes].slice(0, 3);
+
+    // Fallback: filtrar por palavras-chave se não achou seções estruturadas
+    if (!positivos.length && !ajustes.length && relTexto) {
+      const linhas = relTexto.split('\n').map(limpar).filter(l => l.length > 20);
+      for (const l of linhas) {
+        const ll = l.toLowerCase();
+        if (ll.includes('green') || ll.includes('acert') || ll.includes('✅') || ll.includes('assertiv')) {
+          if (positivos.length < 3) positivos.push(l);
+        } else if (ll.includes('amanhã') || ll.includes('prioriz') || ll.includes('evitar') || ll.includes('aumentar') || ll.includes('reduzir')) {
+          if (ajustes.length < 3) ajustes.push(l);
+        }
+      }
+    }
+
+    // Montar badge de tendência
+    const tendBadge = tendencia > 5
+      ? `<span style="font-size:10px;color:#0F766E;background:#CCFBF1;padding:2px 8px;border-radius:20px;font-weight:600">↑ em alta</span>`
+      : tendencia < -5
+      ? `<span style="font-size:10px;color:#BE123C;background:#FFE4E6;padding:2px 8px;border-radius:20px;font-weight:600;opacity:.8">↓ em queda</span>`
+      : tG+tR > 0
+      ? `<span style="font-size:10px;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:20px;font-weight:600">→ estável</span>`
+      : '';
+
+    const pct = assert !== null ? assert : 0;
+    const barColor = pct >= meta ? '#0F766E' : pct >= 50 ? '#D97706' : '#BE123C';
+    const barW = Math.min(pct, 100);
+
+    document.getElementById('stats-rel').innerHTML = `
+      <div class="stat-grid">
+        <div class="stat hl">
+          <div class="stat-val" style="color:${barColor};font-size:24px">${assert !== null ? assert+'%' : '--'}</div>
+          <div class="stat-lbl" style="color:#2DD4BF">semana</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" style="color:#0F766E">${tG}</div>
+          <div class="stat-lbl" style="color:#2DD4BF">greens</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" style="color:#BE123C;opacity:0.7">${tR}</div>
+          <div class="stat-lbl" style="color:#FDA4AF;opacity:0.7">reds</div>
+        </div>
+      </div>
+
+      <div class="bar-wrap">
+        <div class="bar-header">
+          <div class="bar-title">assertividade da semana ${tendBadge}</div>
+          <div class="bar-pct" style="color:${barColor}">${assert !== null ? assert : '--'}<span>%</span></div>
+        </div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${barColor}"></div></div>
+        <div class="bar-sub">
+          <span style="color:#0F766E;font-weight:500">${tG} greens</span>
+          <span style="color:#BE123C;opacity:0.7">${tR} reds</span>
+          <span style="color:#94A3B8">meta ${meta}%</span>
+        </div>
+      </div>
+
+      <div class="rule"></div>
+
+      ${positivos.length > 0 ? `
+      <div class="rel-card" style="margin-bottom:10px;border-left:3px solid #0F766E">
+        <div class="rel-title" style="color:#0F766E">pontos positivos de ontem</div>
+        ${positivos.map(l=>`<div class="rel-item"><div class="dot dot-green"></div><div>${l}</div></div>`).join('')}
+      </div>` : ''}
+
+      ${ajustes.length > 0 ? `
+      <div class="rel-card" style="margin-bottom:10px;border-left:3px solid #D97706">
+        <div class="rel-title" style="color:#92400E">pontos de ajuste</div>
+        ${ajustes.map(l=>`<div class="rel-item"><div class="dot dot-amber"></div><div>${l}</div></div>`).join('')}
+      </div>` : ''}
+
+      ${!relTexto ? `
+      <div class="rel-card" style="background:#F0FDFA;border:1px solid #99F6E4">
+        <div class="rel-title" style="color:#0F766E">análise em preparação</div>
+        <div class="rel-item" style="border:none">
+          <div class="dot dot-green"></div>
+          <div>A análise de ontem é gerada automaticamente toda manhã e ficará disponível aqui ao longo do dia.</div>
+        </div>
+      </div>` : ''}
+    `;
+  } catch(e) {
+    document.getElementById('stats-rel').innerHTML = '<div class="empty">erro ao carregar relatório</div>';
+  }
+}
+
+function switchDay(dia) {
+  diaAtivo = dia;
+  document.querySelectorAll('.day-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['ontem','hoje','amanha'][i] === dia);
+  });
+  carregarDia(dia);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0&&tab==='apostas')||(i===1&&tab==='relatorio'));
+  });
+  document.getElementById('tab-apostas').style.display = tab==='apostas' ? 'block' : 'none';
+  document.getElementById('tab-relatorio').style.display = tab==='relatorio' ? 'block' : 'none';
+  document.getElementById('nav-apostas').classList.toggle('active', tab==='apostas');
+  document.getElementById('nav-relatorio').classList.toggle('active', tab==='relatorio');
+}
+
+function switchSub(sub) {
+  subAtivo = sub;
+  document.querySelectorAll('.subtab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0&&sub==='simples')||(i===1&&sub==='multiplas'));
+  });
+  document.getElementById('sub-simples').style.display = sub==='simples' ? 'block' : 'none';
+  document.getElementById('sub-multiplas').style.display = sub==='multiplas' ? 'block' : 'none';
+}
+
+// Registrar Service Worker e forçar atualização automática
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('oddlab-sw.js').then(reg => {
+    // Verificar atualização a cada abertura
+    reg.update();
+    // Quando SW atualizar, recarregar página automaticamente
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated') {
+          window.location.reload();
+        }
+      });
+    });
+  }).catch(()=>{});
+  // Se SW já está esperando (nova versão disponível), ativar imediatamente
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
+// Verificar se precisa recarregar (cache bust diário)
+const hoje_v = new Date().toISOString().substring(0,10);
+const cacheData_v = localStorage.getItem('oddlab_cache_date');
+if (cacheData_v !== hoje_v) {
+  localStorage.setItem('oddlab_cache_date', hoje_v);
+  // Limpar cache de dados do dia anterior
+  Object.keys(localStorage).filter(k => k.startsWith('oddlab_') && k !== 'oddlab_nome' && k !== 'oddlab_device' && k !== 'oddlab_cache_date').forEach(k => localStorage.removeItem(k));
+  // Se não é primeiro acesso, forçar reload sem cache
+  if (cacheData_v) {
+    window.location.reload(true);
+  }
+}
+
+// Iniciar
+verificarUsuario();
+</script>
+</body>
+</html>

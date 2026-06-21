@@ -3459,15 +3459,11 @@ async function agentValidar(data, opcoes = {}) {
               }
               const res = verificarAposta(jogoOriginal, gC, gF, statsWS);
               pend.placar = `${gC}-${gF}`;
-              // Se ainda pendente após web search (stats não encontradas), marcar cancelado/reembolso
+              // Se ainda pendente após web search (stats não encontradas), manter pendente para input manual
               if (res === 'pendente' || res === 'sem_stats') {
-                if (!statsWS) {
-                  console.log(`    ↩️ Stats não encontradas no web search — marcando reembolso`);
-                  pend.resultado_aposta = 'cancelado';
-                  pend.motivo = 'Stats de escanteios/cartões indisponíveis — reembolso automático';
-                } else {
-                  pend.resultado_aposta = 'pendente';
-                }
+                console.log(`    ⏳ Stats não encontradas no web search — mantendo pendente para input manual`);
+                pend.resultado_aposta = 'pendente';
+                pend.motivo = `${pend.time_casa} ${gC} x ${gF} ${pend.time_fora} — stats indisponíveis, informe manualmente`;
               } else {
                 pend.resultado_aposta = res;
               }
