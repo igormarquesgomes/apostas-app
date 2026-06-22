@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telegram · Teste de Interface · OddLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1E293B;font-size:14px;}
+
+/* ── NAV ───────────────────────────────────────── */
+.nav{position:sticky;top:0;z-index:200;height:46px;background:#FAF7F2;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 28px;gap:8px;}
+.nav-brand{font-size:16px;font-weight:700;color:#1E293B;letter-spacing:-.4px;text-decoration:none;flex-shrink:0;}
+.nav-brand span{color:#0F766E;font-weight:300;}
+.nav-tag{font-size:11px;font-weight:600;background:#F0FDF9;color:#0F766E;border:1px solid #6EE7B7;padding:2px 8px;border-radius:20px;}
+
+/* ── PAGE ──────────────────────────────────────── */
+.page{padding:32px 40px 100px;max-width:860px;margin:0 auto;}
+
+/* ── PANEL ─────────────────────────────────────── */
+.panel{background:#fff;border:1.5px solid #0F766E;border-radius:16px;overflow:hidden;}
+
+/* ── PANEL HEADER ──────────────────────────────── */
+.panel-hd{padding:20px 24px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:14px;}
+.panel-icon{width:40px;height:40px;background:#E8F5FE;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.panel-hd-info{flex:1;}
+.panel-hd-title{font-size:15px;font-weight:700;color:#1E293B;}
+.panel-hd-sub{font-size:12px;color:#64748B;margin-top:2px;}
+.panel-hd-meta{display:flex;gap:6px;align-items:center;margin-left:auto;}
+
+/* ── DATE TABS ─────────────────────────────────── */
+.date-bar{padding:16px 24px 12px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.day-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;}
+.day-tab:hover:not(.active){border-color:#CBD5E1;color:#1E293B;}
+.day-tab.active{background:#0F766E;color:#fff;border-color:#0F766E;}
+.day-inp{font-family:inherit;font-size:12px;border:1px solid #E2E8F0;border-radius:7px;padding:5px 10px;background:#fff;outline:none;margin-left:auto;color:#1E293B;}
+.day-inp:focus{border-color:#0F766E;}
+
+/* ── PROGRESS BAR ──────────────────────────────── */
+.progress-wrap{padding:12px 24px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;gap:12px;}
+.progress-bar-bg{flex:1;height:5px;background:#F1F5F9;border-radius:99px;overflow:hidden;}
+.progress-bar-fill{height:100%;background:#0F766E;border-radius:99px;transition:width .3s ease;}
+.progress-label{font-size:11px;font-weight:600;color:#64748B;white-space:nowrap;}
+.progress-label span{color:#0F766E;}
+
+/* ── COLUMN HEADERS ────────────────────────────── */
+.col-headers{display:grid;grid-template-columns:1fr 1fr 108px;gap:8px;padding:8px 24px 6px;background:#FAFAFA;border-bottom:1px solid #F1F5F9;}
+.col-hdr{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94A3B8;}
+
+/* ── GAME LIST ─────────────────────────────────── */
+.games-list{padding:8px 16px;}
+
+/* ── GAME ITEM ─────────────────────────────────── */
+.game-item{border:1px solid #E2E8F0;border-radius:10px;padding:11px 12px;margin-bottom:6px;transition:border-color .15s,box-shadow .15s;position:relative;}
+.game-item:hover{border-color:#94A3B8;}
+.game-item.filled{border-color:#6EE7B7;background:#FDFFFE;}
+.game-item.sent{border-color:#93C5FD;background:#F8FBFF;opacity:.85;}
+
+.game-top{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.game-num{font-size:10px;font-weight:700;color:#94A3B8;min-width:18px;}
+.game-teams{font-size:13px;font-weight:700;color:#1E293B;flex:1;}
+.game-time-badge{font-size:11px;color:#64748B;background:#F1F5F9;padding:2px 7px;border-radius:5px;white-space:nowrap;}
+.game-bet{font-size:11px;color:#0F766E;font-weight:600;margin-bottom:7px;padding-left:26px;}
+
+.game-inputs{display:grid;grid-template-columns:1fr 108px;gap:8px;align-items:end;}
+.inp-col label{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:3px;}
+
+.link-inp{width:100%;padding:7px 9px;border:1px solid #E2E8F0;border-radius:7px;font-family:'SF Mono',monospace;font-size:10.5px;outline:none;color:#1E293B;background:#FAFAFA;transition:border-color .15s,background .15s;}
+.link-inp:focus{border-color:#0F766E;background:#fff;}
+.link-inp.has-code{border-color:#6EE7B7;background:#F0FDF9;color:#065F46;}
+
+.time-inp{width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:7px;font-family:inherit;font-size:12px;outline:none;color:#1E293B;background:#FAFAFA;text-align:center;transition:border-color .15s,background .15s;}
+.time-inp:focus{border-color:#0F766E;background:#fff;}
+.time-inp.set{border-color:#93C5FD;background:#EFF6FF;}
+
+.sent-badge{position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;color:#1E40AF;background:#EFF6FF;border:1px solid #93C5FD;border-radius:20px;padding:1px 8px;}
+
+/* ── STATUS BOX ────────────────────────────────── */
+.status-box{margin:0 16px 12px;padding:11px 14px;border-radius:10px;font-size:13px;display:flex;align-items:flex-start;gap:10px;}
+.status-box.salvo{background:#F0FDF9;border:1px solid #6EE7B7;color:#065F46;}
+.status-box.agendado{background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;}
+.status-box.enviado{background:#F0FDF9;border:1px solid #6EE7B7;color:#065F46;}
+.status-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.status-text{flex:1;}
+.status-text strong{display:block;font-weight:700;margin-bottom:2px;}
+.status-text span{font-size:12px;opacity:.85;}
+
+/* ── STICKY ACTIONS ────────────────────────────── */
+.sticky-bar{position:sticky;bottom:0;background:#FAF7F2;border-top:1px solid #E2E8F0;padding:12px 24px;display:flex;align-items:center;gap:10px;}
+.sticky-counts{display:flex;gap:12px;flex:1;}
+.count-chip{font-size:12px;color:#64748B;display:flex;align-items:center;gap:5px;}
+.count-chip .dot{width:7px;height:7px;border-radius:50%;}
+.dot-green{background:#10B981;}
+.dot-blue{background:#3B82F6;}
+.dot-gray{background:#CBD5E1;}
+.btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#475569;transition:all .15s;font-family:inherit;display:flex;align-items:center;gap:6px;}
+.btn:hover{border-color:#CBD5E1;color:#1E293B;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn.primary{background:#0F766E;color:#fff;border-color:#0F766E;}
+.btn.primary:hover:not(:disabled){background:#0d6b63;}
+.btn.primary:disabled{background:#0F766E;}
+
+/* ── SECTION DIVIDER ────────────────────────────── */
+.section-divider{padding:6px 24px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;background:#FAFAFA;border-top:1px solid #F1F5F9;border-bottom:1px solid #F1F5F9;margin:4px 0;}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="experimental.html">Odd<span>Lab</span></a>
+  <span class="nav-tag">Telegram · Teste de Interface</span>
+</nav>
+
+<div class="page">
+
+  <div class="panel">
+
+    <!-- Header -->
+    <div class="panel-hd">
+      <div class="panel-icon">📤</div>
+      <div class="panel-hd-info">
+        <div class="panel-hd-title">Telegram — Agendamento de análises</div>
+        <div class="panel-hd-sub">Preencha os links afiliados e os horários de envio por jogo</div>
+      </div>
+    </div>
+
+    <!-- Date selector -->
+    <div class="date-bar">
+      <button class="day-tab" onclick="selDia('hoje',this)">Hoje</button>
+      <button class="day-tab" onclick="selDia('amanha',this)">Amanhã</button>
+      <button class="day-tab active" onclick="selDia('depois',this)">Depois de amanhã</button>
+      <input class="day-inp" type="date" id="inp-data" value="2026-06-24">
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="prog-fill" style="width:40%"></div>
+      </div>
+      <div class="progress-label" id="prog-label"><span>6</span> / 15 links preenchidos</div>
+    </div>
+
+    <!-- Column headers -->
+    <div class="col-headers">
+      <div class="col-hdr">📋 Link afiliado (Lista)</div>
+      <div class="col-hdr" style="grid-column:2/3"></div>
+      <div class="col-hdr">📣 Enviar às</div>
+    </div>
+
+    <!-- Games -->
+    <div class="games-list" id="games-list"></div>
+
+    <!-- Status box -->
+    <div class="status-box salvo" id="status-box">
+      <div class="status-icon">💾</div>
+      <div class="status-text">
+        <strong>Salvo</strong>
+        <span>Links e horários salvos. Edite quando quiser ou confirme o agendamento.</span>
+      </div>
+    </div>
+
+    <!-- Sticky action bar -->
+    <div class="sticky-bar">
+      <div class="sticky-counts">
+        <div class="count-chip"><div class="dot dot-green"></div> <span id="cnt-filled">6 links</span></div>
+        <div class="count-chip"><div class="dot dot-blue"></div> <span id="cnt-timed">15 horários</span></div>
+        <div class="count-chip"><div class="dot dot-gray"></div> <span id="cnt-empty">9 sem link</span></div>
+      </div>
+      <button class="btn" id="btn-salvar" onclick="salvar()">💾 Salvar</button>
+      <button class="btn primary" id="btn-agendar" onclick="agendar()">📅 Agendar</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const BASE = 'https://go.aff.estrelabetpartners.com/j2um212c?utm_campaign=aposta_lista&aposta=';
+
+const JOGOS = [
+  {id:1, horario:'13:00', liga:'Copa do Mundo', time_casa:'Germany',         time_fora:'Ivory Coast',      aposta:'Over 1.5 gols',       odd:'1.50', envio:'12:00', code:'MW0HK'},
+  {id:2, horario:'13:00', liga:'Copa do Mundo', time_casa:'Japan',           time_fora:'South Korea',      aposta:'Over 2.5 gols',       odd:'2.10', envio:'12:05', code:''},
+  {id:3, horario:'13:30', liga:'Copa do Mundo', time_casa:'Brazil',          time_fora:'Argentina',        aposta:'Dupla Chance 1X',     odd:'1.38', envio:'12:15', code:'BZ3RG'},
+  {id:4, horario:'13:30', liga:'Série B',       time_casa:'Ceará',           time_fora:'Botafogo SP',      aposta:'Over 8.5 escanteios', odd:'1.70', envio:'12:25', code:'CE4SC'},
+  {id:5, horario:'14:00', liga:'Copa do Mundo', time_casa:'France',          time_fora:'Portugal',         aposta:'Over 2.5 gols',       odd:'1.85', envio:'12:30', code:''},
+  {id:6, horario:'14:00', liga:'Série B',       time_casa:'Vila Nova',       time_fora:'Náutico Recife',   aposta:'Over 2.5 cartões',    odd:'1.55', envio:'12:40', code:'VN6CR'},
+  {id:7, horario:'15:00', liga:'Copa do Mundo', time_casa:'Spain',           time_fora:'Netherlands',      aposta:'Dupla Chance 1X',     odd:'1.42', envio:'12:55', code:''},
+  {id:8, horario:'15:00', liga:'Copa do Mundo', time_casa:'England',         time_fora:'USA',              aposta:'Over 1.5 gols',       odd:'1.45', envio:'13:05', code:''},
+  {id:9, horario:'16:00', liga:'Copa do Mundo', time_casa:'Canada',          time_fora:'Qatar',            aposta:'Over 0.5 gols',       odd:'1.10', envio:'13:30', code:''},
+  {id:10,horario:'16:00', liga:'Copa do Mundo', time_casa:'Mexico',          time_fora:'Ecuador',          aposta:'Over 1.5 gols',       odd:'1.50', envio:'13:40', code:''},
+  {id:11,horario:'17:00', liga:'Copa do Mundo', time_casa:'Switzerland',     time_fora:'Bosnia',           aposta:'Over 1.5 gols',       odd:'1.35', envio:'14:30', code:''},
+  {id:12,horario:'19:00', liga:'Série A',       time_casa:'Flamengo',        time_fora:'Palmeiras',        aposta:'Dupla Chance X2',     odd:'1.65', envio:'16:30', code:''},
+  {id:13,horario:'19:00', liga:'Copa do Mundo', time_casa:'Czechia',         time_fora:'South Africa',     aposta:'Dupla Chance 1X',     odd:'1.30', envio:'16:40', code:''},
+  {id:14,horario:'21:00', liga:'Série A',       time_casa:'Corinthians',     time_fora:'São Paulo',        aposta:'Over 1.5 gols',       odd:'1.60', envio:'18:30', code:''},
+  {id:15,horario:'21:00', liga:'Série B',       time_casa:'Sport Recife',    time_fora:'Atlético GO',      aposta:'Over 2.5 cartões',    odd:'1.50', envio:'18:45', code:''},
+];
+
+let estado = 'salvo'; // 'salvo' | 'agendado'
+
+function renderJogos() {
+  const list = document.getElementById('games-list');
+
+  // Agrupa por seção de horário
+  const secoes = {};
+  JOGOS.forEach(j => {
+    const h = j.horario;
+    if (!secoes[h]) secoes[h] = [];
+    secoes[h].push(j);
+  });
+
+  let html = '';
+  Object.keys(secoes).sort().forEach(hora => {
+    html += `<div class="section-divider">⚽ Jogos das ${hora}</div>`;
+    secoes[hora].forEach(j => {
+      const linkVal = j.code ? BASE + j.code : BASE;
+      const haCode  = !!j.code;
+      const isSent  = j.id <= 3; // simula primeiros 3 já enviados
+      html += `
+        <div class="game-item${haCode?' filled':''}${isSent?' sent':''}" id="item-${j.id}">
+          ${isSent ? '<div class="sent-badge">Enviado</div>' : ''}
+          <div class="game-top">
+            <span class="game-num">${j.id}</span>
+            <span class="game-teams">${j.time_casa} × ${j.time_fora}</span>
+            <span class="game-time-badge">${j.horario}</span>
+          </div>
+          <div class="game-bet">${j.aposta} · <b>odd ${j.odd}</b> · ${j.liga}</div>
+          <div class="game-inputs">
+            <div class="inp-col">
+              <label>📋 Link afiliado</label>
+              <input class="link-inp${haCode?' has-code':''}" type="url"
+                id="link-${j.id}"
+                data-id="${j.id}"
+                value="${linkVal}"
+                placeholder="Cole o código ao final da URL"
+                ${isSent?'disabled':''}
+                oninput="onLinkInput(${j.id},this)">
+            </div>
+            <div class="inp-col">
+              <label>📣 Enviar às</label>
+              <input class="time-inp${j.envio?' set':''}" type="time"
+                id="time-${j.id}"
+                data-id="${j.id}"
+                value="${j.envio}"
+                ${isSent?'disabled':''}
+                oninput="onTimeInput(${j.id},this)">
+            </div>
+          </div>
+        </div>`;
+    });
+  });
+
+  list.innerHTML = html;
+  atualizarProgresso();
+}
+
+function onLinkInput(id, el) {
+  const val = el.value.trim();
+  const isComplete = val.length > BASE.length + 3;
+  el.classList.toggle('has-code', isComplete);
+  document.getElementById(`item-${id}`).classList.toggle('filled', isComplete);
+  atualizarProgresso();
+}
+
+function onTimeInput(id, el) {
+  el.classList.toggle('set', !!el.value);
+}
+
+function atualizarProgresso() {
+  const linkInputs = document.querySelectorAll('.link-inp:not(:disabled)');
+  let filled = 0;
+  linkInputs.forEach(i => { if (i.value.trim().length > BASE.length + 3) filled++; });
+  const total = linkInputs.length;
+  const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').innerHTML = `<span>${filled}</span> / ${total} links preenchidos`;
+  document.getElementById('cnt-filled').textContent = filled + ' links';
+  document.getElementById('cnt-empty').textContent = (total - filled) + ' sem link';
+
+  const timeInputs = document.querySelectorAll('.time-inp:not(:disabled)');
+  let timed = 0;
+  timeInputs.forEach(i => { if(i.value) timed++; });
+  document.getElementById('cnt-timed').textContent = timed + ' horários';
+}
+
+function salvar() {
+  const btn = document.getElementById('btn-salvar');
+  btn.textContent = 'Salvando…';
+  btn.disabled = true;
+  setTimeout(() => {
+    estado = 'salvo';
+    atualizarStatus();
+    btn.textContent = '💾 Salvar';
+    btn.disabled = false;
+  }, 800);
+}
+
+function agendar() {
+  if (!confirm('⚠️ Confirmar agendamento?\n\nA lista será enviada às 8h e as análises nos horários definidos.\nNÃO pode ser desfeito pela interface.')) return;
+  const btn = document.getElementById('btn-agendar');
+  btn.textContent = 'Agendando…';
+  btn.disabled = true;
+  document.getElementById('btn-salvar').disabled = true;
+  setTimeout(() => {
+    estado = 'agendado';
+    atualizarStatus();
+    btn.textContent = '✅ Agendado';
+  }, 900);
+}
+
+function atualizarStatus() {
+  const box = document.getElementById('status-box');
+  if (estado === 'agendado') {
+    box.className = 'status-box agendado';
+    box.innerHTML = `<div class="status-icon">🔒</div><div class="status-text"><strong>Agendado!</strong><span>Lista enviada às 8h · Análises nos horários definidos · Cancelamento apenas via banco de dados.</span></div>`;
+  } else {
+    box.className = 'status-box salvo';
+    box.innerHTML = `<div class="status-icon">💾</div><div class="status-text"><strong>Salvo</strong><span>Links e horários salvos. Edite quando quiser ou confirme o agendamento.</span></div>`;
+  }
+}
+
+function selDia(periodo, btn) {
+  document.querySelectorAll('.day-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+renderJogos();
+</script>
+</body>
+</html>
