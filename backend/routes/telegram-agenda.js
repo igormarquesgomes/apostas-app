@@ -81,7 +81,7 @@ router.post('/lista/agendar', async (req, res) => {
     const { agendo_id } = req.body;
     if (!agendo_id) return res.status(400).json({ error: 'agendo_id obrigatório' });
 
-    const rows = await supaFetch(`agendos_telegram?id=eq.${agendo_id}&select=id,status`);
+    const rows = await supaFetch(`agendos_telegram?id=eq.${agendo_id}&select=id,status,data_envio,enviado_em`);
     const agendo = rows?.[0];
     if (!agendo) return res.status(404).json({ error: 'Agendo não encontrado' });
     if (agendo.status === 'agendado') return res.json({ success: true, warning: 'Já estava agendado' });
@@ -91,7 +91,20 @@ router.post('/lista/agendar', async (req, res) => {
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ status: 'agendado', updated_at: new Date().toISOString() }),
     });
-    res.json({ success: true, agendo_id, warning: 'Agendado! Cancelamento apenas via banco de dados.' });
+
+    // Se for hoje e já passou das 8h BRT (11h UTC), envia imediatamente
+    const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      .split('/').reverse().join('-');
+    const horaBRT = parseInt(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }), 10);
+
+    if (agendo.data_envio === hoje && horaBRT >= 8 && !agendo.enviado_em) {
+      console.log(`⚡ [Lista] Agendado após 8h — enviando imediatamente`);
+      const svc = require('../services/telegramService');
+      svc.enviarListaDeDia().catch(err => console.error('Erro envio imediato Lista:', err.message));
+      return res.json({ success: true, agendo_id, enviando_agora: true, warning: 'Já passou das 8h — enviando agora!' });
+    }
+
+    res.json({ success: true, agendo_id, warning: 'Agendado! Será enviado às 8h.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -149,6 +162,18 @@ router.post('/analises/agendar', async (req, res) => {
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify(rows),
     });
+
+    // Se for hoje e já passou das 12h BRT, dispara envio imediato dos que já venceram
+    const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      .split('/').reverse().join('-');
+    const horaBRT = parseInt(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }), 10);
+
+    if (data === hoje && horaBRT >= 12) {
+      console.log(`⚡ [Análises] Agendado após 12h — disparando envio imediato dos pendentes`);
+      const svc = require('../services/telegramService');
+      svc.enviarMensagensAnalisesAgendasPremium().catch(err => console.error('Erro envio imediato Análises:', err.message));
+      return res.json({ success: true, agendo_ids: (inserted || []).map(r => r.id), enviando_agora: true });
+    }
 
     res.json({ success: true, agendo_ids: (inserted || []).map(r => r.id) });
   } catch (err) {

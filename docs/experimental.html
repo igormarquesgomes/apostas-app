@@ -446,7 +446,7 @@ async function agendarTudo(){
         body:JSON.stringify({ agendo_id:_agendoLista.id }) });
     const d = await r.json();
     if(!r.ok) throw new Error(d.error||r.statusText);
-    alert('✅ Agendado!');
+    alert(d.enviando_agora ? '✅ Já passou das 8h — enviando agora para o grupo!' : '✅ Agendado! Será enviado às 8h.');
     await carregarDia(_dataAtualTg);
   }catch(e){
     alert('❌ '+e.message);
