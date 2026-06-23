@@ -260,31 +260,39 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
   const linhaMatch = a.match(/(\d+\.?\d*)/);
   const linha = linhaMatch ? linhaMatch[1] : null;
 
-  // Helper: busca odd por bet_name + value, tentando variações de nome
+  // Helper 1: busca exata por lista de nomes conhecidos
   const buscar = (betNomes, valor) => {
     for (const bn of betNomes) {
-      const chave = `${bn}|${valor}`;
-      if (odds[chave] !== undefined) return odds[chave];
+      const v = odds[`${bn}|${valor}`];
+      if (v !== undefined) return v;
+    }
+    return null;
+  };
+
+  // Helper 2: fallback — varre TODAS as chaves procurando por palavras-chave + valor
+  // Usado quando o nome do bet na API não coincide com nenhum nome conhecido
+  // Nota: odds só tem dados das casas preferidas (Bet365/Betano/Betfair/1xBet/Bwin/Betway)
+  // → se encontrado aqui, mercado está disponível nessas casas = proxy da Estrela Bet
+  const buscarPorPalavras = (palavrasChave, valor) => {
+    for (const chave of Object.keys(odds)) {
+      const [betNome, betValor] = chave.split('|');
+      const nomeOk = palavrasChave.some(p => betNome.includes(p));
+      const valorOk = betValor === valor || betValor?.includes(valor);
+      if (nomeOk && valorOk) return odds[chave];
     }
     return null;
   };
 
   // ── GOLS ──────────────────────────────────────────────────────────────────
   if (mercado === 'gols') {
-    // Ambos marcam / BTTS
     if (a.includes('ambos') || a.includes('ambas') || a.includes('btts') || a.includes('both teams')) {
-      return buscar(['goals scored','both teams to score','both teams score'], 'yes')
-          || buscar(['goals scored','both teams to score'], 'sim');
+      return buscar(['goals scored','both teams to score','both teams score','btts'], 'yes')
+          || buscarPorPalavras(['both teams','btts','goals scored'], 'yes');
     }
     if (linha) {
-      if (a.includes('over') || a.includes('mais')) {
-        return buscar(['goals over/under','total goals','over/under'], `over ${linha}`)
-            || buscar(['goals over/under','total - goals','over/under goals'], `over ${linha}`);
-      }
-      if (a.includes('under') || a.includes('menos')) {
-        return buscar(['goals over/under','total goals','over/under'], `under ${linha}`)
-            || buscar(['goals over/under','total - goals','over/under goals'], `under ${linha}`);
-      }
+      const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
+      return buscar(['goals over/under','total goals','over/under','total - goals','over/under goals'], `${dir} ${linha}`)
+          || buscarPorPalavras(['goal','over/under','total'], `${dir} ${linha}`);
     }
   }
 
@@ -295,42 +303,39 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
     const mencCasa = pcasa.length > 2 && a.includes(pcasa);
     const mencFora = pfora.length > 2 && a.includes(pfora);
 
-    // Dupla Chance
-    if (a.includes('dupla') || a.includes('double chance')) {
-      if (a.includes('1x') || a.includes('casa') || a.includes('home/draw') || mencCasa)
-        return buscar(['double chance'], 'home/draw') || buscar(['double chance'], '1x');
-      if (a.includes('x2') || a.includes('fora') || a.includes('draw/away') || mencFora)
-        return buscar(['double chance'], 'draw/away') || buscar(['double chance'], 'x2');
+    if (a.includes('dupla') || a.includes('double')) {
+      if (a.includes('1x') || a.includes('home/draw') || mencCasa)
+        return buscar(['double chance'], 'home/draw') || buscar(['double chance'], '1x')
+            || buscarPorPalavras(['double chance','double'], 'home/draw');
+      if (a.includes('x2') || a.includes('draw/away') || mencFora)
+        return buscar(['double chance'], 'draw/away') || buscar(['double chance'], 'x2')
+            || buscarPorPalavras(['double chance','double'], 'draw/away');
       if (a.includes('12') || a.includes('home/away'))
-        return buscar(['double chance'], 'home/away') || buscar(['double chance'], '12');
+        return buscar(['double chance'], 'home/away') || buscarPorPalavras(['double chance'], 'home/away');
     }
-    // Simples 1X2
     if (a.includes('empate') || a === 'draw' || a === 'x')
-      return buscar(['match winner','1x2','home/draw/away'], 'draw');
-    if (mencCasa || a.includes('casa vence') || a.includes('home wins'))
-      return buscar(['match winner','1x2','home/draw/away'], 'home');
-    if (mencFora || a.includes('fora vence') || a.includes('away wins'))
-      return buscar(['match winner','1x2','home/draw/away'], 'away');
+      return buscar(['match winner','1x2','home/draw/away'], 'draw')
+          || buscarPorPalavras(['match winner','1x2','result','winner'], 'draw');
+    if (mencCasa || a.includes('casa vence') || a.includes('home wins') || a.includes('home'))
+      return buscar(['match winner','1x2','home/draw/away'], 'home')
+          || buscarPorPalavras(['match winner','1x2','result','winner'], 'home');
+    if (mencFora || a.includes('fora vence') || a.includes('away wins') || a.includes('away'))
+      return buscar(['match winner','1x2','home/draw/away'], 'away')
+          || buscarPorPalavras(['match winner','1x2','result','winner'], 'away');
   }
 
   // ── ESCANTEIOS ────────────────────────────────────────────────────────────
   if (mercado === 'escanteios' && linha) {
-    if (a.includes('over') || a.includes('mais'))
-      return buscar(['corners over/under','total corners','corners'], `over ${linha}`)
-          || buscar(['corner kicks over/under','total - corners'], `over ${linha}`);
-    if (a.includes('under') || a.includes('menos'))
-      return buscar(['corners over/under','total corners','corners'], `under ${linha}`)
-          || buscar(['corner kicks over/under','total - corners'], `under ${linha}`);
+    const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
+    return buscar(['corners over/under','total corners','corner kicks over/under','total - corners'], `${dir} ${linha}`)
+        || buscarPorPalavras(['corner','escanteio'], `${dir} ${linha}`);
   }
 
   // ── CARTÕES ───────────────────────────────────────────────────────────────
   if (mercado === 'cartoes' && linha) {
-    if (a.includes('over') || a.includes('mais'))
-      return buscar(['cards over/under','total cards','bookings'], `over ${linha}`)
-          || buscar(['total bookings','cards'], `over ${linha}`);
-    if (a.includes('under') || a.includes('menos'))
-      return buscar(['cards over/under','total cards','bookings'], `under ${linha}`)
-          || buscar(['total bookings','cards'], `under ${linha}`);
+    const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
+    return buscar(['cards over/under','total cards','bookings','total bookings'], `${dir} ${linha}`)
+        || buscarPorPalavras(['card','booking','cartao'], `${dir} ${linha}`);
   }
 
   return null;
