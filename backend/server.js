@@ -336,6 +336,68 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
   return null;
 }
 
+// Odd mínima global — mercado precisa ter odd real ≥ 1.25 para ser aceito
+const ODD_MINIMA = 1.25;
+
+/**
+ * Aplica odds reais ao jogo e pivota para a melhor alternativa disponível se necessário.
+ * Regras:
+ *   1. Busca odd real da aposta principal
+ *   2. Se não disponível (null) OU < ODD_MINIMA → tenta alternativas em ordem
+ *   3. Usa a primeira alternativa com odd real ≥ ODD_MINIMA
+ *   4. Se nenhuma alternativa tiver odd disponível ≥ ODD_MINIMA, mantém a principal
+ *      com flag `sem_odd_disponivel = true`
+ */
+function aplicarOddsEPivotar(jogo, oddsFixture) {
+  const oddPrincipal = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
+  const oddPrincipalNum = oddPrincipal ? parseFloat(oddPrincipal) : null;
+
+  // Caso 1: odd disponível e ≥ mínima → aceita direto
+  if (oddPrincipalNum && oddPrincipalNum >= ODD_MINIMA) {
+    jogo.odd_mercado = oddPrincipalNum;
+    jogo.sem_odd_disponivel = false;
+    console.log(`  ✅ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → ${oddPrincipalNum}`);
+    return;
+  }
+
+  const motivo = oddPrincipalNum ? `odd ${oddPrincipalNum} < ${ODD_MINIMA}` : 'mercado indisponível';
+  console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → ${motivo} — buscando alternativa`);
+
+  // Caso 2: tenta alternativas em ordem de confiança
+  const alternativas = (jogo.alternativas || []).filter(a => a.aposta && a.mercado);
+  for (const alt of alternativas) {
+    const oddAlt = selecionarOddFixture(oddsFixture, alt.aposta, alt.mercado, jogo.time_casa, jogo.time_fora);
+    const oddAltNum = oddAlt ? parseFloat(oddAlt) : null;
+    if (oddAltNum && oddAltNum >= ODD_MINIMA) {
+      console.log(`  ⚡ Pivotando → ${alt.aposta} (${alt.mercado}) @ ${oddAltNum}`);
+      jogo.aposta_original = jogo.aposta_original || jogo.aposta;
+      jogo.mercado_original = jogo.mercado_original || jogo.mercado;
+      jogo.aposta = alt.aposta;
+      jogo.mercado = alt.mercado;
+      jogo.odd_mercado = oddAltNum;
+      jogo.confianca = alt.confianca || jogo.confianca;
+      jogo.sem_odd_disponivel = false;
+      jogo.justificativa = gerarJustificativaPosPivot(alt.aposta, alt.mercado, alt.razao || '', jogo);
+      // Atualiza backup para próxima alternativa disponível
+      const proxAlt = alternativas.find(a => a.aposta !== jogo.aposta && a.mercado !== jogo.mercado);
+      if (proxAlt) { jogo.aposta_backup = proxAlt.aposta; jogo.mercado_backup = proxAlt.mercado; }
+      return;
+    }
+  }
+
+  // Caso 3: nenhuma alternativa com odd disponível — mantém principal com flag
+  if (oddPrincipalNum) {
+    jogo.odd_mercado = oddPrincipalNum;
+    jogo.alerta_odd = true;
+    jogo.confianca = 'baixa';
+    console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora}: odd ${oddPrincipalNum} < mínima, sem alternativa melhor`);
+  } else {
+    jogo.sem_odd_disponivel = true;
+    jogo.confianca = 'baixa';
+    console.log(`  ❌ ${jogo.time_casa} x ${jogo.time_fora}: sem odd disponível em nenhum mercado`);
+  }
+}
+
 // IDs de liga na API-Football
 // Seleções campeãs do mundo (para filtrar eliminatórias e amistosos)
 const SELECOES_CAMPEAS = new Set([
@@ -1490,6 +1552,12 @@ ${listaJogos}
 
 PROCESSO OBRIGATÓRIO para cada jogo:
 
+REGRA DE ODD MÍNIMA (CRÍTICO):
+- O sistema só aceita apostas com odd real ≥ 1.25 verificada nas casas de apostas
+- Prefira SEMPRE mercados com odds que costumam ficar entre 1.40–2.50 (zona de valor)
+- Sugira MÚLTIPLAS alternativas em mercados diferentes — o sistema vai buscar a odd real e escolher a disponível
+- Evite linhas muito óbvias (ex: Over 0.5 gols) que terão odd < 1.25
+
 PASSO 1 — Consulte o histórico de calibração:
 - Qual mercado está performando melhor NESSA LIGA especificamente?
 - Se gols está com red histórico nessa liga, priorize escanteios, cartões ou resultado
@@ -1718,34 +1786,13 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     if (semFixture.length) console.log(`⚠️ Jogos sem fixtureId: ${semFixture.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
   }
 
-  // Buscar odds reais via API-Football /odds (por fixture — exato, cobre todos os mercados)
-  console.log('\n💰 Buscando odds reais (API-Football)...');
+  // Buscar odds reais e aplicar pivô automático (odd mínima 1.25, mercado deve estar disponível)
+  console.log('\n💰 Buscando odds reais (API-Football) — mínima 1.25...');
   if (resultado.jogos) {
     for (const jogo of resultado.jogos) {
       if (!jogo.fixtureId) continue;
       const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data);
-      const oddReal = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
-      console.log(`  📈 ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → odd: ${oddReal || 'n/d'}`);
-
-      if (oddReal) {
-        jogo.odd_mercado = parseFloat(oddReal);
-        const oddMin = { gols: 1.40, resultado: 1.50, escanteios: 1.55, cartoes: 1.55 }[jogo.mercado] || 1.35;
-        if (parseFloat(oddReal) < oddMin) {
-          jogo.alerta_odd = true;
-          jogo.confianca = 'baixa';
-          if (jogo.aposta_backup && jogo.mercado_backup) {
-            console.log(`  ⚡ Pivotando ${jogo.time_casa} x ${jogo.time_fora}: odd ${oddReal} < ${oddMin} → ${jogo.aposta_backup}`);
-            jogo.aposta_original = jogo.aposta;
-            jogo.mercado_original = jogo.mercado;
-            jogo.aposta = jogo.aposta_backup;
-            jogo.mercado = jogo.mercado_backup;
-            jogo.confianca = 'media';
-            jogo.alerta_odd = false;
-            const altBackup = jogo.alternativas?.find(a => a.mercado === jogo.mercado_backup && a.aposta === jogo.aposta_backup);
-            jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altBackup?.razao || '', jogo);
-          }
-        }
-      }
+      aplicarOddsEPivotar(jogo, oddsFixture);
     }
     console.log(`✅ Odds reais aplicadas`);
   }
@@ -2411,30 +2458,11 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   }) };
   resultado.jogos.sort((a,b) => (a.pri||20)-(b.pri||20));
 
-  console.log('\n💰 Buscando odds reais (API-Football, multi-agente)...');
+  console.log('\n💰 Buscando odds reais (API-Football, multi-agente) — mínima 1.25...');
   for (const jogo of resultado.jogos) {
     if (!jogo.fixtureId) continue;
     const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data);
-    const oddReal = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
-    console.log(`  📈 ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → odd: ${oddReal || 'n/d'}`);
-    if (oddReal) {
-      jogo.odd_mercado = parseFloat(oddReal);
-      const oddMin = {gols:1.40,resultado:1.50,escanteios:1.55,cartoes:1.55}[jogo.mercado]||1.35;
-      if (parseFloat(oddReal) < oddMin) {
-        jogo.alerta_odd = true; jogo.confianca = 'baixa';
-        if (jogo.aposta_backup && jogo.mercado_backup) {
-          console.log(`  ⚡ Pivotando odd: ${jogo.time_casa} x ${jogo.time_fora} → ${jogo.aposta_backup}`);
-          const novaAposta = jogo.aposta_backup, novoMercado = jogo.mercado_backup;
-          jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
-          jogo.aposta = novaAposta; jogo.mercado = novoMercado; jogo.confianca = 'media'; jogo.alerta_odd = false;
-          const altB = jogo.alternativas?.find(a => a.mercado===novoMercado && a.aposta===novaAposta);
-          jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altB?.razao||'', jogo);
-          const proxB = jogo.alternativas?.find(a => a.aposta && a.aposta !== jogo.aposta && a.mercado !== jogo.mercado);
-          if (proxB) { jogo.aposta_backup = proxB.aposta; jogo.mercado_backup = proxB.mercado; }
-          else { jogo.aposta_backup = null; jogo.mercado_backup = null; }
-        }
-      }
-    }
+    aplicarOddsEPivotar(jogo, oddsFixture);
   }
 
   const jogosFinais = [];
@@ -4972,11 +5000,12 @@ app.post('/adicionar-jogo-manual', async (req, res) => {
       'DATA: ' + df + '\n' +
       blocoHistorico +
       'JOGO COM ESTATISTICAS REAIS:\n' + listaJogo + '\n\n' +
+      'REGRA CRITICA DE ODD: so aceite apostas com odd real esperada >= 1.25. Prefira mercados entre 1.40-2.50. Sugira alternativas em mercados diferentes.\n\n' +
       'PROCESSO OBRIGATORIO:\n' +
       'PASSO 1 - Verifique o historico de calibracao para esse tipo de liga.\n' +
       'PASSO 2 - Avalie CADA mercado: gols, resultado, escanteios, cartoes.\n' +
       'PASSO 3 - Use web_search para lesoes, escalacoes e contexto atual do jogo.\n' +
-      'PASSO 4 - Escolha o mercado com MAIOR confianca. Nunca retorne confianca baixa como principal.\n\n' +
+      'PASSO 4 - Escolha o mercado com MAIOR confianca e odd esperada >= 1.25. Nunca retorne confianca baixa como principal.\n\n' +
       'CAMPO justificativa: texto para o PUBLICO. Sem termos internos. 2-3 frases em portugues natural sobre fatores esportivos.\n\n' +
       'Retorne SOMENTE JSON valido com exatamente 1 jogo:\n' +
       '{"jogos":[{"id":1,"liga":"' + ligaNome + '","tipo_liga":"eu","time_casa":"' + time_casa + '","time_fora":"' + time_fora + '","horario":"' + horario + '","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","razao_escolha":"media combinada alta","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Analise do jogo.","alternativas":[{"mercado":"gols","aposta":"Over 2.5","confianca":"alta","razao":"media alta"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"forma recente"},{"mercado":"escanteios","aposta":"Over 8.5","confianca":"media","razao":"media 9.2"},{"mercado":"cartoes","aposta":"Over 3.5","confianca":"baixa","razao":"media baixa"}]}]}';
