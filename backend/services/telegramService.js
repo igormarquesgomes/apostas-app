@@ -87,6 +87,13 @@ async function tgCall(token, method, body) {
 // ── formatação ─────────────────────────────────────────────────────────────
 
 function formatarListaDia(data, jogos) {
+  // Cabeçalho: dia do mês + dia da semana em PT-BR
+  const [ano, mes, dia] = data.split('-').map(Number);
+  const dtObj = new Date(ano, mes - 1, dia);
+  const diaSemana = dtObj.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const diaMes    = dtObj.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
+  const cabecalho = `<b>${dia} de ${diaMes.split(' de ')[1]} - ${diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1)}</b>`;
+
   const linhas = jogos
     .slice()
     .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''))
@@ -102,7 +109,16 @@ function formatarListaDia(data, jogos) {
       ].join('\n');
     });
 
-  return `<b>${fmtData(data)} — ANÁLISES DO DIA</b>\n\n${linhas.join('\n\n')}`;
+  const rodape = [
+    '🦅 DICAS 🦅',
+    '⚽️ Máximo 2 duplas, ou 1 tripla',
+    '⚽️ Odd a partir de 1.50',
+    '⚽️ Entrada de 0.5% da banca',
+    '',
+    '🔞 Jogue com Responsabilidade',
+  ].join('\n');
+
+  return `${cabecalho}\n\n${linhas.join('\n\n')}\n\n${rodape}`;
 }
 
 function formatarRelatorioLista(data, jogos) {
