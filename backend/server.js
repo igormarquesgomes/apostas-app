@@ -4218,6 +4218,51 @@ app.get('/admin/usuarios', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Endpoint de teste de odds — mostra todos os bookmakers e mercados de um fixture
+app.get('/testar-odds', async (req, res) => {
+  const { fixtureId, data } = req.query;
+  if (!fixtureId) return res.status(400).json({ error: 'fixtureId obrigatório' });
+  const dataAlvo = data || new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).split('/').reverse().join('-');
+
+  try {
+    if (!contarRequisicao()) return res.status(429).json({ error: 'Limite de requisições atingido' });
+
+    const resApi = await fetch(
+      `https://v3.football.api-sports.io/odds?fixture=${fixtureId}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    if (!resApi.ok) return res.status(resApi.status).json({ error: `API-Football HTTP ${resApi.status}` });
+
+    const json = await resApi.json();
+    const entry = json.response?.[0];
+    if (!entry) return res.json({ fixtureId, bookmakers: [], odds_calculadas: null, msg: 'Sem dados para este fixture' });
+
+    // Retorna estrutura detalhada por bookmaker
+    const detalhes = (entry.bookmakers || []).map(bm => ({
+      bookmaker_id: bm.id,
+      bookmaker_nome: bm.name,
+      mercados: (bm.bets || []).map(bet => ({
+        bet_id: bet.id,
+        bet_nome: bet.name,
+        valores: (bet.values || []).map(v => ({ aposta: v.value, odd: v.odd }))
+      }))
+    }));
+
+    // Também calcula o resultado final (o que o sistema usaria)
+    const oddsParsed = await buscarOddsFixture(fixtureId, dataAlvo);
+
+    res.json({
+      fixtureId: parseInt(fixtureId),
+      fixture: { time_casa: entry.fixture?.home_team, time_fora: entry.fixture?.away_team },
+      total_bookmakers: detalhes.length,
+      bookmakers: detalhes,
+      odds_calculadas: oddsParsed,
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/health', (req, res) => res.json({
   status: 'ok', api: 'API-Football v3',
   api_suspensa: apiSuspensa, api_erro: apiErrorMsg || null,
