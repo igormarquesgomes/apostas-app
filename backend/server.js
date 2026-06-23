@@ -4218,7 +4218,28 @@ app.get('/admin/usuarios', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Endpoint de teste de odds — mostra todos os bookmakers e mercados de um fixture
+// Lista bookmakers disponíveis na API-Football (para encontrar ID da Estrela Bet etc.)
+app.get('/bookmakers-lista', async (req, res) => {
+  const { busca } = req.query;
+  try {
+    if (!contarRequisicao()) return res.status(429).json({ error: 'Limite atingido' });
+    const r = await fetch('https://v3.football.api-sports.io/odds/bookmakers', {
+      headers: { 'x-apisports-key': APIFOOTBALL_KEY }
+    });
+    const json = await r.json();
+    let lista = json.response || [];
+    if (busca) {
+      const b = busca.toLowerCase();
+      lista = lista.filter(bm => bm.name?.toLowerCase().includes(b));
+    }
+    res.json({ total: lista.length, bookmakers: lista });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Nomes candidatos da Estrela Bet no API-Football (verificar via /bookmakers-lista)
+const ESTRELA_BET_NOMES = ['estrela bet','estrelabet','estrelabet','estrela'];
+
+// Endpoint de teste de odds — mostra todos os bookmakers, disponibilidade e Estrela Bet
 app.get('/testar-odds', async (req, res) => {
   const { fixtureId, data } = req.query;
   if (!fixtureId) return res.status(400).json({ error: 'fixtureId obrigatório' });
@@ -4237,26 +4258,54 @@ app.get('/testar-odds', async (req, res) => {
     const entry = json.response?.[0];
     if (!entry) return res.json({ fixtureId, bookmakers: [], odds_calculadas: null, msg: 'Sem dados para este fixture' });
 
-    // Retorna estrutura detalhada por bookmaker
-    const detalhes = (entry.bookmakers || []).map(bm => ({
-      bookmaker_id: bm.id,
-      bookmaker_nome: bm.name,
-      mercados: (bm.bets || []).map(bet => ({
-        bet_id: bet.id,
-        bet_nome: bet.name,
-        valores: (bet.values || []).map(v => ({ aposta: v.value, odd: v.odd }))
-      }))
-    }));
+    const normStr = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
 
-    // Também calcula o resultado final (o que o sistema usaria)
+    // Estrutura detalhada por bookmaker com disponibilidade por mercado
+    const detalhes = (entry.bookmakers || []).map(bm => {
+      const isEstrela = ESTRELA_BET_NOMES.some(n => normStr(bm.name).includes(n));
+      return {
+        bookmaker_id: bm.id,
+        bookmaker_nome: bm.name,
+        is_estrela_bet: isEstrela,
+        mercados: (bm.bets || []).map(bet => ({
+          bet_id: bet.id,
+          bet_nome: bet.name,
+          disponivel: (bet.values||[]).length > 0,
+          valores: (bet.values || []).map(v => ({ aposta: v.value, odd: v.odd }))
+        }))
+      };
+    });
+
+    // Calcula resultado final (média entre bookmakers)
     const oddsParsed = await buscarOddsFixture(fixtureId, dataAlvo);
+
+    // Estrela Bet separada
+    const estrelaBet = detalhes.find(bm => bm.is_estrela_bet) || null;
+
+    // Tabela de disponibilidade: para cada mercado, quais bookmakers têm
+    const mercadosBkMap = {};
+    for (const bm of detalhes) {
+      for (const m of bm.mercados) {
+        if (!mercadosBkMap[m.bet_nome]) mercadosBkMap[m.bet_nome] = [];
+        mercadosBkMap[m.bet_nome].push({ bk: bm.bookmaker_nome, id: bm.bookmaker_id, disponivel: m.disponivel });
+      }
+    }
 
     res.json({
       fixtureId: parseInt(fixtureId),
-      fixture: { time_casa: entry.fixture?.home_team, time_fora: entry.fixture?.away_team },
+      fixture: {
+        time_casa: entry.fixture?.home_team,
+        time_fora: entry.fixture?.away_team,
+        liga: entry.league?.name,
+        data: entry.fixture?.date?.substring(0,10),
+      },
       total_bookmakers: detalhes.length,
+      estrela_bet: estrelaBet,
+      estrela_bet_encontrada: !!estrelaBet,
       bookmakers: detalhes,
+      disponibilidade_por_mercado: mercadosBkMap,
       odds_calculadas: oddsParsed,
+      chaves_disponiveis: oddsParsed ? Object.keys(oddsParsed).sort() : [],
     });
   } catch(e) {
     res.status(500).json({ error: e.message });
