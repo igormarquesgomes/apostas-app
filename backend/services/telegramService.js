@@ -224,7 +224,7 @@ async function enviarListaDeDia() {
     chat_id: chatId,
     text: texto,
     parse_mode: 'HTML',
-    disable_web_page_preview: false,
+    disable_web_page_preview: true,
   });
 
   // Se o grupo migrou para supergrupo, persiste o novo chat_id
@@ -276,7 +276,7 @@ async function enviarMensagensAnalisesAgendasPremium() {
         chat_id: chatId,
         text: texto,
         parse_mode: 'HTML',
-        disable_web_page_preview: false,
+        disable_web_page_preview: true,
       });
 
       await supaFetch(`agendos_telegram_analises?id=eq.${agendo.id}`, {
