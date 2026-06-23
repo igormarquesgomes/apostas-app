@@ -4231,6 +4231,48 @@ app.get('/admin/usuarios', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Busca fixture por nome de times ao vivo na API-Football
+app.get('/buscar-fixture', async (req, res) => {
+  const { casa, fora, data } = req.query;
+  if (!casa && !fora) return res.status(400).json({ error: 'Informe ao menos um time (casa ou fora)' });
+  if (!contarRequisicao()) return res.status(429).json({ error: 'Limite atingido' });
+
+  try {
+    const dataAlvo = data || new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).split('/').reverse().join('-');
+    // Busca fixtures pela data + nome do time casa
+    const teamParam = casa || fora;
+    const url = `https://v3.football.api-sports.io/fixtures?date=${dataAlvo}&search=${encodeURIComponent(teamParam)}`;
+    const r = await fetch(url, { headers: { 'x-apisports-key': APIFOOTBALL_KEY } });
+    const json = await r.json();
+    const fixtures = json.response || [];
+
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nc = norm(casa), nf = norm(fora);
+
+    // Filtra por correspondência de nome
+    const matches = fixtures.filter(f => {
+      const hn = norm(f.teams?.home?.name), an = norm(f.teams?.away?.name);
+      const casaOk = !nc || hn.includes(nc.split(' ')[0]) || nc.split(' ')[0].includes(hn.split(' ')[0]);
+      const foraOk = !nf || an.includes(nf.split(' ')[0]) || nf.split(' ')[0].includes(an.split(' ')[0]);
+      return casaOk && foraOk;
+    });
+
+    res.json({
+      data: dataAlvo,
+      total: matches.length,
+      fixtures: matches.map(f => ({
+        fixtureId: f.fixture?.id,
+        time_casa: f.teams?.home?.name,
+        time_fora: f.teams?.away?.name,
+        horario: f.fixture?.date ? new Date(f.fixture.date).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--:--',
+        liga: f.league?.name,
+        pais: f.league?.country,
+        status: f.fixture?.status?.short,
+      }))
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Lista bookmakers disponíveis na API-Football (para encontrar ID da Estrela Bet etc.)
 app.get('/bookmakers-lista', async (req, res) => {
   const { busca } = req.query;

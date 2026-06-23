@@ -110,9 +110,30 @@ input:focus,select:focus{border-color:#0F766E;background:#fff;}
     <div class="page-sub">Verifica odds por fixture — bookmakers, disponibilidade por mercado, Estrela Bet e odd calculada</div>
   </div>
 
-  <!-- Busca fixture -->
+  <!-- Busca por time (ao vivo na API) -->
   <div class="card">
-    <div class="card-title">🔍 Buscar fixture <span class="badge badge-green">API-Football /odds</span></div>
+    <div class="card-title">⚽ Pesquisar jogo ao vivo <span class="badge badge-green">API-Football em tempo real</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 160px auto;gap:10px;align-items:end;">
+      <div>
+        <label>Time casa</label>
+        <input type="text" id="srch-casa" placeholder="ex: Flamengo" onkeydown="if(event.key==='Enter')pesquisarJogo()" />
+      </div>
+      <div>
+        <label>Time fora (opcional)</label>
+        <input type="text" id="srch-fora" placeholder="ex: Palmeiras" onkeydown="if(event.key==='Enter')pesquisarJogo()" />
+      </div>
+      <div>
+        <label>Data</label>
+        <input type="date" id="srch-data" />
+      </div>
+      <button class="btn primary" onclick="pesquisarJogo()">🔍 Pesquisar</button>
+    </div>
+    <div id="srch-result" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- Busca por fixture ID ou bookmaker -->
+  <div class="card">
+    <div class="card-title">🔢 Buscar por Fixture ID <span class="badge badge-blue">direto</span></div>
     <div class="field-row">
       <div>
         <label>Fixture ID</label>
@@ -183,6 +204,49 @@ input:focus,select:focus{border-color:#0F766E;background:#fff;}
 const B = 'https://apostas-app.onrender.com';
 let _oddsAtuais = null;
 let _timeCasaAtual = '', _timeForaAtual = '';
+
+async function pesquisarJogo() {
+  const casa  = document.getElementById('srch-casa').value.trim();
+  const fora  = document.getElementById('srch-fora').value.trim();
+  const data  = document.getElementById('srch-data').value || hoje();
+  const el    = document.getElementById('srch-result');
+
+  if (!casa && !fora) { el.innerHTML = '<div class="error-box">Informe ao menos o nome de um time.</div>'; return; }
+
+  el.innerHTML = '<div class="loading">⏳ Buscando na API-Football...</div>';
+
+  try {
+    const params = new URLSearchParams({ data });
+    if (casa) params.set('casa', casa);
+    if (fora) params.set('fora', fora);
+
+    const r = await fetch(`${B}/buscar-fixture?${params}`);
+    const d = await r.json();
+
+    if (d.error) { el.innerHTML = `<div class="error-box">❌ ${d.error}</div>`; return; }
+
+    if (!d.fixtures?.length) {
+      el.innerHTML = `<div style="padding:10px 14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;color:#92400E;font-size:13px;">
+        Nenhum jogo encontrado para <b>${casa}${fora?' × '+fora:''}</b> em ${data}.
+        Tente outra data ou verifique o nome do time.
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">${d.total} jogo(s) encontrado(s)</div>
+      <div class="fixtures-grid">
+        ${d.fixtures.map(f => `
+          <div class="fx-chip" onclick="selecionarFixture(${f.fixtureId},'${esc(f.time_casa)}','${esc(f.time_fora)}',this)">
+            <div class="fx-teams">${f.time_casa} × ${f.time_fora}</div>
+            <div class="fx-meta">${f.horario} · ${f.liga} · ${f.pais}</div>
+            <div class="fx-id">ID: ${f.fixtureId} · ${f.status}</div>
+          </div>`).join('')}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="error-box">❌ ${e.message}</div>`;
+  }
+}
 
 function hoje() {
   const d = new Date();
