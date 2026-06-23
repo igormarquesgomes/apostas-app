@@ -200,7 +200,7 @@ const BOOKMAKERS_PREFERIDOS = new Set([8, 3, 11, 6, 24, 32, 4]);
 
 // Converte lista de bookmakers da API em mapa normalizado de odds (média entre casas)
 function parsearBookmakersOdds(bookmakers) {
-  const normStr = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const normStr = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   const preferidos = bookmakers.filter(bm => BOOKMAKERS_PREFERIDOS.has(bm.id));
   const fonte = preferidos.length > 0 ? preferidos : bookmakers;
   const acum = {};
