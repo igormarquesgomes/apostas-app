@@ -38,7 +38,10 @@ const ODDS_SPORT_KEYS = {
 let oddsCacheData = null;
 let oddsCacheDate = '';
 let oddsReqHoje = 0;
-const ODDS_LIMITE = 25; // máx 25 chamadas/mês para ficar bem dentro dos 500
+const ODDS_LIMITE = 25; // legado The Odds API
+
+// Cache por fixture — API-Football /odds (sem limite extra, usa o limite geral de 1000/dia)
+const oddsFixtureCache = new Map(); // "YYYY-MM-DD|fixtureId" → odds estruturadas
 
 async function buscarOddsDia(data) {
   // Só busca 1 vez por dia
@@ -188,6 +191,145 @@ function selecionarOdd(oddsJogo, aposta, timeCasa, timeFora) {
   if (a.includes('empate')) return oddsJogo.empate;
   if (mencCasa && (a.includes('vence') || a.includes('vitória'))) return oddsJogo.casa;
   if (mencFora && (a.includes('vence') || a.includes('vitória'))) return oddsJogo.fora;
+  return null;
+}
+
+// ─── API-Football /odds — por fixture ────────────────────────────────────────
+// Retorna mapa normalizado de todas as apostas disponíveis para um fixture.
+// Estrutura: { "over 1.5": 1.35, "under 1.5": 3.20, "home": 1.50, ... }
+async function buscarOddsFixture(fixtureId, data) {
+  if (!fixtureId) return null;
+  const cacheKey = `${data}|${fixtureId}`;
+  if (oddsFixtureCache.has(cacheKey)) return oddsFixtureCache.get(cacheKey);
+  if (!contarRequisicao()) return null;
+
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/odds?fixture=${fixtureId}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    if (!res.ok) { console.log(`⚠️ Odds fixture ${fixtureId}: HTTP ${res.status}`); return null; }
+    const json = await res.json();
+    const bookmakers = json.response?.[0]?.bookmakers || [];
+    if (!bookmakers.length) { oddsFixtureCache.set(cacheKey, null); return null; }
+
+    // Agrega odds de todos os bookmakers disponíveis (média)
+    const acum = {}; // "chave normalizada" → [odds]
+    const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+    for (const bm of bookmakers) {
+      for (const bet of bm.bets || []) {
+        const betNome = norm(bet.name);
+        for (const v of bet.values || []) {
+          const val = norm(v.value);
+          const odd = parseFloat(v.odd);
+          if (!odd || isNaN(odd)) continue;
+
+          // Chave: "nome_aposta|valor" — ex: "goals over/under|over 2.5"
+          const chave = `${betNome}|${val}`;
+          if (!acum[chave]) acum[chave] = [];
+          acum[chave].push(odd);
+        }
+      }
+    }
+
+    // Calcula média por chave
+    const odds = {};
+    for (const [chave, vals] of Object.entries(acum)) {
+      odds[chave] = parseFloat((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2));
+    }
+
+    oddsFixtureCache.set(cacheKey, odds);
+    return odds;
+  } catch(e) {
+    console.error(`Erro odds fixture ${fixtureId}:`, e.message);
+    return null;
+  }
+}
+
+// Seleciona a odd correta do mapa retornado por buscarOddsFixture
+function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
+  if (!odds) return null;
+  const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const a = norm(aposta);
+
+  // Extrai linha numérica da aposta (ex: "Over 2.5" → 2.5)
+  const linhaMatch = a.match(/(\d+\.?\d*)/);
+  const linha = linhaMatch ? linhaMatch[1] : null;
+
+  // Helper: busca odd por bet_name + value, tentando variações de nome
+  const buscar = (betNomes, valor) => {
+    for (const bn of betNomes) {
+      const chave = `${bn}|${valor}`;
+      if (odds[chave] !== undefined) return odds[chave];
+    }
+    return null;
+  };
+
+  // ── GOLS ──────────────────────────────────────────────────────────────────
+  if (mercado === 'gols') {
+    // Ambos marcam / BTTS
+    if (a.includes('ambos') || a.includes('ambas') || a.includes('btts') || a.includes('both teams')) {
+      return buscar(['goals scored','both teams to score','both teams score'], 'yes')
+          || buscar(['goals scored','both teams to score'], 'sim');
+    }
+    if (linha) {
+      if (a.includes('over') || a.includes('mais')) {
+        return buscar(['goals over/under','total goals','over/under'], `over ${linha}`)
+            || buscar(['goals over/under','total - goals','over/under goals'], `over ${linha}`);
+      }
+      if (a.includes('under') || a.includes('menos')) {
+        return buscar(['goals over/under','total goals','over/under'], `under ${linha}`)
+            || buscar(['goals over/under','total - goals','over/under goals'], `under ${linha}`);
+      }
+    }
+  }
+
+  // ── RESULTADO ─────────────────────────────────────────────────────────────
+  if (mercado === 'resultado') {
+    const ncasa = norm(timeCasa), nfora = norm(timeFora);
+    const pcasa = ncasa.split(' ')[0], pfora = nfora.split(' ')[0];
+    const mencCasa = pcasa.length > 2 && a.includes(pcasa);
+    const mencFora = pfora.length > 2 && a.includes(pfora);
+
+    // Dupla Chance
+    if (a.includes('dupla') || a.includes('double chance')) {
+      if (a.includes('1x') || a.includes('casa') || a.includes('home/draw') || mencCasa)
+        return buscar(['double chance'], 'home/draw') || buscar(['double chance'], '1x');
+      if (a.includes('x2') || a.includes('fora') || a.includes('draw/away') || mencFora)
+        return buscar(['double chance'], 'draw/away') || buscar(['double chance'], 'x2');
+      if (a.includes('12') || a.includes('home/away'))
+        return buscar(['double chance'], 'home/away') || buscar(['double chance'], '12');
+    }
+    // Simples 1X2
+    if (a.includes('empate') || a === 'draw' || a === 'x')
+      return buscar(['match winner','1x2','home/draw/away'], 'draw');
+    if (mencCasa || a.includes('casa vence') || a.includes('home wins'))
+      return buscar(['match winner','1x2','home/draw/away'], 'home');
+    if (mencFora || a.includes('fora vence') || a.includes('away wins'))
+      return buscar(['match winner','1x2','home/draw/away'], 'away');
+  }
+
+  // ── ESCANTEIOS ────────────────────────────────────────────────────────────
+  if (mercado === 'escanteios' && linha) {
+    if (a.includes('over') || a.includes('mais'))
+      return buscar(['corners over/under','total corners','corners'], `over ${linha}`)
+          || buscar(['corner kicks over/under','total - corners'], `over ${linha}`);
+    if (a.includes('under') || a.includes('menos'))
+      return buscar(['corners over/under','total corners','corners'], `under ${linha}`)
+          || buscar(['corner kicks over/under','total - corners'], `under ${linha}`);
+  }
+
+  // ── CARTÕES ───────────────────────────────────────────────────────────────
+  if (mercado === 'cartoes' && linha) {
+    if (a.includes('over') || a.includes('mais'))
+      return buscar(['cards over/under','total cards','bookings'], `over ${linha}`)
+          || buscar(['total bookings','cards'], `over ${linha}`);
+    if (a.includes('under') || a.includes('menos'))
+      return buscar(['cards over/under','total cards','bookings'], `under ${linha}`)
+          || buscar(['total bookings','cards'], `under ${linha}`);
+  }
+
   return null;
 }
 
@@ -1573,24 +1715,21 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     if (semFixture.length) console.log(`⚠️ Jogos sem fixtureId: ${semFixture.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
   }
 
-  // Buscar odds reais da The Odds API (1 chamada/dia, cached)
-  console.log('\n💰 Buscando odds reais...');
-  const todasOdds = await buscarOddsDia(data);
-
-  // Enriquecer cada aposta com a odd real do mercado
-  if (resultado.jogos && todasOdds) {
+  // Buscar odds reais via API-Football /odds (por fixture — exato, cobre todos os mercados)
+  console.log('\n💰 Buscando odds reais (API-Football)...');
+  if (resultado.jogos) {
     for (const jogo of resultado.jogos) {
-      const oddsJogo = extrairOdds(todasOdds, jogo.time_casa, jogo.time_fora, jogo.mercado);
-      const oddReal = selecionarOdd(oddsJogo, jogo.aposta, jogo.time_casa, jogo.time_fora);
+      if (!jogo.fixtureId) continue;
+      const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data);
+      const oddReal = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
+      console.log(`  📈 ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → odd: ${oddReal || 'n/d'}`);
 
       if (oddReal) {
         jogo.odd_mercado = parseFloat(oddReal);
-        // Odd mínima por mercado
         const oddMin = { gols: 1.40, resultado: 1.50, escanteios: 1.55, cartoes: 1.55 }[jogo.mercado] || 1.35;
         if (parseFloat(oddReal) < oddMin) {
           jogo.alerta_odd = true;
           jogo.confianca = 'baixa';
-          // Tentar pivotar para aposta_backup se disponível
           if (jogo.aposta_backup && jogo.mercado_backup) {
             console.log(`  ⚡ Pivotando ${jogo.time_casa} x ${jogo.time_fora}: odd ${oddReal} < ${oddMin} → ${jogo.aposta_backup}`);
             jogo.aposta_original = jogo.aposta;
@@ -1599,7 +1738,6 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
             jogo.mercado = jogo.mercado_backup;
             jogo.confianca = 'media';
             jogo.alerta_odd = false;
-            // Justificativa pública deve refletir a aposta FINAL
             const altBackup = jogo.alternativas?.find(a => a.mercado === jogo.mercado_backup && a.aposta === jogo.aposta_backup);
             jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altBackup?.razao || '', jogo);
           }
@@ -2270,29 +2408,27 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   }) };
   resultado.jogos.sort((a,b) => (a.pri||20)-(b.pri||20));
 
-  console.log('\n💰 Buscando odds reais (multi-agente)...');
-  const todasOdds = await buscarOddsDia(data);
-  if (todasOdds) {
-    for (const jogo of resultado.jogos) {
-      const oddsJogo = extrairOdds(todasOdds, jogo.time_casa, jogo.time_fora, jogo.mercado);
-      const oddReal = selecionarOdd(oddsJogo, jogo.aposta, jogo.time_casa, jogo.time_fora);
-      if (oddReal) {
-        jogo.odd_mercado = parseFloat(oddReal);
-        const oddMin = {gols:1.40,resultado:1.50,escanteios:1.55,cartoes:1.55}[jogo.mercado]||1.35;
-        if (parseFloat(oddReal) < oddMin) {
-          jogo.alerta_odd = true; jogo.confianca = 'baixa';
-          if (jogo.aposta_backup && jogo.mercado_backup) {
-            console.log(`  ⚡ Pivotando odd: ${jogo.time_casa} x ${jogo.time_fora} → ${jogo.aposta_backup}`);
-            const novaAposta = jogo.aposta_backup, novoMercado = jogo.mercado_backup;
-            jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
-            jogo.aposta = novaAposta; jogo.mercado = novoMercado; jogo.confianca = 'media'; jogo.alerta_odd = false;
-            const altB = jogo.alternativas?.find(a => a.mercado===novoMercado && a.aposta===novaAposta);
-            jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altB?.razao||'', jogo);
-            // P5: atualizar backup para próxima alternativa diferente da nova aposta
-            const proxB = jogo.alternativas?.find(a => a.aposta && a.aposta !== jogo.aposta && a.mercado !== jogo.mercado);
-            if (proxB) { jogo.aposta_backup = proxB.aposta; jogo.mercado_backup = proxB.mercado; }
-            else { jogo.aposta_backup = null; jogo.mercado_backup = null; }
-          }
+  console.log('\n💰 Buscando odds reais (API-Football, multi-agente)...');
+  for (const jogo of resultado.jogos) {
+    if (!jogo.fixtureId) continue;
+    const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data);
+    const oddReal = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
+    console.log(`  📈 ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → odd: ${oddReal || 'n/d'}`);
+    if (oddReal) {
+      jogo.odd_mercado = parseFloat(oddReal);
+      const oddMin = {gols:1.40,resultado:1.50,escanteios:1.55,cartoes:1.55}[jogo.mercado]||1.35;
+      if (parseFloat(oddReal) < oddMin) {
+        jogo.alerta_odd = true; jogo.confianca = 'baixa';
+        if (jogo.aposta_backup && jogo.mercado_backup) {
+          console.log(`  ⚡ Pivotando odd: ${jogo.time_casa} x ${jogo.time_fora} → ${jogo.aposta_backup}`);
+          const novaAposta = jogo.aposta_backup, novoMercado = jogo.mercado_backup;
+          jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
+          jogo.aposta = novaAposta; jogo.mercado = novoMercado; jogo.confianca = 'media'; jogo.alerta_odd = false;
+          const altB = jogo.alternativas?.find(a => a.mercado===novoMercado && a.aposta===novaAposta);
+          jogo.justificativa = gerarJustificativaPosPivot(jogo.aposta, jogo.mercado, altB?.razao||'', jogo);
+          const proxB = jogo.alternativas?.find(a => a.aposta && a.aposta !== jogo.aposta && a.mercado !== jogo.mercado);
+          if (proxB) { jogo.aposta_backup = proxB.aposta; jogo.mercado_backup = proxB.mercado; }
+          else { jogo.aposta_backup = null; jogo.mercado_backup = null; }
         }
       }
     }
