@@ -4235,25 +4235,54 @@ app.get('/admin/usuarios', async (req, res) => {
 app.get('/buscar-fixture', async (req, res) => {
   const { casa, fora, data } = req.query;
   if (!casa && !fora) return res.status(400).json({ error: 'Informe ao menos um time (casa ou fora)' });
-  if (!contarRequisicao()) return res.status(429).json({ error: 'Limite atingido' });
 
   try {
     const dataAlvo = data || new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).split('/').reverse().join('-');
-    // Busca fixtures pela data + nome do time casa
-    const teamParam = casa || fora;
-    const url = `https://v3.football.api-sports.io/fixtures?date=${dataAlvo}&search=${encodeURIComponent(teamParam)}`;
-    const r = await fetch(url, { headers: { 'x-apisports-key': APIFOOTBALL_KEY } });
-    const json = await r.json();
-    const fixtures = json.response || [];
-
     const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
-    const nc = norm(casa), nf = norm(fora);
 
-    // Filtra por correspondência de nome
-    const matches = fixtures.filter(f => {
+    // Passo 1: busca ID do time pelo nome (usando o endpoint /teams?search=)
+    const teamBusca = casa || fora;
+    if (!contarRequisicao()) return res.status(429).json({ error: 'Limite atingido' });
+    const rTeam = await fetch(
+      `https://v3.football.api-sports.io/teams?search=${encodeURIComponent(teamBusca)}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const jTeam = await rTeam.json();
+    const teams = jTeam.response || [];
+
+    if (!teams.length) {
+      return res.json({ data: dataAlvo, total: 0, fixtures: [], msg: `Time "${teamBusca}" não encontrado na API` });
+    }
+
+    // Pega os primeiros 3 times mais relevantes
+    const teamIds = teams.slice(0, 3).map(t => t.team?.id).filter(Boolean);
+
+    // Passo 2: busca fixtures por teamId + data
+    const todasFixtures = [];
+    for (const teamId of teamIds) {
+      if (!contarRequisicao()) break;
+      const rFix = await fetch(
+        `https://v3.football.api-sports.io/fixtures?date=${dataAlvo}&team=${teamId}`,
+        { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+      );
+      const jFix = await rFix.json();
+      todasFixtures.push(...(jFix.response || []));
+    }
+
+    // Remove duplicatas por fixtureId
+    const seen = new Set();
+    const unique = todasFixtures.filter(f => {
+      const id = f.fixture?.id;
+      if (seen.has(id)) return false;
+      seen.add(id); return true;
+    });
+
+    // Se informou fora também, filtra
+    const nc = norm(casa), nf = norm(fora);
+    const matches = unique.filter(f => {
       const hn = norm(f.teams?.home?.name), an = norm(f.teams?.away?.name);
-      const casaOk = !nc || hn.includes(nc.split(' ')[0]) || nc.split(' ')[0].includes(hn.split(' ')[0]);
-      const foraOk = !nf || an.includes(nf.split(' ')[0]) || nf.split(' ')[0].includes(an.split(' ')[0]);
+      const casaOk = !nc || hn.includes(nc.split(' ')[0]) || nc.split(' ')[0] === hn.split(' ')[0];
+      const foraOk = !nf || an.includes(nf.split(' ')[0]) || nf.split(' ')[0] === an.split(' ')[0];
       return casaOk && foraOk;
     });
 
