@@ -1,4 +1,4 @@
-const express = require('express');
+﻿﻿const express = require('express');
 const cors = require('cors');
 const telegramAgendaRoutes = require('./routes/telegram-agenda');
 const { agendarCronTelegram } = require('./crons/telegram-crons');
@@ -200,7 +200,7 @@ const BOOKMAKERS_PREFERIDOS = new Set([8, 3, 11, 6, 24, 32, 4]);
 
 // Converte lista de bookmakers da API em mapa normalizado de odds (média entre casas)
 function parsearBookmakersOdds(bookmakers) {
-  const normStr = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const normStr = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   const preferidos = bookmakers.filter(bm => BOOKMAKERS_PREFERIDOS.has(bm.id));
   const fonte = preferidos.length > 0 ? preferidos : bookmakers;
   const acum = {};
@@ -253,7 +253,7 @@ async function buscarOddsFixture(fixtureId, data) {
 // Seleciona a odd correta do mapa retornado por buscarOddsFixture
 function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
   if (!odds) return null;
-  const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   const a = norm(aposta);
 
   // Extrai linha numérica da aposta (ex: "Over 2.5" → 2.5)
@@ -2391,7 +2391,7 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
     return 0;
   }
 
-  const norm = s => s == null ? '' : s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+  const norm = s => s == null ? '' : s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
   const fixtureMap = new Map(), metaMap = new Map();
   for (const jg of jogos) {
     const k = `${norm(jg.timeCasa)}|${norm(jg.timeFora)}`;
@@ -3055,7 +3055,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   // IMPORTANTE: checar escanteios/cartões ANTES de over/under genérico,
   // pois "Over 2.5 cartões" contém "over" mas é cartoes, não gols.
   const inferirMercadoVerif = (m, a) => {
-    const al = (a||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const al = (a||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     if (al.includes('escanteio') || al.includes('corner') || al.includes('canto')) return 'escanteios';
     if (al.includes('cartao') || al.includes('amarelo') || al.includes('card') || al.includes('yellow')) return 'cartoes';
     if (al.includes('marca') || al.includes('to score') || al.includes('anytime') ||
@@ -4228,7 +4228,7 @@ app.get('/buscar-fixture', async (req, res) => {
 
   try {
     const dataAlvo = data || new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).split('/').reverse().join('-');
-    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,' ').trim();
     const nc = norm(casa), nf = norm(fora);
 
     // Usa o cache de fixtures do dia se disponível (não consome req)
@@ -4320,7 +4320,7 @@ app.get('/testar-odds', async (req, res) => {
     const entry = json.response?.[0];
     if (!entry) return res.json({ fixtureId, bookmakers: [], odds_calculadas: null, msg: 'Sem dados para este fixture' });
 
-    const normStr = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+    const normStr = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 
     // Estrutura detalhada por bookmaker com disponibilidade por mercado
     const detalhes = (entry.bookmakers || []).map(bm => {
