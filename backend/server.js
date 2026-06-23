@@ -338,64 +338,84 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
 
 // Odd mínima global — mercado precisa ter odd real ≥ 1.25 para ser aceito
 const ODD_MINIMA = 1.25;
+// Dia com muitos jogos disponíveis — não reutiliza descartados
+const LIMITE_JOGOS_MUITOS = 20;
 
 /**
- * Aplica odds reais ao jogo e pivota para a melhor alternativa disponível se necessário.
- * Regras:
- *   1. Busca odd real da aposta principal
- *   2. Se não disponível (null) OU < ODD_MINIMA → tenta alternativas em ordem
- *   3. Usa a primeira alternativa com odd real ≥ ODD_MINIMA
- *   4. Se nenhuma alternativa tiver odd disponível ≥ ODD_MINIMA, mantém a principal
- *      com flag `sem_odd_disponivel = true`
+ * Aplica odds reais ao jogo e pivota para a melhor alternativa com:
+ *   - odd real ≥ ODD_MINIMA (1.25)
+ *   - confiança ALTA
+ * Retorna motivo de descarte se não encontrar nenhuma opção válida.
  */
 function aplicarOddsEPivotar(jogo, oddsFixture) {
-  const oddPrincipal = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
-  const oddPrincipalNum = oddPrincipal ? parseFloat(oddPrincipal) : null;
+  const tentarAposta = (aposta, mercado, confianca) => {
+    const odd = selecionarOddFixture(oddsFixture, aposta, mercado, jogo.time_casa, jogo.time_fora);
+    const oddNum = odd ? parseFloat(odd) : null;
+    if (oddNum && oddNum >= ODD_MINIMA && confianca === 'alta') return oddNum;
+    return null;
+  };
 
-  // Caso 1: odd disponível e ≥ mínima → aceita direto
-  if (oddPrincipalNum && oddPrincipalNum >= ODD_MINIMA) {
-    jogo.odd_mercado = oddPrincipalNum;
-    jogo.sem_odd_disponivel = false;
-    console.log(`  ✅ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → ${oddPrincipalNum}`);
-    return;
+  // Caso 1: aposta principal com odd ≥ mínima e confiança alta
+  const oddPrincipal = tentarAposta(jogo.aposta, jogo.mercado, jogo.confianca);
+  if (oddPrincipal) {
+    jogo.odd_mercado = oddPrincipal;
+    jogo.descartado = false;
+    console.log(`  ✅ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} @ ${oddPrincipal} (alta)`);
+    return null;
   }
 
-  const motivo = oddPrincipalNum ? `odd ${oddPrincipalNum} < ${ODD_MINIMA}` : 'mercado indisponível';
-  console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → ${motivo} — buscando alternativa`);
+  // Motivo do problema na principal
+  const oddBruta = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
+  const oddBrutaNum = oddBruta ? parseFloat(oddBruta) : null;
+  let motivoPrincipal;
+  if (!oddBrutaNum) motivoPrincipal = `mercado "${jogo.aposta}" indisponível na API`;
+  else if (oddBrutaNum < ODD_MINIMA) motivoPrincipal = `odd ${oddBrutaNum} < mínima ${ODD_MINIMA}`;
+  else motivoPrincipal = `confiança "${jogo.confianca}" não é alta`;
 
-  // Caso 2: tenta alternativas em ordem de confiança
-  const alternativas = (jogo.alternativas || []).filter(a => a.aposta && a.mercado);
+  console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → ${motivoPrincipal} — buscando alternativa`);
+
+  // Caso 2: alternativas com confiança alta e odd ≥ mínima
+  const alternativas = (jogo.alternativas || []).filter(a => a.aposta && a.mercado && a.confianca === 'alta');
   for (const alt of alternativas) {
-    const oddAlt = selecionarOddFixture(oddsFixture, alt.aposta, alt.mercado, jogo.time_casa, jogo.time_fora);
-    const oddAltNum = oddAlt ? parseFloat(oddAlt) : null;
-    if (oddAltNum && oddAltNum >= ODD_MINIMA) {
-      console.log(`  ⚡ Pivotando → ${alt.aposta} (${alt.mercado}) @ ${oddAltNum}`);
+    const oddAlt = tentarAposta(alt.aposta, alt.mercado, alt.confianca);
+    if (oddAlt) {
+      console.log(`  ⚡ Pivotando → ${alt.aposta} (${alt.mercado}) @ ${oddAlt} (alta)`);
       jogo.aposta_original = jogo.aposta_original || jogo.aposta;
       jogo.mercado_original = jogo.mercado_original || jogo.mercado;
       jogo.aposta = alt.aposta;
       jogo.mercado = alt.mercado;
-      jogo.odd_mercado = oddAltNum;
-      jogo.confianca = alt.confianca || jogo.confianca;
-      jogo.sem_odd_disponivel = false;
+      jogo.odd_mercado = oddAlt;
+      jogo.confianca = 'alta';
+      jogo.descartado = false;
       jogo.justificativa = gerarJustificativaPosPivot(alt.aposta, alt.mercado, alt.razao || '', jogo);
-      // Atualiza backup para próxima alternativa disponível
-      const proxAlt = alternativas.find(a => a.aposta !== jogo.aposta && a.mercado !== jogo.mercado);
+      const proxAlt = alternativas.find(a => a.aposta !== jogo.aposta);
       if (proxAlt) { jogo.aposta_backup = proxAlt.aposta; jogo.mercado_backup = proxAlt.mercado; }
-      return;
+      return null; // sem motivo de descarte
     }
   }
 
-  // Caso 3: nenhuma alternativa com odd disponível — mantém principal com flag
-  if (oddPrincipalNum) {
-    jogo.odd_mercado = oddPrincipalNum;
-    jogo.alerta_odd = true;
-    jogo.confianca = 'baixa';
-    console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora}: odd ${oddPrincipalNum} < mínima, sem alternativa melhor`);
-  } else {
-    jogo.sem_odd_disponivel = true;
-    jogo.confianca = 'baixa';
-    console.log(`  ❌ ${jogo.time_casa} x ${jogo.time_fora}: sem odd disponível em nenhum mercado`);
+  // Caso 3: sem opção válida → marca para descarte
+  const motivo = `${motivoPrincipal} | sem alternativa com confiança alta e odd ≥ ${ODD_MINIMA}`;
+  jogo.descartado = true;
+  jogo.descartado_motivo = motivo;
+  console.log(`  ❌ Descartando ${jogo.time_casa} x ${jogo.time_fora}: ${motivo}`);
+  return motivo;
+}
+
+/**
+ * Formata todos os mercados disponíveis de um fixture para apresentar ao agente.
+ * Retorna string formatada com: mercado | aposta | odd
+ */
+function formatarMercadosDisponiveisParaIA(oddsFixture) {
+  if (!oddsFixture) return 'Nenhum mercado disponível na API.';
+  const linhas = [];
+  for (const [chave, odd] of Object.entries(oddsFixture).sort()) {
+    const [betNome, valor] = chave.split('|');
+    if (odd >= ODD_MINIMA && odd <= 10) {
+      linhas.push(`  ${betNome} → ${valor}: ${odd}`);
+    }
   }
+  return linhas.length ? linhas.join('\n') : 'Nenhum mercado com odd ≥ 1.25.';
 }
 
 // IDs de liga na API-Football
@@ -1786,14 +1806,78 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     if (semFixture.length) console.log(`⚠️ Jogos sem fixtureId: ${semFixture.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
   }
 
-  // Buscar odds reais e aplicar pivô automático (odd mínima 1.25, mercado deve estar disponível)
-  console.log('\n💰 Buscando odds reais (API-Football) — mínima 1.25...');
+  // Buscar odds reais — mínima 1.25, confiança alta obrigatória
+  const poucosJogosDia = jogos.length < LIMITE_JOGOS_MUITOS;
+  console.log(`\n💰 Buscando odds reais — mínima 1.25, confiança alta | dia ${poucosJogosDia ? 'com poucos' : 'com muitos'} jogos (${jogos.length} disponíveis)...`);
+  const descartados = []; // { jogo, motivo, oddsFixture }
+
   if (resultado.jogos) {
     for (const jogo of resultado.jogos) {
       if (!jogo.fixtureId) continue;
       const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data);
-      aplicarOddsEPivotar(jogo, oddsFixture);
+      const motivo = aplicarOddsEPivotar(jogo, oddsFixture);
+      if (motivo) descartados.push({ jogo, motivo, oddsFixture });
     }
+
+    // Dia com poucos jogos: re-analisar descartados com todos os mercados disponíveis
+    if (poucosJogosDia && descartados.length > 0) {
+      console.log(`\n🔄 Dia com poucos jogos — re-analisando ${descartados.length} descartado(s) com mercados disponíveis...`);
+      for (const { jogo, motivo, oddsFixture } of descartados) {
+        if (!oddsFixture) { console.log(`  ⏭️ ${jogo.time_casa} x ${jogo.time_fora}: sem odds disponíveis`); continue; }
+        const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
+        console.log(`  🔍 Re-analisando ${jogo.time_casa} x ${jogo.time_fora} | motivo: ${motivo}`);
+
+        const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})
+Motivo do descarte anterior: ${motivo}
+
+Mercados DISPONÍVEIS na API com odd ≥ 1.25 (estes são os únicos que podem ser apostados):
+${mercadosDisp}
+
+Dados do jogo:
+- Forma casa: ${jogo.forma_casa || '?'} | Forma fora: ${jogo.forma_fora || '?'}
+- Gols média: ${jogo.media_gols_casa || '?'} (casa) + ${jogo.media_gols_fora || '?'} (fora)
+- Escanteios: ${jogo.media_escanteios || '?'} | Cartões: ${jogo.media_cartoes || '?'}
+
+MISSÃO: Escolha a MELHOR aposta dentre os mercados disponíveis acima.
+A aposta deve ter confiança ALTA e odd ≥ 1.25.
+Use apenas mercados da lista acima — outros não estão disponíveis para apostar.
+
+Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+
+        try {
+          const resposta = await chamarIA(promptReanalise, 800);
+          if (resposta) {
+            const jsonMatch = resposta.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const nova = JSON.parse(jsonMatch[0]);
+              if (nova.aposta && nova.mercado && nova.confianca === 'alta') {
+                // Verifica se a odd sugerida existe de fato nos mercados disponíveis
+                const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
+                const oddNum = oddReal ? parseFloat(oddReal) : null;
+                if (oddNum && oddNum >= ODD_MINIMA) {
+                  console.log(`  ✅ Re-análise OK: ${nova.aposta} (${nova.mercado}) @ ${oddNum}`);
+                  jogo.aposta_original = jogo.aposta;
+                  jogo.mercado_original = jogo.mercado;
+                  jogo.aposta = nova.aposta;
+                  jogo.mercado = nova.mercado;
+                  jogo.odd_mercado = oddNum;
+                  jogo.confianca = 'alta';
+                  jogo.descartado = false;
+                  jogo.descartado_motivo = null;
+                  jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
+                } else {
+                  console.log(`  ⚠️ Re-análise sugeriu "${nova.aposta}" mas odd não confirmada. Jogo descartado.`);
+                }
+              }
+            }
+          }
+        } catch(e) { console.error(`  Erro re-análise ${jogo.time_casa}: ${e.message}`); }
+      }
+    } else if (descartados.length > 0) {
+      console.log(`\n📋 Dia com muitos jogos — ${descartados.length} jogo(s) descartado(s) (não reutilizados):`);
+      descartados.forEach(({ jogo, motivo }) => console.log(`  🗑️ ${jogo.time_casa} x ${jogo.time_fora}: ${motivo}`));
+    }
+
     console.log(`✅ Odds reais aplicadas`);
   }
 
@@ -2458,11 +2542,46 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   }) };
   resultado.jogos.sort((a,b) => (a.pri||20)-(b.pri||20));
 
-  console.log('\n💰 Buscando odds reais (API-Football, multi-agente) — mínima 1.25...');
+  const poucosJogosDiaMA = jogos.length < LIMITE_JOGOS_MUITOS;
+  console.log(`\n💰 Odds reais (multi-agente) — mínima 1.25 | ${poucosJogosDiaMA ? 'poucos' : 'muitos'} jogos (${jogos.length})...`);
+  const descartadosMA = [];
   for (const jogo of resultado.jogos) {
     if (!jogo.fixtureId) continue;
     const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data);
-    aplicarOddsEPivotar(jogo, oddsFixture);
+    const motivo = aplicarOddsEPivotar(jogo, oddsFixture);
+    if (motivo) descartadosMA.push({ jogo, motivo, oddsFixture });
+  }
+  if (poucosJogosDiaMA && descartadosMA.length > 0) {
+    console.log(`\n🔄 Re-analisando ${descartadosMA.length} descartado(s) com mercados disponíveis...`);
+    for (const { jogo, motivo, oddsFixture } of descartadosMA) {
+      if (!oddsFixture) continue;
+      const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
+      const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})\nMotivo do descarte: ${motivo}\n\nMercados DISPONÍVEIS na API (únicos apostáveis):\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | Esc: ${jogo.media_escanteios||'?'} | Cart: ${jogo.media_cartoes||'?'}\n\nEscolha a MELHOR aposta dentre os mercados acima. Confiança ALTA, odd ≥ 1.25.\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+      try {
+        const resp = await chamarIA(promptReanalise, 800);
+        if (resp) {
+          const m = resp.match(/\{[\s\S]*\}/);
+          if (m) {
+            const nova = JSON.parse(m[0]);
+            if (nova.aposta && nova.mercado && nova.confianca === 'alta') {
+              const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
+              const oddNum = oddReal ? parseFloat(oddReal) : null;
+              if (oddNum && oddNum >= ODD_MINIMA) {
+                console.log(`  ✅ Re-análise MA: ${nova.aposta} (${nova.mercado}) @ ${oddNum}`);
+                jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
+                jogo.aposta = nova.aposta; jogo.mercado = nova.mercado;
+                jogo.odd_mercado = oddNum; jogo.confianca = 'alta';
+                jogo.descartado = false; jogo.descartado_motivo = null;
+                jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
+              }
+            }
+          }
+        }
+      } catch(e) { console.error(`  Erro re-análise MA ${jogo.time_casa}: ${e.message}`); }
+    }
+  } else if (descartadosMA.length > 0) {
+    console.log(`📋 Muitos jogos — ${descartadosMA.length} descartado(s) não reutilizados`);
+    descartadosMA.forEach(({ jogo, motivo }) => console.log(`  🗑️ ${jogo.time_casa} x ${jogo.time_fora}: ${motivo}`));
   }
 
   const jogosFinais = [];
