@@ -4239,65 +4239,53 @@ app.get('/buscar-fixture', async (req, res) => {
   try {
     const dataAlvo = data || new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).split('/').reverse().join('-');
     const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nc = norm(casa), nf = norm(fora);
 
-    // Passo 1: busca ID do time pelo nome (usando o endpoint /teams?search=)
-    const teamBusca = casa || fora;
-    if (!contarRequisicao()) return res.status(429).json({ error: 'Limite atingido' });
-    const rTeam = await fetch(
-      `https://v3.football.api-sports.io/teams?search=${encodeURIComponent(teamBusca)}`,
-      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
-    );
-    const jTeam = await rTeam.json();
-    const teams = jTeam.response || [];
-
-    if (!teams.length) {
-      return res.json({ data: dataAlvo, total: 0, fixtures: [], msg: `Time "${teamBusca}" não encontrado na API` });
-    }
-
-    // Pega os primeiros 3 times mais relevantes
-    const teamIds = teams.slice(0, 3).map(t => t.team?.id).filter(Boolean);
-
-    // Passo 2: busca fixtures por teamId + data
-    const todasFixtures = [];
-    for (const teamId of teamIds) {
-      if (!contarRequisicao()) break;
-      const rFix = await fetch(
-        `https://v3.football.api-sports.io/fixtures?date=${dataAlvo}&team=${teamId}`,
+    // Usa o cache de fixtures do dia se disponível (não consome req)
+    // Senão chama a API diretamente
+    let fixtures = [];
+    const cached = await buscarFixturesPorData(dataAlvo); // já usa cache interno
+    if (cached && cached.length) {
+      fixtures = cached;
+      console.log(`🔍 buscar-fixture: usando cache de ${fixtures.length} fixtures para ${dataAlvo}`);
+    } else {
+      // Fallback: chama /fixtures?date= diretamente
+      if (!contarRequisicao()) return res.status(429).json({ error: 'Limite atingido' });
+      const r = await fetch(
+        `https://v3.football.api-sports.io/fixtures?date=${dataAlvo}`,
         { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
       );
-      const jFix = await rFix.json();
-      todasFixtures.push(...(jFix.response || []));
+      const json = await r.json();
+      fixtures = json.response || [];
+      console.log(`🔍 buscar-fixture: API retornou ${fixtures.length} fixtures para ${dataAlvo}`);
     }
 
-    // Remove duplicatas por fixtureId
-    const seen = new Set();
-    const unique = todasFixtures.filter(f => {
-      const id = f.fixture?.id;
-      if (seen.has(id)) return false;
-      seen.add(id); return true;
-    });
-
-    // Se informou fora também, filtra
-    const nc = norm(casa), nf = norm(fora);
-    const matches = unique.filter(f => {
-      const hn = norm(f.teams?.home?.name), an = norm(f.teams?.away?.name);
-      const casaOk = !nc || hn.includes(nc.split(' ')[0]) || nc.split(' ')[0] === hn.split(' ')[0];
-      const foraOk = !nf || an.includes(nf.split(' ')[0]) || nf.split(' ')[0] === an.split(' ')[0];
+    // Filtra por nome (normalizado, match parcial pela primeira palavra)
+    const matches = fixtures.filter(f => {
+      const hn = norm(f.teams?.home?.name || f.timeCasa || '');
+      const an = norm(f.teams?.away?.name || f.timeFora || '');
+      const casaOk = !nc || hn.includes(nc.split(' ')[0]) || nc.split(' ')[0].length > 2 && hn.split(' ').some(w => nc.includes(w));
+      const foraOk = !nf || an.includes(nf.split(' ')[0]) || nf.split(' ')[0].length > 2 && an.split(' ').some(w => nf.includes(w));
       return casaOk && foraOk;
     });
 
     res.json({
       data: dataAlvo,
       total: matches.length,
-      fixtures: matches.map(f => ({
-        fixtureId: f.fixture?.id,
-        time_casa: f.teams?.home?.name,
-        time_fora: f.teams?.away?.name,
-        horario: f.fixture?.date ? new Date(f.fixture.date).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--:--',
-        liga: f.league?.name,
-        pais: f.league?.country,
-        status: f.fixture?.status?.short,
-      }))
+      fonte: fixtures === cached ? 'cache' : 'api',
+      fixtures: matches.map(f => {
+        // Suporta tanto o formato da API quanto o formato do cache interno
+        const isCacheFormat = !!f.timeCasa;
+        return {
+          fixtureId: isCacheFormat ? f.fixtureId : f.fixture?.id,
+          time_casa: isCacheFormat ? f.timeCasa : f.teams?.home?.name,
+          time_fora: isCacheFormat ? f.timeFora : f.teams?.away?.name,
+          horario: isCacheFormat ? f.horario : (f.fixture?.date ? new Date(f.fixture.date).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--:--'),
+          liga: isCacheFormat ? f.liga : f.league?.name,
+          pais: isCacheFormat ? '' : f.league?.country,
+          status: isCacheFormat ? 'NS' : f.fixture?.status?.short,
+        };
+      })
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
