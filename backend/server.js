@@ -198,9 +198,33 @@ function selecionarOdd(oddsJogo, aposta, timeCasa, timeFora) {
 // Bet365=8, Betfair=3, 1xBet=11, Bwin=6, Betway=24, Betano=32, Pinnacle=4
 const BOOKMAKERS_PREFERIDOS = new Set([8, 3, 11, 6, 24, 32, 4]);
 
+// Converte lista de bookmakers da API em mapa normalizado de odds (média entre casas)
+function parsearBookmakersOdds(bookmakers) {
+  const normStr = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const preferidos = bookmakers.filter(bm => BOOKMAKERS_PREFERIDOS.has(bm.id));
+  const fonte = preferidos.length > 0 ? preferidos : bookmakers;
+  const acum = {};
+  for (const bm of fonte) {
+    for (const bet of bm.bets || []) {
+      const betNome = normStr(bet.name);
+      for (const v of bet.values || []) {
+        const val = normStr(v.value);
+        const odd = parseFloat(v.odd);
+        if (!odd || isNaN(odd)) continue;
+        const chave = `${betNome}|${val}`;
+        if (!acum[chave]) acum[chave] = [];
+        acum[chave].push(odd);
+      }
+    }
+  }
+  const odds = {};
+  for (const [chave, vals] of Object.entries(acum)) {
+    odds[chave] = parseFloat((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2));
+  }
+  return Object.keys(odds).length ? odds : null;
+}
+
 // ─── API-Football /odds — por fixture ────────────────────────────────────────
-// Retorna mapa normalizado. Usa só BOOKMAKERS_PREFERIDOS quando disponíveis,
-// cai para todos se nenhum preferido estiver presente.
 async function buscarOddsFixture(fixtureId, data) {
   if (!fixtureId) return null;
   const cacheKey = `${data}|${fixtureId}`;
@@ -214,44 +238,10 @@ async function buscarOddsFixture(fixtureId, data) {
     );
     if (!res.ok) { console.log(`⚠️ Odds fixture ${fixtureId}: HTTP ${res.status}`); return null; }
     const json = await res.json();
-    let bookmakers = json.response?.[0]?.bookmakers || [];
+    const bookmakers = json.response?.[0]?.bookmakers || [];
     if (!bookmakers.length) { oddsFixtureCache.set(cacheKey, null); return null; }
 
-    // Filtra por bookmakers preferidos; se nenhum disponível usa todos
-    const preferidos = bookmakers.filter(bm => BOOKMAKERS_PREFERIDOS.has(bm.id));
-    if (preferidos.length > 0) {
-      bookmakers = preferidos;
-      console.log(`  📊 Odds: usando ${preferidos.length} bookmaker(s) preferido(s): ${preferidos.map(b=>b.name).join(', ')}`);
-    } else {
-      console.log(`  📊 Odds: nenhum bookmaker preferido disponível, usando todos (${bookmakers.length})`);
-    }
-
-    // Agrega odds dos bookmakers selecionados (média)
-    const acum = {}; // "chave normalizada" → [odds]
-    const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-
-    for (const bm of bookmakers) {
-      for (const bet of bm.bets || []) {
-        const betNome = norm(bet.name);
-        for (const v of bet.values || []) {
-          const val = norm(v.value);
-          const odd = parseFloat(v.odd);
-          if (!odd || isNaN(odd)) continue;
-
-          // Chave: "nome_aposta|valor" — ex: "goals over/under|over 2.5"
-          const chave = `${betNome}|${val}`;
-          if (!acum[chave]) acum[chave] = [];
-          acum[chave].push(odd);
-        }
-      }
-    }
-
-    // Calcula média por chave
-    const odds = {};
-    for (const [chave, vals] of Object.entries(acum)) {
-      odds[chave] = parseFloat((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2));
-    }
-
+    const odds = parsearBookmakersOdds(bookmakers);
     oddsFixtureCache.set(cacheKey, odds);
     return odds;
   } catch(e) {
@@ -4348,8 +4338,11 @@ app.get('/testar-odds', async (req, res) => {
       };
     });
 
-    // Calcula resultado final (média entre bookmakers)
-    const oddsParsed = await buscarOddsFixture(fixtureId, dataAlvo);
+    // Calcula resultado final reutilizando os dados já buscados (sem segunda chamada API)
+    const oddsParsed = parsearBookmakersOdds(entry.bookmakers || []);
+    // Também popula o cache para chamadas futuras (ex: geração de apostas)
+    const cacheKey = `${dataAlvo}|${fixtureId}`;
+    if (!oddsFixtureCache.has(cacheKey)) oddsFixtureCache.set(cacheKey, oddsParsed);
 
     // Estrela Bet separada
     const estrelaBet = detalhes.find(bm => bm.is_estrela_bet) || null;
