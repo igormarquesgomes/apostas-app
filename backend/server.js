@@ -194,9 +194,13 @@ function selecionarOdd(oddsJogo, aposta, timeCasa, timeFora) {
   return null;
 }
 
+// Bookmakers preferidos para cálculo de odds (casas confiáveis + brasileiras)
+// Bet365=8, Betfair=3, 1xBet=11, Bwin=6, Betway=24, Betano=32, Pinnacle=4
+const BOOKMAKERS_PREFERIDOS = new Set([8, 3, 11, 6, 24, 32, 4]);
+
 // ─── API-Football /odds — por fixture ────────────────────────────────────────
-// Retorna mapa normalizado de todas as apostas disponíveis para um fixture.
-// Estrutura: { "over 1.5": 1.35, "under 1.5": 3.20, "home": 1.50, ... }
+// Retorna mapa normalizado. Usa só BOOKMAKERS_PREFERIDOS quando disponíveis,
+// cai para todos se nenhum preferido estiver presente.
 async function buscarOddsFixture(fixtureId, data) {
   if (!fixtureId) return null;
   const cacheKey = `${data}|${fixtureId}`;
@@ -210,10 +214,19 @@ async function buscarOddsFixture(fixtureId, data) {
     );
     if (!res.ok) { console.log(`⚠️ Odds fixture ${fixtureId}: HTTP ${res.status}`); return null; }
     const json = await res.json();
-    const bookmakers = json.response?.[0]?.bookmakers || [];
+    let bookmakers = json.response?.[0]?.bookmakers || [];
     if (!bookmakers.length) { oddsFixtureCache.set(cacheKey, null); return null; }
 
-    // Agrega odds de todos os bookmakers disponíveis (média)
+    // Filtra por bookmakers preferidos; se nenhum disponível usa todos
+    const preferidos = bookmakers.filter(bm => BOOKMAKERS_PREFERIDOS.has(bm.id));
+    if (preferidos.length > 0) {
+      bookmakers = preferidos;
+      console.log(`  📊 Odds: usando ${preferidos.length} bookmaker(s) preferido(s): ${preferidos.map(b=>b.name).join(', ')}`);
+    } else {
+      console.log(`  📊 Odds: nenhum bookmaker preferido disponível, usando todos (${bookmakers.length})`);
+    }
+
+    // Agrega odds dos bookmakers selecionados (média)
     const acum = {}; // "chave normalizada" → [odds]
     const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 

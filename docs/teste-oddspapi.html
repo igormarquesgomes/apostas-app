@@ -281,11 +281,21 @@ async function testar() {
     let html = '<div class="card">';
 
     // Header info
+    const bkPreferidos = [8,3,11,6,24,32,4];
+    const bkNomePreferidos = ['Bet365','Betfair','1xBet','Bwin','Betway','Betano','Pinnacle'];
+    const bkDisponiveis = (d.bookmakers||[]).filter(bm => bkPreferidos.includes(bm.bookmaker_id));
+    const bkUsados = bkDisponiveis.length > 0 ? bkDisponiveis : (d.bookmakers||[]);
+
     html += `<div class="card-title">
       ${d.fixture?.time_casa||'?'} × ${d.fixture?.time_fora||'?'}
       <span class="badge badge-blue">${d.fixture?.liga||''}</span>
-      <span class="badge badge-green">${d.total_bookmakers} bookmaker(s)</span>
-      ${d.estrela_bet_encontrada ? '<span class="badge badge-amber">⭐ Estrela Bet ✓</span>' : '<span class="badge badge-red">Estrela Bet não encontrada</span>'}
+      <span class="badge badge-green">${d.total_bookmakers} bks total</span>
+      <span class="badge ${bkDisponiveis.length>0?'badge-green':'badge-amber'}">${bkUsados.length} preferido(s) usados</span>
+      ${d.estrela_bet_encontrada ? '<span class="badge badge-amber">⭐ Estrela Bet ✓</span>' : ''}
+    </div>
+    <div style="font-size:11px;color:#64748B;margin-bottom:12px;">
+      Odds calculadas com: ${bkUsados.map(b=>`<b>${b.bookmaker_nome}</b>`).join(', ')}
+      ${bkDisponiveis.length===0?'<span style="color:#B45309"> (nenhum preferido disponível — usando todos)</span>':''}
     </div>`;
 
     // ── Estrela Bet ──
@@ -415,8 +425,12 @@ function preencherAposta(chave) {
 
 function simular() {
   const el = document.getElementById('sim-result');
-  if (!_oddsAtuais || !Object.keys(_oddsAtuais).length) {
-    el.innerHTML = '<div class="result-pill pill-nd">⚠️ Busque um fixture primeiro.</div>';
+  if (_oddsAtuais === null) {
+    el.innerHTML = '<div class="result-pill pill-nd">⚠️ Selecione um jogo acima primeiro.</div>';
+    return;
+  }
+  if (!Object.keys(_oddsAtuais).length) {
+    el.innerHTML = '<div class="result-pill pill-nd">⚠️ Este fixture não tem odds disponíveis na API.</div>';
     return;
   }
 
