@@ -4182,11 +4182,13 @@ async function rotina04h() {
 
   for (const diaAlvo of [hoje, amanha]) {
     const row = await dbGet(diaAlvo);
-    const jogosExistentes = row?.apostas?.jogos || [];
+    const todosjogos = row?.apostas?.jogos || [];
+    // Considera apenas jogos válidos (não descartados e com odd confirmada)
+    const jogosExistentes = todosjogos.filter(j => !j.descartado);
     const total = jogosExistentes.length;
 
     if (total >= 15) {
-      console.log(`✅ ${diaAlvo}: já tem ${total} jogos — pulando`);
+      console.log(`✅ ${diaAlvo}: já tem ${total} jogos válidos — pulando`);
       continue;
     }
 
