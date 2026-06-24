@@ -4221,11 +4221,12 @@ async function rotina04h() {
       await dbSave(diaAlvo, resultado);
       console.log(`✅ ${diaAlvo}: ${resultado.jogos.length} jogos salvos`);
     } else {
-      // Complemento — mesclar com jogos existentes
+      // Complemento — mesclar com jogos existentes usando maior ID existente para evitar colisão
+      const maxIdExistente = todosjogos.reduce((max, j) => Math.max(max, j.id || 0), 0);
       const jogosCompletos = {
         jogos: [...jogosExistentes, ...resultado.jogos.map((j, i) => ({
           ...j,
-          id: total + i + 1 // Continuar a numeração
+          id: maxIdExistente + i + 1
         }))]
       };
       await dbSave(diaAlvo, jogosCompletos);
@@ -4332,7 +4333,7 @@ async function rotina05h() {
         if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
         if (resultado?.jogos?.length) {
           const jogosCompletos = {
-            jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: jogosValidos.length + i + 1}))]
+            jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...jogos.map(x=>x.id||0), 0) + i + 1}))]
           };
           await dbSave(diaAlvo, jogosCompletos);
           console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.length} jogos após complemento`);
