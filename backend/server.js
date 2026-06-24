@@ -4256,7 +4256,19 @@ async function rotina05h() {
     const jogos = row?.apostas?.jogos || [];
     const multiplas = row?.multiplas;
 
-    // 1. Verificar jogos — conta e também checa jogos sem odd_mercado validada
+    // 1. Re-confirmar odds salvas contra a API (detecta odds de mercado errado, ex: 1º tempo vs jogo completo)
+    for (const jogo of jogos) {
+      if (!jogo.odd_mercado || jogo.descartado || !jogo.fixtureId) continue;
+      const oddsFixture = await buscarOddsFixture(jogo.fixtureId, diaAlvo);
+      if (!oddsFixture) continue;
+      const oddConfirmada = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
+      if (oddConfirmada === null) {
+        console.log(`⚠️ ${jogo.time_casa} x ${jogo.time_fora}: odd_mercado ${jogo.odd_mercado} não confirmada para "${jogo.aposta}" — odd capturada de mercado errado, removendo`);
+        jogo.odd_mercado = null; // força re-análise na etapa seguinte
+      }
+    }
+
+    // 2. Verificar jogos — conta e também checa jogos sem odd_mercado validada
     const semOdd = jogos.filter(j => !j.odd_mercado && !j.descartado);
     const precisaComplementar = jogos.length < 15 || semOdd.length > 0;
 
