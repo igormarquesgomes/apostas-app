@@ -343,6 +343,16 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
 
 // Odd mínima global — mercado precisa ter odd real ≥ 1.25 para ser aceito
 const ODD_MINIMA = 1.25;
+
+// Gera justificativa pública limpa após pivô (remove termos internos)
+function gerarJustificativaPosPivot(aposta, mercado, razao, jogo) {
+  const termos = [/calibra[çc][aã]o\b/gi, /assertividade\b/gi, /LigaMedia\b/gi, /pivotad[ao]\b/gi, /nosso modelo\b/gi, /hist[oó]rico do sistema\b/gi];
+  let base = (razao || '').trim();
+  for (const t of termos) base = base.replace(t, '');
+  base = base.replace(/^[:\s—–-]+/, '').trim();
+  if (!base) return `Análise dos dados recentes aponta ${aposta} como a opção mais consistente para este jogo.`;
+  return base.charAt(0).toUpperCase() + base.slice(1) + (base.endsWith('.') ? '' : '.');
+}
 // Dia com muitos jogos disponíveis — não reutiliza descartados
 const LIMITE_JOGOS_MUITOS = 20;
 
