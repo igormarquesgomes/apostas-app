@@ -4254,28 +4254,78 @@ async function rotina05h() {
     const jogos = row?.apostas?.jogos || [];
     const multiplas = row?.multiplas;
 
-    // 1. Verificar jogos
-    if (jogos.length < 15) {
-      console.log(`⚠️ ${diaAlvo}: apenas ${jogos.length}/15 jogos — acionando complemento`);
-      const timesJaSelecionados = new Set(
-        jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
-      );
-      const faltam = 15 - jogos.length;
-      let resultado = null;
-      try {
-        resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
-        if (!resultado?.jogos?.length) { console.log(`⚠️ Multi-agente sem jogos — fallback gerarApostas`); resultado = null; }
-      } catch(e) { console.error('❌ Multi-agente falhou, usando fallback:', e.message); }
-      if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
-      if (resultado?.jogos?.length) {
-        const jogosCompletos = {
-          jogos: [...jogos, ...resultado.jogos.map((j, i) => ({...j, id: jogos.length + i + 1}))]
-        };
-        await dbSave(diaAlvo, jogosCompletos);
-        console.log(`✅ ${diaAlvo}: complementado para ${jogosCompletos.jogos.length} jogos`);
+    // 1. Verificar jogos — conta e também checa jogos sem odd_mercado validada
+    const semOdd = jogos.filter(j => !j.odd_mercado && !j.descartado);
+    const precisaComplementar = jogos.length < 15 || semOdd.length > 0;
+
+    if (precisaComplementar) {
+      const motivo = jogos.length < 15
+        ? `apenas ${jogos.length}/15 jogos`
+        : `${semOdd.length} jogo(s) sem odd_mercado validada`;
+      console.log(`⚠️ ${diaAlvo}: ${motivo} — acionando re-análise`);
+
+      // Re-analisar jogos sem odd antes de tentar complementar
+      if (semOdd.length > 0) {
+        console.log(`🔄 Re-analisando ${semOdd.length} jogo(s) sem odd: ${semOdd.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
+        const jogosAtualizados = [...jogos];
+        for (const jogo of semOdd) {
+          if (!jogo.fixtureId) continue;
+          const oddsFixture = await buscarOddsFixture(jogo.fixtureId, diaAlvo);
+          if (!oddsFixture) { jogo.descartado = true; jogo.descartado_motivo = 'sem odds na API'; continue; }
+          const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
+          const promptReanalise = `Jogo Copa/Liga: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga||''}, ${jogo.horario||''})\nMotivo sem odd: aposta original "${jogo.aposta}" não disponível ou odd < 1.25\n\nMercados DISPONÍVEIS com odd ≥ 1.25:\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'}\n\nEscolha a MELHOR aposta. Confiança ALTA, odd ≥ 1.25. Mercados de tempo parcial válidos (diga o período).\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+          try {
+            const resp = await chamarIA(promptReanalise, 800);
+            const m = resp?.match(/\{[\s\S]*\}/);
+            if (m) {
+              const nova = JSON.parse(m[0]);
+              if (nova.aposta && nova.mercado && nova.confianca === 'alta') {
+                const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
+                const oddNum = oddReal ? parseFloat(oddReal) : null;
+                if (oddNum && oddNum >= ODD_MINIMA) {
+                  console.log(`  ✅ Re-análise: ${jogo.time_casa} x ${jogo.time_fora} → ${nova.aposta} @ ${oddNum}`);
+                  jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
+                  jogo.aposta = nova.aposta; jogo.mercado = nova.mercado;
+                  jogo.odd_mercado = oddNum; jogo.confianca = 'alta';
+                  jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
+                  jogo.descartado = false;
+                } else {
+                  console.log(`  ❌ Re-análise falhou para ${jogo.time_casa}: odd não confirmada. Descartando.`);
+                  jogo.descartado = true; jogo.descartado_motivo = `re-análise: ${nova.aposta} sem odd confirmada`;
+                }
+              }
+            }
+          } catch(e) { console.error(`  Erro re-análise ${jogo.time_casa}:`, e.message); jogo.descartado = true; }
+        }
+        // Salva jogos atualizados antes de complementar
+        await dbSave(diaAlvo, { jogos: jogosAtualizados });
+      }
+
+      // Complementar se ainda faltam jogos (descontando descartados)
+      const rowAtualizado = await dbGet(diaAlvo);
+      const jogosValidos = (rowAtualizado?.apostas?.jogos || []).filter(j => !j.descartado);
+      if (jogosValidos.length < 15) {
+        const faltam = 15 - jogosValidos.length;
+        const timesJaSelecionados = new Set(
+          jogosValidos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+        );
+        console.log(`🔄 ${diaAlvo}: complementando ${faltam} jogo(s)`);
+        let resultado = null;
+        try {
+          resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
+          if (!resultado?.jogos?.length) resultado = null;
+        } catch(e) { console.error('❌ Multi-agente falhou:', e.message); }
+        if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
+        if (resultado?.jogos?.length) {
+          const jogosCompletos = {
+            jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: jogosValidos.length + i + 1}))]
+          };
+          await dbSave(diaAlvo, jogosCompletos);
+          console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.length} jogos após complemento`);
+        }
       }
     } else {
-      console.log(`✅ ${diaAlvo}: ${jogos.length} jogos OK`);
+      console.log(`✅ ${diaAlvo}: ${jogos.length} jogos com odds validadas OK`);
     }
 
     // 2. Verificar múltiplas
