@@ -5400,16 +5400,37 @@ app.get('/apostas-resultado/:data', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
-function agendarRotina() {
+function msAteHoraUTC(horaUTC, minUTC = 0) {
   const agora = new Date();
-  // 06:05 UTC = 03:05 Brasília (UTC-3), após os jogos europeus terminarem
-  const prox = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()+1, 6, 5, 0));
-  const ms = prox.getTime() - agora.getTime();
-  console.log(`⏰ Próxima rotina em ${Math.round(ms/60000)} min`);
-  setTimeout(() => {
+  const prox = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), horaUTC, minUTC, 0));
+  if (prox <= agora) prox.setUTCDate(prox.getUTCDate() + 1);
+  return prox.getTime() - agora.getTime();
+}
+
+function agendarRotina() {
+  // 06:05 UTC = 03:05 BRT — validação + calibração
+  const ms03h = msAteHoraUTC(6, 5);
+  console.log(`⏰ Próxima rotina (03h) em ${Math.round(ms03h/60000)} min`);
+  setTimeout(function tick03h() {
     rotinaNoturna().catch(console.error);
-    setInterval(() => rotinaNoturna().catch(console.error), 24*60*60*1000);
-  }, ms);
+    setTimeout(tick03h, 24 * 60 * 60 * 1000);
+  }, ms03h);
+
+  // 06:35 UTC = 03:35 BRT — gerar apostas de hoje e amanhã
+  const ms0335 = msAteHoraUTC(6, 35);
+  console.log(`⏰ Próxima rotina (03h35) em ${Math.round(ms0335/60000)} min`);
+  setTimeout(function tick0335() {
+    rotina04h().catch(console.error);
+    setTimeout(tick0335, 24 * 60 * 60 * 1000);
+  }, ms0335);
+
+  // 07:05 UTC = 04:05 BRT — verificar integridade e complementar
+  const ms04h = msAteHoraUTC(7, 5);
+  console.log(`⏰ Próxima rotina (04h) em ${Math.round(ms04h/60000)} min`);
+  setTimeout(function tick04h() {
+    rotina05h().catch(console.error);
+    setTimeout(tick04h, 24 * 60 * 60 * 1000);
+  }, ms04h);
 }
 
 app.listen(PORT, () => {
