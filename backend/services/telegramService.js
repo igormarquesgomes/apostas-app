@@ -346,6 +346,12 @@ async function responderValidacoesAnalises() {
         text: reply,
         reply_to_message_id: agendo.message_id,
       });
+      // Marca como validado para não reenviar em próximas execuções
+      await supaFetch(`agendos_telegram_analises?id=eq.${agendo.id}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'validado', updated_at: new Date().toISOString() }),
+      });
       console.log(`  ↩️ [Análises] Reply ${agendo.jogo.time_casa} x ${agendo.jogo.time_fora}: ${reply}`);
     } catch (err) {
       console.error(`  ❌ [Análises] Reply erro: ${err.message}`);
