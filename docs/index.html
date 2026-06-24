@@ -912,8 +912,26 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
     const apNG=normAccG(ap);
     const nomeCasaG=normAccG((timeCasa||'').toLowerCase()),nomeForaG=normAccG((timeFora||'').toLowerCase());
     const primCasaG=nomeCasaG.split(' ')[0],primForaG=nomeForaG.split(' ')[0];
+
+    // Apostas de tempo parcial — frontend não tem placar de intervalo, não pode validar
+    const eParcial=ap.includes('1st half')||ap.includes('first half')||ap.includes('primeiro tempo')||
+                   ap.includes('2nd half')||ap.includes('second half')||ap.includes('segundo tempo')||
+                   ap.includes('halftime')||ap.includes('ht)');
+    if(eParcial) return null;
+
+    // Apostas de time específico — usa gols do time correto
+    const eAway=ap.includes('away')||ap.includes('visitante')||ap.includes('fora over')||ap.includes('fora under');
+    const eHome=ap.includes('home ')||ap.includes('mandante')||ap.includes('casa over')||ap.includes('casa under');
+    if(eAway&&!isNaN(n)){
+      if(ap.includes('over')||ap.includes('mais')) return gf>n?'green':'red';
+      if(ap.includes('under')||ap.includes('menos')) return gf<n?'green':'red';
+    }
+    if(eHome&&!isNaN(n)){
+      if(ap.includes('over')||ap.includes('mais')) return gc>n?'green':'red';
+      if(ap.includes('under')||ap.includes('menos')) return gc<n?'green':'red';
+    }
+
     if(apNG.includes('marca')){
-      // "Time marca" / "Time marca Over X gols" — usa gols do time específico, não o total
       let golsTime=null;
       if(apNG.includes('fora')||apNG.includes('away')) golsTime=gf;
       else if(apNG.includes('casa')||apNG.includes('home')) golsTime=gc;
