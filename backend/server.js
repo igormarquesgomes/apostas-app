@@ -2002,8 +2002,8 @@ Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes",
   if (usouBaixa > 0) {
     console.log(`  ⚠️  ${usouBaixa} jogo(s) de baixa confiança incluídos por falta de opção melhor`);
   }
-  const descartados = jogosFinais.length - resultado.jogos.length;
-  if (descartados > 0) {
+  const totalDescartados = jogosFinais.length - resultado.jogos.length;
+  if (totalDescartados > 0) {
     console.log(`  ✂️  Cortando ${descartados} reservas extras`);
   }
 
@@ -2012,7 +2012,7 @@ Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes",
     const c = j.confianca || 'media';
     acc[c] = (acc[c] || 0) + 1; return acc;
   }, {});
-  console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}${descartados > 0 ? ` | descartados: ${descartados}` : ''}`);
+  console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}${descartados > 0 ? ` | descartados: ${totalDescartados}` : ''}`);
 
   // Reatribuir id sequencial — a IA reinicia a numeração em cada chamada/sublote,
   // causando ids duplicados (ex: vários jogos com id:1). Garante id único 1..N.
