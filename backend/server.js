@@ -5403,8 +5403,18 @@ function msAteHoraUTC(horaUTC, minUTC = 0) {
   return prox.getTime() - agora.getTime();
 }
 
+function jaPassouHojeUTC(horaUTC, minUTC = 0) {
+  const agora = new Date();
+  const ref = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), horaUTC, minUTC, 0));
+  return agora > ref;
+}
+
 function agendarRotina() {
   // 06:05 UTC = 03:05 BRT — validação + calibração
+  if (jaPassouHojeUTC(6, 5)) {
+    console.log(`⚡ Rotina 03h já passou hoje — executando validação agora`);
+    setTimeout(() => rotinaNoturna().catch(console.error), 5000);
+  }
   const ms03h = msAteHoraUTC(6, 5);
   console.log(`⏰ Próxima rotina (03h) em ${Math.round(ms03h/60000)} min`);
   setTimeout(function tick03h() {
@@ -5413,6 +5423,10 @@ function agendarRotina() {
   }, ms03h);
 
   // 06:35 UTC = 03:35 BRT — gerar apostas de hoje e amanhã
+  if (jaPassouHojeUTC(6, 35)) {
+    console.log(`⚡ Rotina 03h35 já passou hoje — verificando se apostas foram geradas`);
+    setTimeout(() => rotina04h().catch(console.error), 15000);
+  }
   const ms0335 = msAteHoraUTC(6, 35);
   console.log(`⏰ Próxima rotina (03h35) em ${Math.round(ms0335/60000)} min`);
   setTimeout(function tick0335() {
@@ -5421,6 +5435,10 @@ function agendarRotina() {
   }, ms0335);
 
   // 07:05 UTC = 04:05 BRT — verificar integridade e complementar
+  if (jaPassouHojeUTC(7, 5)) {
+    console.log(`⚡ Rotina 04h já passou hoje — verificando integridade`);
+    setTimeout(() => rotina05h().catch(console.error), 30000);
+  }
   const ms04h = msAteHoraUTC(7, 5);
   console.log(`⏰ Próxima rotina (04h) em ${Math.round(ms04h/60000)} min`);
   setTimeout(function tick04h() {

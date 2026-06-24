@@ -24,24 +24,45 @@ function horaBRT() {
   return parseInt(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }), 10);
 }
 
+function jaPassouHoje(horaUTC, minUTC = 0) {
+  const agora = new Date();
+  const ref = new Date(Date.UTC(
+    agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(),
+    horaUTC, minUTC, 0
+  ));
+  return agora > ref;
+}
+
 function agendarCronTelegram() {
   // ── 09h UTC (06h BRT) — editar lista + reply análises ─────────────────
+  const run06h = () => Promise.all([
+    telegramService.editarMensagemListaAnterior(),
+    telegramService.responderValidacoesAnalises(),
+  ]).catch(err => console.error('❌ [Telegram 06h]:', err.message));
+
+  if (jaPassouHoje(9, 0)) {
+    console.log(`⚡ [Telegram] 06h já passou hoje — executando agora`);
+    setTimeout(run06h, 5000); // pequeno delay para o servidor estabilizar
+  }
   const ms06h = msAteProxima(9, 0);
-  console.log(`⏰ [Telegram] Edição/reply em ${Math.round(ms06h / 60000)} min`);
+  console.log(`⏰ [Telegram] Próxima edição/reply em ${Math.round(ms06h / 60000)} min`);
   setTimeout(function tick06h() {
-    Promise.all([
-      telegramService.editarMensagemListaAnterior(),
-      telegramService.responderValidacoesAnalises(),
-    ]).catch(err => console.error('❌ [Telegram 06h]:', err.message));
+    run06h();
     setTimeout(tick06h, 24 * 60 * 60 * 1000);
   }, ms06h);
 
   // ── 11h UTC (08h BRT) — enviar lista de hoje ──────────────────────────
+  const run08h = () => telegramService.enviarListaDeDia()
+    .catch(err => console.error('❌ [Telegram 08h]:', err.message));
+
+  if (jaPassouHoje(11, 0)) {
+    console.log(`⚡ [Telegram] 08h já passou hoje — verificando se lista foi enviada`);
+    setTimeout(run08h, 8000);
+  }
   const ms08h = msAteProxima(11, 0);
-  console.log(`⏰ [Telegram] Envio lista em ${Math.round(ms08h / 60000)} min`);
+  console.log(`⏰ [Telegram] Próximo envio lista em ${Math.round(ms08h / 60000)} min`);
   setTimeout(function tick08h() {
-    telegramService.enviarListaDeDia()
-      .catch(err => console.error('❌ [Telegram 08h]:', err.message));
+    run08h();
     setTimeout(tick08h, 24 * 60 * 60 * 1000);
   }, ms08h);
 
