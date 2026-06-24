@@ -286,7 +286,7 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
     return null;
   };
 
-  // ── GOLS ──────────────────────────────────────────────────────────────────
+  // ── GOLS (inclui mercados de tempo parcial quando mencionados explicitamente) ──
   if (mercado === 'gols') {
     if (a.includes('ambos') || a.includes('ambas') || a.includes('btts') || a.includes('both teams')) {
       return buscar(['goals scored','both teams to score','both teams score','btts'], 'yes')
@@ -294,6 +294,22 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
     }
     if (linha) {
       const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
+
+      // Tempo parcial mencionado explicitamente na aposta
+      const isPrimTempo = a.includes('primeiro tempo') || a.includes('1o tempo') || a.includes('1st half') || a.includes('first half') || a.includes('ht');
+      const isSegTempo  = a.includes('segundo tempo')  || a.includes('2o tempo') || a.includes('2nd half') || a.includes('second half');
+
+      if (isPrimTempo) {
+        // busca direta em chaves de primeiro tempo — buscarPorPalavras OK aqui (parcial explícito)
+        return buscar(['goals over/under first half','goals over/under - first half','first half goals','ht goals'], `${dir} ${linha}`)
+            || (Object.entries(odds).find(([k,v]) => (k.includes('first half') || k.includes('1st half')) && k.includes(dir) && k.includes(linha))?.[1] ?? null);
+      }
+      if (isSegTempo) {
+        return buscar(['goals over/under - second half','goals over/under second half','second half goals'], `${dir} ${linha}`)
+            || (Object.entries(odds).find(([k,v]) => (k.includes('second half') || k.includes('2nd half')) && k.includes('|'+dir+' '+linha))?.[1] ?? null);
+      }
+
+      // Jogo completo — fallback exclui parciais (comportamento original)
       return buscar(['goals over/under','total goals','over/under','total - goals','over/under goals'], `${dir} ${linha}`)
           || buscarPorPalavras(['goal','over/under','total'], `${dir} ${linha}`);
     }
@@ -426,10 +442,12 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
  */
 function formatarMercadosDisponiveisParaIA(oddsFixture) {
   if (!oddsFixture) return 'Nenhum mercado disponível na API.';
+  // Mercados relevantes para sugestão — inclui tempo parcial explicitamente
+  const RELEVANTES = ['goals over/under','match winner','double chance','both teams','corners','cards','first half','second half','1st half','2nd half','total goals','result'];
   const linhas = [];
   for (const [chave, odd] of Object.entries(oddsFixture).sort()) {
     const [betNome, valor] = chave.split('|');
-    if (odd >= ODD_MINIMA && odd <= 10) {
+    if (odd >= ODD_MINIMA && odd <= 10 && RELEVANTES.some(r => betNome.includes(r))) {
       linhas.push(`  ${betNome} → ${valor}: ${odd}`);
     }
   }
@@ -2557,7 +2575,7 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
     for (const { jogo, motivo, oddsFixture } of descartadosMA) {
       if (!oddsFixture) continue;
       const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
-      const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})\nMotivo do descarte: ${motivo}\n\nMercados DISPONÍVEIS na API (únicos apostáveis):\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | Esc: ${jogo.media_escanteios||'?'} | Cart: ${jogo.media_cartoes||'?'}\n\nEscolha a MELHOR aposta dentre os mercados acima. Confiança ALTA, odd ≥ 1.25.\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+      const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})\nMotivo do descarte: ${motivo}\n\nMercados DISPONÍVEIS na API (únicos apostáveis):\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | Esc: ${jogo.media_escanteios||'?'} | Cart: ${jogo.media_cartoes||'?'}\n\nEscolha a MELHOR aposta dentre os mercados acima. Confiança ALTA, odd ≥ 1.25.\nMercados de tempo parcial (primeiro tempo / segundo tempo) são válidos se disponíveis — deixe CLARO no campo aposta qual período (ex: "Over 0.5 gols - Primeiro Tempo", "Over 1.5 gols - Segundo Tempo").\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
       try {
         const resp = await chamarIA(promptReanalise, 800);
         if (resp) {
