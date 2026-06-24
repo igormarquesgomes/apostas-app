@@ -3108,6 +3108,9 @@ async function buscarResultadoFixture(fixtureId) {
       placar: `${f.goals?.home}-${f.goals?.away}`,
       golsCasa: f.goals?.home,
       golsFora: f.goals?.away,
+      // Placar do 1º tempo — necessário para validar apostas de tempo parcial
+      golsCasa1T: f.score?.halftime?.home ?? null,
+      golsFora1T: f.score?.halftime?.away ?? null,
       status
     };
   } catch(e) { return null; }
@@ -3265,7 +3268,45 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
 
   // ── MERCADO GOLS ──────────────────────────────────────────
   if (mercado === 'gols') {
-    for (const linha of ['0.5','1.5','2.5','3.5','4.5']) {
+    // Detecta tempo parcial na aposta
+    const isPrimTempo = apostaNorm.includes('primeiro tempo') || apostaNorm.includes('1st half') || apostaNorm.includes('first half') || apostaNorm.includes('1o tempo') || apostaNorm.includes('ht') || apostaNorm.includes('halftime');
+    const isSegTempo  = apostaNorm.includes('segundo tempo')  || apostaNorm.includes('2nd half') || apostaNorm.includes('second half') || apostaNorm.includes('2o tempo');
+    // Detecta time específico
+    const isAway = apostaNorm.includes('away') || apostaNorm.includes('visitante') || apostaNorm.includes('fora over') || apostaNorm.includes('fora under');
+    const isHome = apostaNorm.includes('home ') || apostaNorm.includes('mandante') || apostaNorm.includes('casa over') || apostaNorm.includes('casa under');
+
+    // Gols parciais (1º/2º tempo) — usa placar de intervalo quando disponível
+    if (isPrimTempo || isSegTempo) {
+      const golsPT = stats?.golsCasa1T != null ? {
+        casa: stats.golsCasa1T, fora: stats.golsFora1T,
+        total: stats.golsCasa1T + stats.golsFora1T
+      } : null;
+      // Sem dado de 1T/2T → não consegue validar
+      if (!golsPT) return 'sem_stats';
+      const valorPT = isAway ? golsPT.fora : isHome ? golsPT.casa : golsPT.total;
+      for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
+        const r = checkOverUnder(valorPT, linha);
+        if (r) return r;
+      }
+      return 'pendente';
+    }
+
+    // Apostas de time específico (full match)
+    if (isAway || palavrasFora.some(p => apostaNorm.includes(p))) {
+      for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
+        const r = checkOverUnder(golsFora, linha);
+        if (r) return r;
+      }
+    }
+    if (isHome || palavrasCasa.some(p => apostaNorm.includes(p) && !isAway)) {
+      for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
+        const r = checkOverUnder(golsCasa, linha);
+        if (r) return r;
+      }
+    }
+
+    // Over/Under total — inclui linhas inteiras (1, 2, 3) além das .5
+    for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
       const r = checkOverUnder(total, linha);
       if (r) return r;
     }
@@ -3277,10 +3318,8 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     }
     // Time marca primeiro / anytime
     if (apostaNorm.includes('marca') || apostaNorm.includes('to score') || apostaNorm.includes('anytime')) {
-      // Mandante/visitante genérico
       if (apostaNorm.includes('visitante') || apostaNorm.includes('away team') || apostaNorm.includes('away to score')) return golsFora > 0 ? 'green' : 'red';
       if (apostaNorm.includes('mandante') || apostaNorm.includes('home team') || apostaNorm.includes('home to score')) return golsCasa > 0 ? 'green' : 'red';
-      // Por nome do time
       if (palavrasCasa.some(p => apostaNorm.includes(p))) return golsCasa > 0 ? 'green' : 'red';
       if (palavrasFora.some(p => apostaNorm.includes(p))) return golsFora > 0 ? 'green' : 'red';
     }
@@ -3473,6 +3512,12 @@ async function agentValidar(data, opcoes = {}) {
         const res = await buscarResultadoFixture(jogo.fixtureId);
         if (res) {
           placar = res.placar; golsCasa = res.golsCasa; golsFora = res.golsFora;
+          // Propaga placar do 1º tempo para stats (usado em verificarAposta para apostas de tempo parcial)
+          if (res.golsCasa1T != null) {
+            if (!stats) stats = {};
+            stats.golsCasa1T = res.golsCasa1T;
+            stats.golsFora1T = res.golsFora1T;
+          }
         } else {
           // fixtureId existe mas jogo não terminou — API encontrou o jogo
           jogoEncontradoNaAPI = true;
