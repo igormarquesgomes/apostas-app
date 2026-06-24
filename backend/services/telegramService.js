@@ -23,10 +23,11 @@ function dataHoje() {
 }
 
 function dataOntem() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-    .split('/').reverse().join('-');
+  // Calcula a partir da data BRT de hoje para evitar bugs de crossing midnight UTC→BRT
+  const hoje = dataHoje();
+  const [a, m, d] = hoje.split('-').map(Number);
+  const dt = new Date(a, m - 1, d - 1); // subtrai 1 dia da data BRT já correta
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 }
 
 function fmtData(iso) {
