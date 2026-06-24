@@ -273,9 +273,12 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
   // Usado quando o nome do bet na API não coincide com nenhum nome conhecido
   // Nota: odds só tem dados das casas preferidas (Bet365/Betano/Betfair/1xBet/Bwin/Betway)
   // → se encontrado aqui, mercado está disponível nessas casas = proxy da Estrela Bet
+  // Mercados de tempo parcial — excluídos do fallback para não contaminar busca de jogo completo
+  const PARCIAIS = ['first half','second half','1st half','2nd half','half time','halftime','1h','2h'];
   const buscarPorPalavras = (palavrasChave, valor) => {
     for (const chave of Object.keys(odds)) {
       const [betNome, betValor] = chave.split('|');
+      if (PARCIAIS.some(p => betNome.includes(p))) continue; // ignora mercados de tempo parcial
       const nomeOk = palavrasChave.some(p => betNome.includes(p));
       const valorOk = betValor === valor || betValor?.includes(valor);
       if (nomeOk && valorOk) return odds[chave];
