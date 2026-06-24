@@ -5591,42 +5591,70 @@ function jaPassouHojeUTC(horaUTC, minUTC = 0) {
   return agora > ref;
 }
 
+// Janela de catch-up: só executa se passou há menos de N minutos (evita re-execução tardia)
+const CATCHUP_MAX_MIN = 90; // se passou > 90 min do horário, não faz catch-up
+function deveExecutarCatchup(horaUTC, minUTC = 0) {
+  const agora = new Date();
+  const ref = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), horaUTC, minUTC, 0));
+  if (agora <= ref) return false; // ainda não passou
+  const minPassados = (agora - ref) / 60000;
+  return minPassados <= CATCHUP_MAX_MIN; // só faz catch-up se passou < 90 min
+}
+
 function agendarRotina() {
-  // 06:05 UTC = 03:05 BRT — validação + calibração
-  if (jaPassouHojeUTC(6, 5)) {
-    console.log(`⚡ Rotina 03h já passou hoje — executando validação agora`);
-    setTimeout(() => rotinaNoturna().catch(console.error), 5000);
-  }
-  const ms03h = msAteHoraUTC(6, 5);
-  console.log(`⏰ Próxima rotina (03h) em ${Math.round(ms03h/60000)} min`);
+  // ── 03:00 BRT (06:00 UTC) — validação noturna + calibração ──────────────
+  // SEM catch-up: rotinaNoturna não deve rodar fora da janela noturna
+  const ms03h = msAteHoraUTC(6, 0);
+  console.log(`⏰ Próxima rotinaNoturna (03h) em ${Math.round(ms03h/60000)} min`);
   setTimeout(function tick03h() {
     rotinaNoturna().catch(console.error);
     setTimeout(tick03h, 24 * 60 * 60 * 1000);
   }, ms03h);
 
-  // 06:35 UTC = 03:35 BRT — gerar apostas de hoje e amanhã
-  if (jaPassouHojeUTC(6, 35)) {
-    console.log(`⚡ Rotina 03h35 já passou hoje — verificando se apostas foram geradas`);
+  // ── 03:30 BRT (06:30 UTC) — gerar apostas de hoje e amanhã ──────────────
+  // Catch-up: se servidor reiniciou em até 90 min depois, gera apostas do dia
+  if (deveExecutarCatchup(6, 30)) {
+    console.log(`⚡ Catch-up 03h30: gerando apostas (passou < ${CATCHUP_MAX_MIN} min)`);
     setTimeout(() => rotina04h().catch(console.error), 15000);
   }
-  const ms0335 = msAteHoraUTC(6, 35);
-  console.log(`⏰ Próxima rotina (03h35) em ${Math.round(ms0335/60000)} min`);
-  setTimeout(function tick0335() {
+  const ms0330 = msAteHoraUTC(6, 30);
+  console.log(`⏰ Próxima rotina04h (03h30) em ${Math.round(ms0330/60000)} min`);
+  setTimeout(function tick0330() {
     rotina04h().catch(console.error);
-    setTimeout(tick0335, 24 * 60 * 60 * 1000);
-  }, ms0335);
+    setTimeout(tick0330, 24 * 60 * 60 * 1000);
+  }, ms0330);
 
-  // 07:05 UTC = 04:05 BRT — verificar integridade e complementar
-  if (jaPassouHojeUTC(7, 5)) {
-    console.log(`⚡ Rotina 04h já passou hoje — verificando integridade`);
+  // ── 04:15 BRT (07:15 UTC) — verificar integridade e corrigir ────────────
+  if (deveExecutarCatchup(7, 15)) {
+    console.log(`⚡ Catch-up 04h15: verificando integridade`);
     setTimeout(() => rotina05h().catch(console.error), 30000);
   }
-  const ms04h = msAteHoraUTC(7, 5);
-  console.log(`⏰ Próxima rotina (04h) em ${Math.round(ms04h/60000)} min`);
-  setTimeout(function tick04h() {
+  const ms0415 = msAteHoraUTC(7, 15);
+  console.log(`⏰ Próxima rotina05h (04h15) em ${Math.round(ms0415/60000)} min`);
+  setTimeout(function tick0415() {
     rotina05h().catch(console.error);
-    setTimeout(tick04h, 24 * 60 * 60 * 1000);
-  }, ms04h);
+    setTimeout(tick0415, 24 * 60 * 60 * 1000);
+  }, ms0415);
+
+  // ── 15:00 BRT (18:00 UTC) — primeira validação parcial dos jogos do dia ─
+  const ms15h = msAteHoraUTC(18, 0);
+  console.log(`⏰ Próxima validação parcial (15h) em ${Math.round(ms15h/60000)} min`);
+  setTimeout(function tick15h() {
+    const hoje = hojeStr();
+    console.log(`⏰ [15h] Validação parcial — ${hoje}`);
+    agentValidar(hoje, { forcarWebSearch: false }).catch(console.error);
+    setTimeout(tick15h, 24 * 60 * 60 * 1000);
+  }, ms15h);
+
+  // ── 18:00 BRT (21:00 UTC) — segunda validação parcial ───────────────────
+  const ms18h = msAteHoraUTC(21, 0);
+  console.log(`⏰ Próxima validação parcial (18h) em ${Math.round(ms18h/60000)} min`);
+  setTimeout(function tick18h() {
+    const hoje = hojeStr();
+    console.log(`⏰ [18h] Validação parcial — ${hoje}`);
+    agentValidar(hoje, { forcarWebSearch: true }).catch(console.error);
+    setTimeout(tick18h, 24 * 60 * 60 * 1000);
+  }, ms18h);
 }
 
 app.listen(PORT, () => {
