@@ -346,7 +346,7 @@ const ODD_MINIMA = 1.25;
 
 // Gera justificativa pública limpa após pivô (remove termos internos)
 function gerarJustificativaPosPivot(aposta, mercado, razao, jogo) {
-  const termos = [/calibra[çc][aã]o\b/gi, /assertividade\b/gi, /LigaMedia\b/gi, /pivotad[ao]\b/gi, /nosso modelo\b/gi, /hist[oó]rico do sistema\b/gi];
+  const termos = [/calibra[çc][aã]o\b/gi, /assertividade\b/gi, /LigaMedia\b/gi, /pivotad[ao]\b/gi, /nosso modelo\b/gi, /hist[oó]rico do sistema\b/gi, /especialista\b/gi, /agente\b/gi];
   let base = (razao || '').trim();
   for (const t of termos) base = base.replace(t, '');
   base = base.replace(/^[:\s—–-]+/, '').trim();
@@ -1922,16 +1922,7 @@ Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes",
     return 0;
   }
 
-  // Gera justificativa pública coerente com a aposta final (pós-pivot), sem termos técnicos internos
-  function gerarJustificativaPosPivot(aposta, mercado, razao, jogo) {
-    const termos = [/calibra[çc][aã]o\b/gi, /assertividade\b/gi, /LigaMedia\b/gi, /pivotad[ao]\b/gi, /nosso modelo\b/gi, /hist[oó]rico do sistema\b/gi];
-    let base = (razao || '').trim();
-    for (const t of termos) base = base.replace(t, '');
-    base = base.replace(/^[:\s—–-]+/, '').trim();
-    if (!base) return `Análise dos dados recentes aponta ${aposta} como a opção mais consistente para este jogo.`;
-    // Capitalizar primeira letra
-    return base.charAt(0).toUpperCase() + base.slice(1) + (base.endsWith('.') ? '' : '.');
-  }
+
 
   // ── Pós-processamento: pivotar para confiança alta, descartar complementares sem opção ──────────
   const jogosFinais = [];
@@ -2014,7 +2005,7 @@ Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes",
   }
   const totalDescartados = jogosFinais.length - resultado.jogos.length;
   if (totalDescartados > 0) {
-    console.log(`  ✂️  Cortando ${descartados} reservas extras`);
+    console.log(`  ✂️  Cortando ${totalDescartados} reservas extras`);
   }
 
   // Log distribuição final
@@ -2022,7 +2013,7 @@ Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes",
     const c = j.confianca || 'media';
     acc[c] = (acc[c] || 0) + 1; return acc;
   }, {});
-  console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}${descartados > 0 ? ` | descartados: ${totalDescartados}` : ''}`);
+  console.log(`  📊 Distribuição por confiança: ${Object.entries(distConf).map(([c,n])=>`${c}:${n}`).join(' | ')}${totalDescartados > 0 ? ` | descartados: ${totalDescartados}` : ''}`);
 
   // Reatribuir id sequencial — a IA reinicia a numeração em cada chamada/sublote,
   // causando ids duplicados (ex: vários jogos com id:1). Garante id único 1..N.
@@ -2514,14 +2505,6 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
     if (!j.mercado || j.mercado === 'undefined') return false;
     if (!j.justificativa || j.justificativa === '-' || j.justificativa.trim() === '') return false;
     return true;
-  }
-  function gerarJustificativaPosPivot(aposta, mercado, razao, jogo) {
-    const termos = [/calibra[çc][aã]o\b/gi,/assertividade\b/gi,/LigaMedia\b/gi,/pivotad[ao]\b/gi,/nosso modelo\b/gi,/hist[oó]rico do sistema\b/gi,/especialista\b/gi,/agente\b/gi];
-    let base = (razao||'').trim();
-    for (const t of termos) base = base.replace(t, '');
-    base = base.replace(/^[:\s—–-]+/,'').trim();
-    if (!base) return `Análise dos dados recentes aponta ${aposta} como a opção mais consistente para este jogo.`;
-    return base.charAt(0).toUpperCase() + base.slice(1) + (base.endsWith('.')?'':'.');
   }
   function calcularScoreProbabilidade(aposta, mercado, jogo) {
     if (!aposta) return 0;
