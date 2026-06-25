@@ -1665,9 +1665,9 @@ razao_escolha: frase curta explicando por que esse mercado e não outro.
 alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais ao menos confiável.`;
   }
 
-  // Adicionar margem de 3 jogos reservas — analisados pela IA junto com os principais
-  // Se algum for descartado no pós-processamento, o substituto já vem com análise completa
-  const MARGEM_RESERVA = 3;
+  // Adicionar margem de 7 jogos reservas — analisados pela IA junto com os principais
+  // Se algum for descartado (sem odd válida, confiança baixa etc.), o substituto já vem pronto
+  const MARGEM_RESERVA = 7;
   const totalComMargem = Math.min(metaJogos + MARGEM_RESERVA, jogos.length);
   jogos = jogos.slice(0, totalComMargem);
 
@@ -2163,7 +2163,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   }
   if (!jogos.length) return null;
 
-  const MARGEM = 3;
+  const MARGEM = 7;
   jogos = jogos.slice(0, Math.min(metaJogos + MARGEM, jogos.length));
   console.log(`\nMulti-agente — jogos selecionados: ${jogos.length}`);
   jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
