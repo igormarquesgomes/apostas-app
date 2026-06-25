@@ -4313,8 +4313,14 @@ async function rotina05h() {
       if (!oddsFixture) continue;
       const oddConfirmada = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
       if (oddConfirmada === null) {
-        console.log(`⚠️ ${jogo.time_casa} x ${jogo.time_fora}: odd_mercado ${jogo.odd_mercado} não confirmada para "${jogo.aposta}" — odd capturada de mercado errado, removendo`);
-        jogo.odd_mercado = null; // força re-análise na etapa seguinte
+        console.log(`⚠️ ${jogo.time_casa}: odd não encontrada para "${jogo.aposta}" — mercado errado, removendo`);
+        jogo.odd_mercado = null;
+      } else if (parseFloat(oddConfirmada) < ODD_MINIMA) {
+        console.log(`⚠️ ${jogo.time_casa}: odd confirmada ${oddConfirmada} < mínima ${ODD_MINIMA} — forçando re-análise`);
+        jogo.odd_mercado = null;
+      } else if (Math.abs(parseFloat(oddConfirmada) - parseFloat(jogo.odd_mercado)) > 0.15) {
+        console.log(`⚠️ ${jogo.time_casa}: odd salva ${jogo.odd_mercado} diverge da API ${oddConfirmada} — corrigindo`);
+        jogo.odd_mercado = parseFloat(oddConfirmada); // corrige para o valor real
       }
     }
 
