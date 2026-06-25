@@ -3917,8 +3917,8 @@ async function agentDiario(data) {
   const total = g + r; // cancelados não entram no cálculo
   const assert = total > 0 ? ((g/total)*100).toFixed(2) : 0;
 
-  // Só incluir jogos validados no relatório — pendentes não têm resultado para analisar
-  const resultadosValidados = resultados.filter(r => ['green','red','cancelado'].includes(r.resultado_aposta));
+  // Incluir todos os jogos no relatório — pendentes também (marcados como não resolvidos)
+  const resultadosValidados = resultados.filter(r => ['green','red','cancelado','pendente'].includes(r.resultado_aposta));
 
   // Calcular mercados alternativos para TODOS os jogos (não só RED)
   // Isso gera padrões por liga
@@ -5018,13 +5018,12 @@ app.post('/validar-pendentes', async (req, res) => {
 
 // Corrigir resultado de uma aposta manualmente
 app.post('/corrigir-resultado', async (req, res) => {
-  const { data, jogo_id, placar, resultado } = req.body;
+  const { data, jogo_id, placar, placar_ht, resultado } = req.body;
   if (!data || !jogo_id) return res.status(400).json({ error: 'Parâmetros inválidos' });
 
   const row = await dbGet(data);
   if (!row?.resultados?.apostas) return res.status(404).json({ error: 'Sem resultados para esta data' });
 
-  // Encontrar aposta e jogo correspondente
   const apostaRes = row.resultados.apostas.find(a => a.jogo_id === jogo_id);
   const jogo = row.apostas?.jogos?.find(j => j.id === jogo_id);
   if (!apostaRes) return res.status(404).json({ error: 'Aposta não encontrada' });
@@ -5032,27 +5031,31 @@ app.post('/corrigir-resultado', async (req, res) => {
   let novoResultado = apostaRes.resultado_aposta;
   let novoPlacar = apostaRes.placar;
 
-  // Se forneceu resultado direto (green/red/cancelado), usar sem recalcular
   if (resultado && ['green','red','cancelado','pendente'].includes(resultado)) {
     novoResultado = resultado;
-    console.log(`✏️ Resultado forçado: ${apostaRes.time_casa} x ${apostaRes.time_fora} → ${resultado}`);
   } else if (placar && placar.match(/^\d+-\d+$/)) {
-    // Se forneceu placar, recalcular green/red
-    const partes = placar.split('-');
-    const gC = parseInt(partes[0]), gF = parseInt(partes[1]);
+    const [gC, gF] = placar.split('-').map(Number);
     novoPlacar = placar;
     if (jogo) {
-      novoResultado = verificarAposta(jogo, gC, gF, null);
+      // Monta stats com placar de intervalo se fornecido
+      let statsParaVerif = null;
+      if (placar_ht && placar_ht.match(/^\d+-\d+$/)) {
+        const [gC1T, gF1T] = placar_ht.split('-').map(Number);
+        statsParaVerif = { golsCasa1T: gC1T, golsFora1T: gF1T, confirmado: true };
+      }
+      novoResultado = verificarAposta(jogo, gC, gF, statsParaVerif);
+      if (novoResultado === 'sem_stats' && !statsParaVerif) {
+        novoResultado = 'pendente'; // Aposta de tempo parcial sem placar de intervalo
+      }
     }
-    console.log(`✏️ Corrigindo placar ${apostaRes.time_casa} x ${apostaRes.time_fora}: ${apostaRes.placar} → ${placar} | ${apostaRes.resultado_aposta} → ${novoResultado}`);
+    console.log(`✏️ ${apostaRes.time_casa}: ${apostaRes.placar}→${placar}${placar_ht?' (1T:'+placar_ht+')':''} | ${apostaRes.resultado_aposta}→${novoResultado}`);
   }
 
-  const apostas = row.resultados.apostas.map(a => {
-    if (a.jogo_id === jogo_id) {
-      return { ...a, placar: novoPlacar, resultado_aposta: novoResultado, corrigido_manualmente: true };
-    }
-    return a;
-  });
+  const apostas = row.resultados.apostas.map(a =>
+    a.jogo_id === jogo_id
+      ? { ...a, placar: novoPlacar, resultado_aposta: novoResultado, corrigido_manualmente: true, ...(placar_ht ? { placar_ht } : {}) }
+      : a
+  );
 
   await dbSaveResultados(data, { ...row.resultados, apostas });
   res.json({ ok: true, mensagem: `Corrigido: ${novoPlacar} → ${novoResultado}`, resultado: novoResultado, placar: novoPlacar });

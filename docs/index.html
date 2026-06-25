@@ -520,6 +520,7 @@ const hojeStr=hoje();
 document.getElementById('d-input').value=offsetData(hojeStr,1);
 let dataMin=null,dataMax=offsetData(hojeStr,1);
 let dataAtual='';
+const _apostasCache={}; // cache de jogos por data para uso no modal de correção
 
 // Init sidebar mult buttons with data-dtm
 (function(){
@@ -579,6 +580,7 @@ async function carregarDia(data,label){
         const res=resultados.find(x=>x.jogo_id===jg.id);
         return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
       });
+      _apostasCache[data]=j.apostas.jogos; // popula cache para uso no modal de correção
       render(jogosComRes,data);
     }else{
       document.getElementById('tw').innerHTML=`<div class="aviso">⚠ Sem apostas para ${fmtDL(data)}.<br><small>Use "Analisar" para gerar.</small></div>`;
@@ -1000,19 +1002,32 @@ function _abrirModalStats(titulo, bodyHtml, callback){
 // ─── Ações ────────────────────────────────────────────────────────────────────
 async function editarResultado(event,idx,data,jogoId,resultadoAtual){
   event.stopPropagation();
+  // Detecta se a aposta é de tempo parcial para pedir placar de intervalo
+  const jogo = _apostasCache?.[data]?.find?.(j=>j.id===jogoId);
+  const aposta = (jogo?.aposta||'').toLowerCase();
+  const eParcial = aposta.includes('1st half')||aposta.includes('first half')||aposta.includes('primeiro tempo')||
+                   aposta.includes('2nd half')||aposta.includes('second half')||aposta.includes('segundo tempo')||
+                   aposta.includes('halftime')||aposta.includes('ht)');
+  const campoHT = eParcial ? `
+    <div class="modal-field" style="margin-top:10px">
+      <label class="modal-label">Placar do 1º tempo (ex: 1-1) <span style="color:var(--amber);font-size:11px">— necessário para aposta de tempo parcial</span></label>
+      <input class="modal-input" id="mst-placar-ht" placeholder="1-1" style="font-size:16px;font-weight:700;text-align:center;letter-spacing:2px">
+    </div>` : '';
   _abrirModalStats('Corrigir placar', `
     <div class="modal-field">
-      <label class="modal-label">Placar real (ex: 2-1)</label>
+      <label class="modal-label">Placar final (ex: 2-1)</label>
       <input class="modal-input" id="mst-placar" placeholder="2-1" value="${resultadoAtual||''}" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:2px">
     </div>
+    ${campoHT}
     <div class="modal-actions" style="margin-top:8px">
       <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
       <button class="modal-btn primary" onclick="_mstCallback()">Salvar</button>
     </div>`, async () => {
     const placar = (_mstInput('mst-placar')?.value||'').trim();
+    const placarHT = (_mstInput('mst-placar-ht')?.value||'').trim() || null;
     fecharModalStats();
     try{
-      const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,placar:placar||null})});
+      const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,placar:placar||null,placar_ht:placarHT})});
       const j=await r.json();
       if(j.ok){ await _recarregarLista(data); }else{ alert('Erro: '+j.error); }
     }catch(e){ alert('Erro: '+e.message); }
