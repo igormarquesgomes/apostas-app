@@ -3503,6 +3503,7 @@ async function agentValidar(data, opcoes = {}) {
 
     console.log(`  Verificando: ${jogo.time_casa} x ${jogo.time_fora} | fixtureId:${jogo.fixtureId||'?'} ligaId:${jogo.ligaId||'?'}`);
     let placar = null, golsCasa = null, golsFora = null, fixtureIdUsado = jogo.fixtureId || null;
+    let stats = null; // declarado aqui para estar disponível ao propagar placar do 1ºT
 
     try {
       let jogoEncontradoNaAPI = false; // Declarar no escopo externo
@@ -3666,7 +3667,8 @@ async function agentValidar(data, opcoes = {}) {
         // Buscar stats detalhadas se precisar (cartões/escanteios)
         // Busca sempre que: aposta principal é escanteios/cartões OU existem alternativas nesses mercados
         const temAltStats = jogo.alternativas?.some(a => ['escanteios','cartoes'].includes(a.mercado));
-        let stats = null;
+        // stats já declarado no escopo externo — reset para busca de escanteios/cartões
+        stats = null;
         if ((['escanteios','cartoes'].includes(mercadoEfetivo) || temAltStats) && fixtureIdUsado) {
           console.log(`    📊 Buscando stats para mercado: ${mercadoEfetivo}${temAltStats?' (alternativas)':''}`);
           stats = await buscarStatsFixture(fixtureIdUsado);
