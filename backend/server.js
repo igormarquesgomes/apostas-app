@@ -5647,13 +5647,43 @@ function deveExecutarCatchup(horaUTC, minUTC = 0) {
   return minPassados <= CATCHUP_MAX_MIN; // só faz catch-up se passou < 90 min
 }
 
+async function rotinaDas03h() {
+  const hoje = hojeStr();
+  const ontem = diaOffset(hoje, -1);
+  console.log(`\n🌙 [03h] Validação final + relatório diário — ${ontem}`);
+  const rowOntem = await dbGet(ontem);
+  if (rowOntem?.apostas?.jogos) {
+    const pendentes = rowOntem.resultados?.apostas?.filter(r => r.resultado_aposta === 'pendente') || [];
+    const semResultado = !rowOntem.resultados;
+    if (semResultado || pendentes.length > 0) {
+      await agentValidar(ontem, { forcarWebSearch: true });
+    }
+    const calExistente = await dbGetCalibracaoPorPeriodo('diario', ontem).catch(()=>null);
+    if (!calExistente) {
+      await agentDiario(ontem);
+      console.log(`✅ Relatório diário de ${ontem} gerado`);
+    } else {
+      console.log(`✅ Relatório de ${ontem} já existe`);
+    }
+  }
+}
+
 function agendarRotina() {
-  // ── 03:00 BRT (06:00 UTC) — validação noturna + calibração ──────────────
-  // SEM catch-up: rotinaNoturna não deve rodar fora da janela noturna
-  const ms03h = msAteHoraUTC(6, 0);
-  console.log(`⏰ Próxima rotinaNoturna (03h) em ${Math.round(ms03h/60000)} min`);
-  setTimeout(function tick03h() {
+  // ── 00:00 BRT (03:00 UTC) — validação noturna inicial + calibrações ─────
+  // SEM catch-up: não deve rodar fora da madrugada
+  const ms00h = msAteHoraUTC(3, 0);
+  console.log(`⏰ Próxima rotinaNoturna (00h) em ${Math.round(ms00h/60000)} min`);
+  setTimeout(function tick00h() {
     rotinaNoturna().catch(console.error);
+    setTimeout(tick00h, 24 * 60 * 60 * 1000);
+  }, ms00h);
+
+  // ── 03:00 BRT (06:00 UTC) — validação final + relatório diário ───────────
+  // SEM catch-up: não deve rodar fora da madrugada
+  const ms03h = msAteHoraUTC(6, 0);
+  console.log(`⏰ Próxima rotinaDas03h (03h) em ${Math.round(ms03h/60000)} min`);
+  setTimeout(function tick03h() {
+    rotinaDas03h().catch(console.error);
     setTimeout(tick03h, 24 * 60 * 60 * 1000);
   }, ms03h);
 
