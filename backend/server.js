@@ -2684,8 +2684,9 @@ JOGOS ELEGÍVEIS (prioridade 1-6):
 ${lista}
 
 REGRAS:
-- Múltipla A: odd total entre 3.50 e 4.50 (mais jogos)
-- Múltipla B: odd total entre 2.50 e 3.49 (menos jogos, mais seguro)
+- Múltipla A: odd total entre 3.50 e 4.50 — ALVO: ~4.00 (adicione ou remova jogos até chegar nessa faixa)
+- Múltipla B: odd total entre 2.60 e 3.49 — ALVO: ~3.00 (adicione ou remova jogos até chegar nessa faixa)
+- CRÍTICO: odd total NUNCA pode passar de 4.50 na A nem de 3.49 na B — reduza jogos se necessário
 - Use APENAS jogos da lista acima
 - CRÍTICO: copie time_casa e time_fora EXATAMENTE como aparecem na lista — nunca inverta a ordem dos times
 - A aposta de cada jogo PODE ser diferente da aposta simples do dia
@@ -2710,13 +2711,35 @@ Retorne SOMENTE JSON:
   }
 }`;
 
-  // Múltiplas não precisam de web_search — dados já vêm das estatísticas
   const txt = await chamarIA(prompt, 1500);
   if (!txt) return null;
   try {
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
     if (s === -1) return null;
-    return JSON.parse(txt.slice(s, e+1));
+    const obj = JSON.parse(txt.slice(s, e+1));
+
+    // Validação das faixas de odd — rejeita se fora do alvo
+    const validarFaixa = (mult, tipo) => {
+      if (!mult?.jogos?.length) return mult;
+      const odd = parseFloat(mult.odd_total);
+      const [min, max] = tipo === 'A' ? [3.50, 4.50] : [2.60, 3.49];
+      if (isNaN(odd) || odd < min || odd > max) {
+        console.warn(`⚠️ Múltipla ${tipo}: odd ${odd} fora da faixa [${min}-${max}] — recalculando`);
+        // Recalcula a odd real como produto das odds individuais
+        const oddReal = mult.jogos.reduce((p, j) => p * (parseFloat(j.odd) || 1), 1);
+        mult.odd_total = parseFloat(oddReal.toFixed(2));
+        // Se ainda fora, loga o aviso (será tratado na próxima geração)
+        if (mult.odd_total < min || mult.odd_total > max) {
+          console.warn(`  ❌ Múltipla ${tipo} rejeitada: odd ${mult.odd_total} fora de [${min}-${max}]`);
+          return null;
+        }
+      }
+      return mult;
+    };
+
+    obj.multipla_a = validarFaixa(obj.multipla_a, 'A');
+    obj.multipla_b = validarFaixa(obj.multipla_b, 'B');
+    return obj;
   } catch(err) {
     console.error('Erro parse múltiplas:', err.message);
     return null;
