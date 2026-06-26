@@ -3267,20 +3267,24 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   const checkOverUnder = (valor, linha) => {
     const n = parseFloat(linha);
     const ap = (typeof apostaNorm !== 'undefined' ? apostaNorm : aposta);
+    // Verifica se a linha aparece como número completo (não como prefixo de outro número)
+    // Ex: "over 2" não deve casar em "over 2.5" — verifica que após a linha não vem dígito/ponto
+    const linhaExata = (prefixo, l) => {
+      const idx = ap.indexOf(`${prefixo} ${l}`);
+      if (idx === -1) return false;
+      const proxChar = ap[idx + prefixo.length + 1 + l.length];
+      return !proxChar || !/[0-9.]/.test(proxChar);
+    };
     // Linhas inteiras (1, 2, 3...) usam Asian Handicap: valor exato = PUSH (reembolso)
+    // Linhas .5 (1.5, 2.5...) nunca têm push — resultado sempre green ou red
     const isLinhaInteira = Number.isInteger(n);
-    if (ap.includes(`over ${linha}`) || ap.includes(`mais de ${linha}`)) {
-      if (isLinhaInteira && valor === n) return 'cancelado'; // push
+    if (linhaExata('over', linha) || linhaExata('mais de', linha)) {
+      if (isLinhaInteira && valor === n) return 'cancelado'; // push só para linhas inteiras
       return valor > n ? 'green' : 'red';
     }
-    if (ap.includes(`under ${linha}`) || ap.includes(`menos de ${linha}`)) {
-      if (isLinhaInteira && valor === n) return 'cancelado'; // push
+    if (linhaExata('under', linha) || linhaExata('menos de', linha)) {
+      if (isLinhaInteira && valor === n) return 'cancelado';
       return valor < n ? 'green' : 'red';
-    }
-    // Linhas .25 e .75 (quarter ball): split result — aprox como .5
-    if (ap.includes(`over ${n + 0.25}`) || ap.includes(`over ${n - 0.25}`)) {
-      // quarter handicap: ganha metade se entre as duas linhas — simplificado como green
-      return valor > n ? 'green' : (valor === n ? 'cancelado' : 'red');
     }
     return null;
   };
