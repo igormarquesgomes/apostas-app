@@ -129,10 +129,13 @@ function formatarRelatorioLista(data, jogos) {
     .slice()
     .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''))
     .map(j => {
-      const icone = j.resultado === 'green' ? '✅ GREEN' : j.resultado === 'red' ? '❌ RED' : '⏳ Pendente';
+      const icone = j.resultado === 'green' ? '✅ GREEN'
+                  : j.resultado === 'red' ? '❌ RED'
+                  : j.resultado === 'cancelado' ? '↩️ REEMBOLSO'
+                  : '⏳ Pendente';
       if (j.resultado === 'green') acertos++;
       else if (j.resultado === 'red') erros++;
-      else pendentes++;
+      else if (j.resultado !== 'cancelado') pendentes++; // reembolsos não contam
       return [
         `🕐 <b>${j.horario || '--:--'}</b>`,
         `⚽ <b>${j.time_casa} x ${j.time_fora}</b>`,
@@ -338,7 +341,9 @@ async function responderValidacoesAnalises() {
     const resultado = res?.resultado_aposta;
     if (!resultado || resultado === 'pendente') continue;
 
-    const reply = resultado === 'green' ? '✅ ✅ ✅ ✅' : '❌ ❌ ❌';
+    const reply = resultado === 'green' ? '✅ ✅ ✅ ✅'
+                : resultado === 'cancelado' ? '↩️ REEMBOLSO'
+                : '❌ ❌ ❌';
     const chatId = agendo.chat_id || CHAT_ID_ANALISES;
 
     try {

@@ -3266,10 +3266,22 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   // Helper: verificar over/under genérico
   const checkOverUnder = (valor, linha) => {
     const n = parseFloat(linha);
-    // usar apostaNorm para evitar problemas de acentuação — declarada abaixo mas hoisted via let
     const ap = (typeof apostaNorm !== 'undefined' ? apostaNorm : aposta);
-    if (ap.includes(`over ${linha}`) || ap.includes(`mais de ${linha}`)) return valor > n ? 'green' : 'red';
-    if (ap.includes(`under ${linha}`) || ap.includes(`menos de ${linha}`)) return valor < n ? 'green' : 'red';
+    // Linhas inteiras (1, 2, 3...) usam Asian Handicap: valor exato = PUSH (reembolso)
+    const isLinhaInteira = Number.isInteger(n);
+    if (ap.includes(`over ${linha}`) || ap.includes(`mais de ${linha}`)) {
+      if (isLinhaInteira && valor === n) return 'cancelado'; // push
+      return valor > n ? 'green' : 'red';
+    }
+    if (ap.includes(`under ${linha}`) || ap.includes(`menos de ${linha}`)) {
+      if (isLinhaInteira && valor === n) return 'cancelado'; // push
+      return valor < n ? 'green' : 'red';
+    }
+    // Linhas .25 e .75 (quarter ball): split result — aprox como .5
+    if (ap.includes(`over ${n + 0.25}`) || ap.includes(`over ${n - 0.25}`)) {
+      // quarter handicap: ganha metade se entre as duas linhas — simplificado como green
+      return valor > n ? 'green' : (valor === n ? 'cancelado' : 'red');
+    }
     return null;
   };
 
