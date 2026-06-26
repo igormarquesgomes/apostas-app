@@ -947,8 +947,11 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
         return golsTime>0?'green':'red';
       }
     }
-    if(ap.includes('over')||ap.includes('mais')) return total>n?'green':'red';
-    if(ap.includes('under')||ap.includes('menos')) return total<n?'green':'red';
+    // Match exato da linha — evita "over 2.5" casar com linha "2" via substring
+    const linhaStr=isNaN(n)?'':String(n);
+    const linhaExataFE=(pfx,l)=>{const idx=ap.indexOf(`${pfx} ${l}`);if(idx===-1)return false;const nx=ap[idx+pfx.length+1+l.length];return!nx||!/[0-9.]/.test(nx);};
+    if(linhaExataFE('over',linhaStr)||linhaExataFE('mais',linhaStr)) return total>n?'green':'red';
+    if(linhaExataFE('under',linhaStr)||linhaExataFE('menos',linhaStr)) return total<n?'green':'red';
     if(ap.includes('ambas')||ap.includes('ambos')||ap.includes('btts')) return(gc>0&&gf>0)?'green':'red';
   }
   if(merc==='resultado'){

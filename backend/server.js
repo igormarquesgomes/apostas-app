@@ -275,7 +275,9 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
   // → se encontrado aqui, mercado está disponível nessas casas = proxy da Estrela Bet
   // Mercados excluídos do fallback de jogo completo
   const PARCIAIS = ['first half','second half','1st half','2nd half','half time','halftime','1h','2h'];
-  const TEAM_SPECIFIC = ['total - home','total - away','home team','away team','home total','away total'];
+  const TEAM_SPECIFIC = ['total - home','total - away','home team','away team','home total','away total',
+    'home score','away score','home goals','away goals','home team score','away team score',
+    'home team total','away team total','team to score','home exact','away exact'];
   const buscarPorPalavras = (palavrasChave, valor, excluirTeamSpecific = true) => {
     for (const chave of Object.keys(odds)) {
       const [betNome, betValor] = chave.split('|');
@@ -4427,7 +4429,7 @@ async function rotina05h() {
         if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
         if (resultado?.jogos?.length) {
           const jogosCompletos = {
-            jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...jogos.map(x=>x.id||0), 0) + i + 1}))]
+            jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...(rowAtualizado?.apostas?.jogos||[]).map(x=>x.id||0), 0) + i + 1}))]
           };
           await dbSave(diaAlvo, jogosCompletos);
           console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.length} jogos após complemento`);
