@@ -576,11 +576,13 @@ async function carregarDia(data,label){
     const j=await r.json();
     if(j.apostas?.jogos?.length>0){
       const resultados=j.resultados?.apostas||[];
-      const jogosComRes=j.apostas.jogos.map(jg=>{
-        const res=resultados.find(x=>x.jogo_id===jg.id);
-        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
-      });
-      _apostasCache[data]=j.apostas.jogos; // popula cache para uso no modal de correção
+      const jogosComRes=j.apostas.jogos
+        .filter(jg=>!jg.descartado) // não exibe jogos descartados (sem odd válida)
+        .map(jg=>{
+          const res=resultados.find(x=>x.jogo_id===jg.id);
+          return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
+        });
+      _apostasCache[data]=j.apostas.jogos;
       render(jogosComRes,data);
     }else{
       document.getElementById('tw').innerHTML=`<div class="aviso">⚠ Sem apostas para ${fmtDL(data)}.<br><small>Use "Analisar" para gerar.</small></div>`;
@@ -607,7 +609,7 @@ async function buscar(){
     const j=await r.json();
     if(j.apostas?.jogos?.length>0){
       const resultados=j.resultados?.apostas||[];
-      const jogosComRes=j.apostas.jogos.map(jg=>{
+      const jogosComRes=j.apostas.jogos.filter(jg=>!jg.descartado).map(jg=>{
         const res=resultados.find(x=>x.jogo_id===jg.id);
         return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
       });
@@ -1122,7 +1124,7 @@ async function _recarregarLista(data){
   const d2=await r2.json();
   if(d2.apostas?.jogos?.length>0){
     const resultados=d2.resultados?.apostas||[];
-    const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
+    const jogosComRes=d2.apostas.jogos.filter(jg=>!jg.descartado).map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
     render(jogosComRes,data);
   }
 }
@@ -1349,7 +1351,7 @@ async function confirmarJogoManual(data){
     const dv = await rv.json();
     if(dv.apostas?.jogos?.length > 0){
       const resultados = dv.resultados?.apostas || [];
-      const jogosComRes = dv.apostas.jogos.map(jg => {
+      const jogosComRes = dv.apostas.jogos.filter(jg=>!jg.descartado).map(jg => {
         const res = resultados.find(x => x.jogo_id === jg.id);
         return {...jg, resultado:res?.resultado_aposta||null, placar:res?.placar||null, mercados_resultado:res?.mercados_resultado||null};
       });

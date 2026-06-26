@@ -4366,7 +4366,8 @@ async function rotina05h() {
     }
 
     // 2. Verificar jogos — conta e também checa jogos sem odd_mercado validada
-    const semOdd = jogos.filter(j => !j.odd_mercado && !j.descartado);
+    // Inclui descartados sem odd — podem ter uma alternativa válida não tentada ainda
+    const semOdd = jogos.filter(j => !j.odd_mercado);
     const precisaComplementar = jogos.length < 15 || semOdd.length > 0;
 
     if (precisaComplementar) {

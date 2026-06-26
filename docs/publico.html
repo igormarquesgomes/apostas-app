@@ -313,7 +313,7 @@ async function carregarDia(dia) {
 }
 
 function renderDia(dia, data) {
-  const jogos = data.apostas?.jogos || [];
+  const jogos = (data.apostas?.jogos || []).filter(j => !j.descartado);
   const resultados = data.resultados?.apostas || [];
   const dataStr = dia === 'hoje' ? hojeStr() : dia === 'ontem' ? offsetStr(-1) : offsetStr(1);
 
