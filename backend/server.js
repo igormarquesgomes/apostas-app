@@ -3645,14 +3645,14 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
 
     // Gols parciais (1º/2º tempo) — usa placar de intervalo quando disponível
     if (isPrimTempo || isSegTempo) {
-      const golsPT = stats?.golsCasa1T != null ? {
-        casa: stats.golsCasa1T, fora: stats.golsFora1T,
-        total: stats.golsCasa1T + stats.golsFora1T
-      } : null;
-      // Sem dado de 1T/2T → não consegue validar
-      if (!golsPT) return 'sem_stats';
+      if (stats?.golsCasa1T == null) return 'sem_stats';
+      // 1º tempo: gols do intervalo
+      // 2º tempo: gols totais MENOS gols do 1º tempo
+      const golsPT = isPrimTempo
+        ? { casa: stats.golsCasa1T, fora: stats.golsFora1T, total: stats.golsCasa1T + stats.golsFora1T }
+        : { casa: golsCasa - stats.golsCasa1T, fora: golsFora - stats.golsFora1T, total: (golsCasa - stats.golsCasa1T) + (golsFora - stats.golsFora1T) };
       const valorPT = isAway ? golsPT.fora : isHome ? golsPT.casa : golsPT.total;
-      for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
+      for (const linha of ['0.5','0.75','1','1.5','2','2.5','3','3.5','4','4.5']) {
         const r = checkOverUnder(valorPT, linha);
         if (r) return r;
       }
