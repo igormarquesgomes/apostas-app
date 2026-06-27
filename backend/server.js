@@ -225,10 +225,10 @@ function parsearBookmakersOdds(bookmakers) {
 }
 
 // ─── API-Football /odds — por fixture ────────────────────────────────────────
-async function buscarOddsFixture(fixtureId, data) {
+async function buscarOddsFixture(fixtureId, data, forcarAtualizar = false) {
   if (!fixtureId) return null;
   const cacheKey = `${data}|${fixtureId}`;
-  if (oddsFixtureCache.has(cacheKey)) return oddsFixtureCache.get(cacheKey);
+  if (!forcarAtualizar && oddsFixtureCache.has(cacheKey)) return oddsFixtureCache.get(cacheKey);
   if (!contarRequisicao()) return null;
 
   try {
@@ -239,7 +239,10 @@ async function buscarOddsFixture(fixtureId, data) {
     if (!res.ok) { console.log(`⚠️ Odds fixture ${fixtureId}: HTTP ${res.status}`); return null; }
     const json = await res.json();
     const bookmakers = json.response?.[0]?.bookmakers || [];
-    if (!bookmakers.length) { oddsFixtureCache.set(cacheKey, null); return null; }
+    if (!bookmakers.length) {
+      if (!forcarAtualizar) oddsFixtureCache.set(cacheKey, null); // só cacheia null na primeira vez
+      return null;
+    }
 
     const odds = parsearBookmakersOdds(bookmakers);
     oddsFixtureCache.set(cacheKey, odds);
@@ -523,10 +526,19 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
   }
 
   // Caso 3: sem opção válida
-  const motivo = `${motivoPrincipal} | sem alternativa com odd ≥ ${ODD_MINIMA}${isPrioritario ? ' (prioritário — sem mercado disponível na API)' : ' e confiança alta'}`;
+  const motivo = `${motivoPrincipal} | sem alternativa com odd ≥ ${ODD_MINIMA}${isPrioritario ? ' (prioritário)' : ' e confiança alta'}`;
+  if (isPrioritario) {
+    // Liga prioritária: não descarta — marca como "analisando" para retry nas rotinas do dia
+    jogo.descartado = false;
+    jogo.analisando = true;
+    jogo.descartado_motivo = motivo;
+    jogo.odd_mercado = null;
+    console.log(`  ⏳ [PRIORITÁRIO] ${jogo.time_casa} x ${jogo.time_fora} → analisando (retry nas rotinas do dia): ${motivo}`);
+    return null; // não descarta
+  }
   jogo.descartado = true;
   jogo.descartado_motivo = motivo;
-  console.log(`  ❌ ${isPrioritario ? '[PRIORITÁRIO] ' : ''}Descartando ${jogo.time_casa} x ${jogo.time_fora}: ${motivo}`);
+  console.log(`  ❌ Descartando ${jogo.time_casa} x ${jogo.time_fora}: ${motivo}`);
   return motivo;
 }
 
@@ -5054,6 +5066,16 @@ app.post('/rotina-05h', async (req, res) => {
   rotinaMultiplas().catch(console.error);
 });
 
+app.post('/reprocessar-analisando', async (req, res) => {
+  const { data } = req.body;
+  const hoje = hojeStr();
+  const amanha = diaOffset(hoje, 1);
+  res.json({ mensagem: 'Reprocessando jogos analisando...', dias: data ? [data] : [hoje, amanha] });
+  for (const d of (data ? [data] : [hoje, amanha])) {
+    reprocessarAnalisando(d).catch(console.error);
+  }
+});
+
 // Sincronizar histórico de assertividade das ligas com dados reais dos últimos 60 dias
 app.post('/sincronizar-ligas', async (req, res) => {
   res.json({ mensagem: 'Sincronização de ligas iniciada' });
@@ -5905,6 +5927,86 @@ async function rotinaDas03h() {
   }
 }
 
+// Reprocessa jogos marcados como "analisando=true" com nova chamada à API de odds
+async function reprocessarAnalisando(data) {
+  try {
+    const row = await dbGet(data);
+    const jogos = row?.apostas?.jogos;
+    if (!jogos?.length) return;
+
+    const analisando = jogos.filter(j => j.analisando && !j.descartado);
+    if (!analisando.length) { console.log(`✅ [analisando] Nenhum jogo pendente para ${data}`); return; }
+
+    console.log(`\n🔄 [analisando] ${analisando.length} jogo(s) prioritário(s) para reanalisar em ${data}...`);
+    let alterou = false;
+
+    for (const jogo of analisando) {
+      if (!jogo.fixtureId) continue;
+      console.log(`  🔍 ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}) — buscando odds atualizadas...`);
+
+      // Busca NOVA — ignora cache
+      const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data, true);
+      if (!oddsFixture) {
+        console.log(`  ⏭️ Sem odds na API ainda para ${jogo.time_casa} x ${jogo.time_fora}`);
+        continue;
+      }
+
+      // Tenta aplicar odds e pivotar (agora com dados frescos)
+      const motivo = aplicarOddsEPivotar(jogo, oddsFixture);
+
+      // Se ainda marcado como analisando, tenta os agentes de 1º/2º tempo e combo
+      if (jogo.analisando) {
+        const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
+        if (mercadosDisp !== 'Nenhum mercado com odd ≥ 1.25.') {
+          const promptRetry = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})
+Liga PRIORITÁRIA — encontre a melhor aposta disponível. Aceite confiança "media" se necessário.
+
+Mercados disponíveis na API com odd ≥ 1.25:
+${mercadosDisp}
+
+Forma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'}
+
+Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes|combo|resultado_1t|resultado_2t","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+          try {
+            const resp = await chamarIA(promptRetry, 600);
+            if (resp) {
+              const m = resp.match(/\{[\s\S]*\}/);
+              if (m) {
+                const nova = JSON.parse(m[0]);
+                const confOk = nova.confianca === 'alta' || nova.confianca === 'media';
+                if (nova.aposta && nova.mercado && confOk) {
+                  const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
+                  const oddNum = oddReal ? parseFloat(oddReal) : null;
+                  if (oddNum && oddNum >= ODD_MINIMA) {
+                    jogo.aposta = nova.aposta; jogo.mercado = nova.mercado;
+                    jogo.odd_mercado = oddNum; jogo.confianca = nova.confianca;
+                    jogo.analisando = false; jogo.descartado_motivo = null;
+                    jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
+                    console.log(`  ✅ Resolvido: ${nova.aposta} (${nova.mercado}) @ ${oddNum} [${nova.confianca}]`);
+                    alterou = true;
+                  }
+                }
+              }
+            }
+          } catch(e) { console.error(`  Erro retry IA ${jogo.time_casa}: ${e.message}`); }
+        }
+      } else if (!motivo) {
+        // aplicarOddsEPivotar resolveu
+        jogo.analisando = false;
+        console.log(`  ✅ ${jogo.time_casa} x ${jogo.time_fora} resolvido por odds frescas @ ${jogo.odd_mercado}`);
+        alterou = true;
+      }
+    }
+
+    if (alterou) {
+      await dbSave(data, { jogos });
+      console.log(`✅ [analisando] Banco atualizado para ${data}`);
+    } else {
+      console.log(`⚠️ [analisando] Nenhum jogo resolvido para ${data} — tentará novamente na próxima rotina`);
+    }
+  } catch(e) { console.error('[analisando] Erro:', e.message); }
+}
+
 function agendarRotina() {
   // ── 00:00 BRT (03:00 UTC) — validação noturna inicial + calibrações ─────
   // SEM catch-up: não deve rodar fora da madrugada
@@ -5956,6 +6058,7 @@ function agendarRotina() {
     const hoje = hojeStr();
     console.log(`⏰ [15h] Validação parcial — ${hoje}`);
     agentValidar(hoje, { forcarWebSearch: false }).catch(console.error);
+    reprocessarAnalisando(hoje).catch(console.error);
     setTimeout(tick15h, 24 * 60 * 60 * 1000);
   }, ms15h);
 
@@ -5966,6 +6069,7 @@ function agendarRotina() {
     const hoje = hojeStr();
     console.log(`⏰ [18h] Validação parcial — ${hoje}`);
     agentValidar(hoje, { forcarWebSearch: true }).catch(console.error);
+    reprocessarAnalisando(hoje).catch(console.error);
     setTimeout(tick18h, 24 * 60 * 60 * 1000);
   }, ms18h);
 }
