@@ -1836,9 +1836,13 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       if (jogosComOdds.length >= metaJogos + 5) break;
       if (!j.fixtureId) continue;
       const odds = await buscarOddsFixture(j.fixtureId, data);
-      if (odds && Object.keys(odds).length > 0) {
+      // Mesma verificação rigorosa: exige ao menos 1 mercado relevante ≥ 1.25
+      const temMercado = odds && formatarMercadosDisponiveisParaIA(odds) !== 'Nenhum mercado com odd ≥ 1.25.';
+      if (temMercado) {
         jogosComOdds.push(j);
         console.log(`  ➕ ${j.time_casa||j.timeCasa} x ${j.time_fora||j.timeFora} (${j.liga}) adicionado`);
+      } else {
+        console.log(`  ✂️ ${j.time_casa||j.timeCasa} x ${j.time_fora||j.timeFora} (${j.liga}) extras — sem mercado válido`);
       }
     }
   }
@@ -2049,29 +2053,52 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
         // ── Agente 1: mercados completos (gols, resultado, escanteios, cartões) ──
         const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})
 Motivo do descarte anterior: ${motivo}
-${isPrioritarioReanalise ? '\n⚠️ LIGA PRIORITÁRIA — você DEVE encontrar uma aposta válida.' : ''}
+${isPrioritarioReanalise ? '\n⚠️ LIGA PRIORITÁRIA — você DEVE encontrar uma aposta válida. Há mercados disponíveis acima.' : ''}
 
-Mercados DISPONÍVEIS na API com odd ≥ 1.25:
+Mercados DISPONÍVEIS na API com odd ≥ 1.25 (SOMENTE esses existem para apostar):
 ${mercadosDisp}
 
 Dados: forma casa ${jogo.forma_casa||'?'} | fora ${jogo.forma_fora||'?'} | gols ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | esc ${jogo.media_escanteios||'?'} | cart ${jogo.media_cartoes||'?'}
 
-MISSÃO: Escolha a MELHOR aposta. ${isPrioritarioReanalise ? 'Aceite confiança "media" se necessário.' : 'Confiança ALTA, odd ≥ 1.25.'}
-Mercados válidos: gols, resultado, escanteios, cartoes, combo (ex: "Argentina vence e over 2.5 gols"), resultado_1t (1º tempo), resultado_2t (2º tempo).
-Para combos use mercado "combo" e aposta no formato "[time] vence e over X.X gols".
+MISSÃO: Escolha a MELHOR aposta da lista acima. ${isPrioritarioReanalise ? 'Aceite confiança "media" se necessário.' : 'Confiança ALTA, odd ≥ 1.25.'}
+Use mercado "gols" para gols, "resultado" para resultado/dupla chance, "escanteios" para cantos, "cartoes" para cartões.
+Para 1º tempo use "gols" com "Primeiro Tempo" no texto da aposta (ex: "Over 0.5 gols - Primeiro Tempo").
+Para 2º tempo use "gols" com "Segundo Tempo" no texto da aposta (ex: "Over 1.5 gols - Segundo Tempo").
 
-Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes|combo|resultado_1t|resultado_2t","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+IMPORTANTE: A aposta deve usar termos presentes na lista de mercados acima para que a odd seja confirmada.
+
+Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
 
         const aplicarNovaAposta = async (nova) => {
           const confOk = nova.confianca === 'alta' || (isPrioritarioReanalise && nova.confianca === 'media');
           if (!nova.aposta || !nova.mercado || !confOk) return false;
+
+          // Tentativa 1: selecionarOddFixture padrão
+          let oddNum = null;
           const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
-          const oddNum = oddReal ? parseFloat(oddReal) : null;
+          if (oddReal) oddNum = parseFloat(oddReal);
+
+          // Tentativa 2: lookup direto por texto na chave (fallback para mercados exóticos / 1º-2º tempo)
+          if ((!oddNum || oddNum < ODD_MINIMA) && oddsFixture) {
+            const normAposta = (nova.aposta || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+            const directMatch = Object.entries(oddsFixture).find(([k, v]) => {
+              if (v < ODD_MINIMA || v > 15) return false;
+              const kn = k.toLowerCase();
+              // Checar se a chave contém palavras-chave da aposta
+              const palavras = normAposta.split(/\s+/).filter(p => p.length > 2);
+              return palavras.length > 0 && palavras.filter(p => kn.includes(p)).length >= Math.ceil(palavras.length * 0.5);
+            });
+            if (directMatch) {
+              oddNum = parseFloat(directMatch[1]);
+              console.log(`  🔎 Lookup direto: ${directMatch[0]} @ ${oddNum}`);
+            }
+          }
+
           if (oddNum && oddNum >= ODD_MINIMA) {
             jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
             jogo.aposta = nova.aposta; jogo.mercado = nova.mercado;
             jogo.odd_mercado = oddNum; jogo.confianca = nova.confianca || 'alta';
-            jogo.descartado = false; jogo.descartado_motivo = null;
+            jogo.descartado = false; jogo.analisando = false; jogo.descartado_motivo = null;
             jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
             console.log(`  ✅ Re-análise OK: ${nova.aposta} (${nova.mercado}) @ ${oddNum} [${jogo.confianca}]`);
             return true;
