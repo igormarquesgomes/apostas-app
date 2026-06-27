@@ -526,16 +526,66 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
     }
   }
 
-  // Caso 3: sem opção válida
+  // Caso 3: agente entregou aposta mas confirmação falhou em tudo
+  // Para qualquer jogo com odds disponíveis: pegar o melhor mercado direto da lista — sem mais IA
+  if (oddsFixture) {
+    // Prioridade de mercados: gols > resultado > escanteios > cartões > outros
+    const MERCADOS_PREF = [
+      'goals over/under|','goals over/under first half|','goals over/under - second half|',
+      'goal line|','match winner|','double chance|','both teams score|',
+      'corners over under|','cards over/under|',
+    ];
+    // Filtrar mercados relevantes e válidos, ordenados por preferência e melhor odd
+    const candidatos = [];
+    for (const [chave, oddVal] of Object.entries(oddsFixture)) {
+      if (oddVal < ODD_MINIMA || oddVal > 5) continue; // entre 1.25 e 5.00
+      const pref = MERCADOS_PREF.findIndex(p => chave.startsWith(p));
+      if (pref === -1) continue; // só mercados conhecidos
+      const [betNome, betValor] = chave.split('|');
+      // Excluir apostas de times individuais ou exóticos
+      if (betNome.includes('total - home') || betNome.includes('total - away') || betNome.includes('exact score') || betNome.includes('correct score')) continue;
+      candidatos.push({ chave, betNome, betValor, odd: oddVal, pref });
+    }
+    // Ordenar: primeiro por preferência, depois pela odd mais atraente (> 1.40 é melhor que 1.25)
+    candidatos.sort((a, b) => {
+      if (a.pref !== b.pref) return a.pref - b.pref;
+      const scoreA = Math.abs(a.odd - 1.70); // ideal próximo de 1.70
+      const scoreB = Math.abs(b.odd - 1.70);
+      return scoreA - scoreB;
+    });
+    if (candidatos.length > 0) {
+      const melhor = candidatos[0];
+      // Mapear betNome para mercado interno
+      const mercadoMap = melhor.betNome.includes('corner') ? 'escanteios'
+        : melhor.betNome.includes('card') ? 'cartoes'
+        : (melhor.betNome.includes('winner') || melhor.betNome.includes('double chance') || melhor.betNome.includes('both teams')) ? 'resultado'
+        : 'gols';
+      // Formatar aposta legível
+      const apostaFinal = melhor.betNome.includes('first half') ? `${melhor.betValor.charAt(0).toUpperCase()}${melhor.betValor.slice(1)} - Primeiro Tempo`
+        : melhor.betNome.includes('second half') ? `${melhor.betValor.charAt(0).toUpperCase()}${melhor.betValor.slice(1)} - Segundo Tempo`
+        : `${melhor.betValor.charAt(0).toUpperCase()}${melhor.betValor.slice(1)}`;
+      jogo.aposta_original = jogo.aposta_original || jogo.aposta;
+      jogo.mercado_original = jogo.mercado_original || jogo.mercado;
+      jogo.aposta = apostaFinal;
+      jogo.mercado = mercadoMap;
+      jogo.odd_mercado = melhor.odd;
+      jogo.confianca = melhor.odd >= 1.50 ? 'alta' : 'media';
+      jogo.descartado = false; jogo.analisando = false; jogo.descartado_motivo = null;
+      jogo.justificativa = `Mercado disponível confirmado na API com odd ${melhor.odd}.`;
+      console.log(`  🎯 [FALLBACK] ${jogo.time_casa} x ${jogo.time_fora} → ${apostaFinal} (${mercadoMap}) @ ${melhor.odd}`);
+      return null;
+    }
+  }
+
+  // Sem nenhum mercado disponível na API
   const motivo = `${motivoPrincipal} | sem alternativa com odd ≥ ${ODD_MINIMA}${isPrioritario ? ' (prioritário)' : ' e confiança alta'}`;
   if (isPrioritario) {
-    // Liga prioritária: não descarta — marca como "analisando" para retry nas rotinas do dia
     jogo.descartado = false;
     jogo.analisando = true;
     jogo.descartado_motivo = motivo;
     jogo.odd_mercado = null;
-    console.log(`  ⏳ [PRIORITÁRIO] ${jogo.time_casa} x ${jogo.time_fora} → analisando (retry nas rotinas do dia): ${motivo}`);
-    return null; // não descarta
+    console.log(`  ⏳ [PRIORITÁRIO] ${jogo.time_casa} x ${jogo.time_fora} → analisando: ${motivo}`);
+    return null;
   }
   jogo.descartado = true;
   jogo.descartado_motivo = motivo;
