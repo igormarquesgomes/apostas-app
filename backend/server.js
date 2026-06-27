@@ -1790,9 +1790,10 @@ razao_escolha: frase curta explicando por que esse mercado e não outro.
 alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais ao menos confiável.`;
   }
 
-  // Adicionar margem de 7 jogos reservas — analisados pela IA junto com os principais
-  // Se algum for descartado (sem odd válida, confiança baixa etc.), o substituto já vem pronto
-  const MARGEM_RESERVA = 7;
+  // Margem de reserva: quanto maior, mais candidatos analisados → menor risco de faltar jogos
+  // Com Copa Chile/Paraguay (~35% falha em odds), precisamos de buffer generoso
+  // Custo extra: ~$0.003 por jogo adicional no Haiku — vale a pena vs faltar jogos
+  const MARGEM_RESERVA = Math.max(10, Math.ceil(metaJogos * 0.7)); // mínimo 10, ou 70% da meta
   const totalComMargem = Math.min(metaJogos + MARGEM_RESERVA, jogos.length);
   jogos = jogos.slice(0, totalComMargem);
 
