@@ -1186,36 +1186,41 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   // Limite de 4 apenas às 13:00
   let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
 
-  if (jogos.length < metaJogos) {
-    const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
-    let cont13h = 0;
-    const compFiltrado = [];
-    for (const j of compOrdenado) {
-      if (j.horario === '13:00') {
-        cont13h++;
-        if (cont13h <= 4) compFiltrado.push(j);
-      } else {
-        compFiltrado.push(j);
-      }
-    }
-    const faltam = metaJogos - jogos.length;
-    // Pegar o dobro do necessário para ter reserva após filtro de timesIgnorar
-    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 5)];
-  }
-
-  // Filtrar times já selecionados (para complemento)
+  // Filtrar times já selecionados ANTES de decidir quantos complementares adicionar
+  // (evita o bug onde jogosMap.length >= metaJogos mas todos os jogos são filtrados por timesIgnorar)
   if (timesIgnorar.size > 0) {
     const antes = jogos.length;
-    const jogosNovos = jogos.filter(j => {
+    jogos = jogos.filter(j => {
       const casa = j.timeCasa?.toLowerCase();
       const fora = j.timeFora?.toLowerCase();
       return !timesIgnorar.has(casa) && !timesIgnorar.has(fora);
     });
-    const filtrados = antes - jogosNovos.length;
+    const filtrados = antes - jogos.length;
     if (filtrados > 0) console.log(`🚫 ${filtrados} jogos filtrados (duplicatas)`);
-    jogos = jogosNovos; // não limitar aqui — MARGEM_RESERVA é aplicada abaixo
-    if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis`);
   }
+
+  // Preparar pool de complementares (com filtro de timesIgnorar aplicado)
+  const compOrdenado = Array.from(jogosComp.values())
+    .filter(j => !timesIgnorar.has(j.timeCasa?.toLowerCase()) && !timesIgnorar.has(j.timeFora?.toLowerCase()))
+    .sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
+  let cont13h = 0;
+  const compFiltrado = [];
+  for (const j of compOrdenado) {
+    if (j.horario === '13:00') {
+      cont13h++;
+      if (cont13h <= 4) compFiltrado.push(j);
+    } else {
+      compFiltrado.push(j);
+    }
+  }
+
+  if (jogos.length < metaJogos) {
+    const faltam = metaJogos - jogos.length;
+    // Pegar 10x o necessário para ter reserva suficiente de candidatos
+    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 10)];
+  }
+
+  if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis (meta: ${metaJogos})`);
 
   console.log(`\nJogos selecionados: ${jogos.length}`);
   jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
@@ -1384,7 +1389,7 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
 
   // Adicionar margem de 3 jogos reservas — analisados pela IA junto com os principais
   // Se algum for descartado no pós-processamento, o substituto já vem com análise completa
-  const MARGEM_RESERVA = 3;
+  const MARGEM_RESERVA = 7;
   const totalComMargem = Math.min(metaJogos + MARGEM_RESERVA, jogos.length);
   jogos = jogos.slice(0, totalComMargem);
 
