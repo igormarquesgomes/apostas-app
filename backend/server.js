@@ -549,6 +549,8 @@ const LIGAS_IGNORAR = new Set([
   1146, 1143,  // Alagoano-2, Estadual Junior
   // Competições internacionais sub-categorias
   921, 928, 914, 973, // UEFA U17, ASEAN U19, Tournoi Revello, CAF U17
+  // Ligas sem cobertura de odds na API-Football (sempre descartados)
+  1232, 1229,  // Copa De La Liga Peru, Liga Women Peru
 ]);
 
 // Países com ligas muito fracas — evitar como complementar
@@ -1859,9 +1861,10 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       if (motivo) descartados.push({ jogo, motivo, oddsFixture });
     }
 
-    // Dia com poucos jogos: re-analisar descartados com todos os mercados disponíveis
-    if (poucosJogosDia && descartados.length > 0) {
-      console.log(`\n🔄 Dia com poucos jogos — re-analisando ${descartados.length} descartado(s) com mercados disponíveis...`);
+    // Re-analisar descartados sempre que faltar jogos ativos para atingir a meta
+    const ativosAposOdds = resultado.jogos.filter(j => !j.descartado).length;
+    if (descartados.length > 0 && ativosAposOdds < metaJogos) {
+      console.log(`\n🔄 Apenas ${ativosAposOdds}/${metaJogos} jogos ativos — re-analisando ${descartados.length} descartado(s) com mercados disponíveis...`);
       for (const { jogo, motivo, oddsFixture } of descartados) {
         if (!oddsFixture) { console.log(`  ⏭️ ${jogo.time_casa} x ${jogo.time_fora}: sem odds disponíveis`); continue; }
         const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
@@ -1914,7 +1917,7 @@ Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes",
         } catch(e) { console.error(`  Erro re-análise ${jogo.time_casa}: ${e.message}`); }
       }
     } else if (descartados.length > 0) {
-      console.log(`\n📋 Dia com muitos jogos — ${descartados.length} jogo(s) descartado(s) (não reutilizados):`);
+      console.log(`\n📋 ${ativosAposOdds}/${metaJogos} jogos ativos — ${descartados.length} descartado(s) sem re-análise (meta atingida):`);
       descartados.forEach(({ jogo, motivo }) => console.log(`  🗑️ ${jogo.time_casa} x ${jogo.time_fora}: ${motivo}`));
     }
 
@@ -2565,8 +2568,7 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   }) };
   resultado.jogos.sort((a,b) => (a.pri||20)-(b.pri||20));
 
-  const poucosJogosDiaMA = jogos.length < LIMITE_JOGOS_MUITOS;
-  console.log(`\n💰 Odds reais (multi-agente) — mínima 1.25 | ${poucosJogosDiaMA ? 'poucos' : 'muitos'} jogos (${jogos.length})...`);
+  console.log(`\n💰 Odds reais (multi-agente) — mínima 1.25 | ${jogos.length} candidatos...`);
   const descartadosMA = [];
   for (const jogo of resultado.jogos) {
     if (!jogo.fixtureId) continue;
@@ -2574,8 +2576,9 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
     const motivo = aplicarOddsEPivotar(jogo, oddsFixture);
     if (motivo) descartadosMA.push({ jogo, motivo, oddsFixture });
   }
-  if (poucosJogosDiaMA && descartadosMA.length > 0) {
-    console.log(`\n🔄 Re-analisando ${descartadosMA.length} descartado(s) com mercados disponíveis...`);
+  const ativosAposOddsMA = resultado.jogos.filter(j => !j.descartado).length;
+  if (descartadosMA.length > 0 && ativosAposOddsMA < metaJogos) {
+    console.log(`\n🔄 Apenas ${ativosAposOddsMA}/${metaJogos} jogos ativos — re-analisando ${descartadosMA.length} descartado(s)...`);
     for (const { jogo, motivo, oddsFixture } of descartadosMA) {
       if (!oddsFixture) continue;
       const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
