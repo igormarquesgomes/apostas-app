@@ -4910,6 +4910,35 @@ app.get('/health', (req, res) => res.json({
   alerta_custo: custoHoje > ALERTA_CUSTO_DIA
 }));
 
+// Busca fixtures por time e data, retorna odds brutas do fixture encontrado
+app.get('/odds-jogo', async (req, res) => {
+  const { casa, fora, data } = req.query;
+  if (!casa || !fora) return res.status(400).json({ erro: 'Informe casa e fora' });
+  const dataAlvo = data || hojeStr();
+  try {
+    const fixtures = await buscarFixturesPorData(dataAlvo);
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').trim();
+    const nc = norm(casa), nf = norm(fora);
+    const match = fixtures.find(f => {
+      const h = norm(f.teams?.home?.name), a = norm(f.teams?.away?.name);
+      return (h.includes(nc.split(' ')[0]) || nc.includes(h.split(' ')[0])) &&
+             (a.includes(nf.split(' ')[0]) || nf.includes(a.split(' ')[0]));
+    });
+    if (!match) return res.json({ erro: `Fixture não encontrado para "${casa}" x "${fora}" em ${dataAlvo}`, total_fixtures: fixtures.length });
+    const fixtureId = match.fixture?.id;
+    const odds = await buscarOddsFixture(fixtureId, dataAlvo, true);
+    res.json({
+      fixture_id: fixtureId,
+      casa: match.teams?.home?.name,
+      fora: match.teams?.away?.name,
+      liga: match.league?.name,
+      horario: new Date(match.fixture?.timestamp * 1000).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }),
+      status: match.fixture?.status?.short,
+      mercados_disponiveis: odds || 'Sem odds na API para este fixture'
+    });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
 app.get('/api-status', async (req, res) => {
   const ok = await verificarStatusAPI();
   res.json({ ok, suspensa: apiSuspensa, erro: apiErrorMsg || null, req_hoje: reqHoje, limite: LIMITE_SEGURO, uso: ((reqHoje/LIMITE_SEGURO)*100).toFixed(1)+'%' });
