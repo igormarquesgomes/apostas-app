@@ -307,13 +307,14 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
       const isSegTempo  = a.includes('segundo tempo')  || a.includes('2o tempo') || a.includes('2nd half') || a.includes('second half');
 
       if (isPrimTempo) {
-        // busca direta em chaves de primeiro tempo — buscarPorPalavras OK aqui (parcial explícito)
+        const r1 = Object.entries(odds).find(([k]) => (k.includes('first half') || k.includes('1st half')) && k.includes(dir) && k.includes(linha));
         return buscar(['goals over/under first half','goals over/under - first half','first half goals','ht goals'], `${dir} ${linha}`)
-            || (Object.entries(odds).find(([k,v]) => (k.includes('first half') || k.includes('1st half')) && k.includes(dir) && k.includes(linha))?.[1] ?? null);
+            || (r1 ? r1[1] : null);
       }
       if (isSegTempo) {
+        const r2 = Object.entries(odds).find(([k]) => (k.includes('second half') || k.includes('2nd half')) && k.includes('|'+dir+' '+linha));
         return buscar(['goals over/under - second half','goals over/under second half','second half goals'], `${dir} ${linha}`)
-            || (Object.entries(odds).find(([k,v]) => (k.includes('second half') || k.includes('2nd half')) && k.includes('|'+dir+' '+linha))?.[1] ?? null);
+            || (r2 ? r2[1] : null);
       }
 
       // Jogo completo — fallback exclui parciais (comportamento original)
@@ -380,21 +381,21 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
     if (linha) {
       const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
       const comboVal = `${ladoResult} & ${dir} ${linha}`;
+      const rc = Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+        (k.includes('result') && (k.includes('total') || k.includes('goal'))) &&
+        k.includes(`${dir} ${linha}`) && k.includes(ladoResult));
       const found = buscar(['result/total goals','match result and total goals','result & total goals','double result'], comboVal)
-          || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
-              (k.includes('result') && k.includes('total') || k.includes('result') && k.includes('goal')) &&
-              k.includes(`${dir} ${linha}`) && k.includes(ladoResult)
-            )?.[1] ?? null;
+          || (rc ? rc[1] : null);
       if (found) return found;
     }
 
     // Combo resultado + BTTS
     if (a.includes('btts') || a.includes('ambos') || a.includes('both teams')) {
       const comboVal = `${ladoResult} & yes`;
+      const rb = Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+        (k.includes('btts') || k.includes('both teams')) && k.includes('result') && k.includes('yes') && k.includes(ladoResult));
       return buscar(['result/both teams score','match result and btts','result & btts'], comboVal)
-          || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
-              (k.includes('btts') || k.includes('both teams')) && k.includes('result') && k.includes('yes') && k.includes(ladoResult)
-            )?.[1] ?? null;
+          || (rb ? rb[1] : null);
     }
   }
 
@@ -404,12 +405,12 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
     const lado = a.includes('empat') || a.includes('draw') ? 'draw'
                : (pfora.length > 2 && a.includes(pfora)) || a.includes('away') ? 'away'
                : 'home';
+    const r1t = Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+      ((k.includes('first half') || k.includes('1st half') || k.includes('halftime') || k.includes('half time')) &&
+       (k.includes('result') || k.includes('winner')) && k.includes(lado)));
     return buscar(['1st half winner','first half result','halftime result','half time result','1st half - match result'], lado)
         || buscar(['1st half winner','first half result','halftime result','half time result'], lado === 'home' ? '1' : lado === 'draw' ? 'x' : '2')
-        || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
-            (k.includes('first half') || k.includes('1st half') || k.includes('halftime') || k.includes('half time')) &&
-            k.includes('result') || k.includes('winner') && k.includes(lado)
-          )?.[1] ?? null;
+        || (r1t ? r1t[1] : null);
   }
 
   // ── 2º TEMPO RESULTADO ───────────────────────────────────────────────────
@@ -418,11 +419,11 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
     const lado = a.includes('empat') || a.includes('draw') ? 'draw'
                : (pfora.length > 2 && a.includes(pfora)) || a.includes('away') ? 'away'
                : 'home';
+    const r2t = Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+      (k.includes('second half') || k.includes('2nd half')) && (k.includes('result') || k.includes('winner')) && k.includes(lado));
     return buscar(['2nd half winner','second half result','2nd half - match result'], lado)
         || buscar(['2nd half winner','second half result'], lado === 'home' ? '1' : lado === 'draw' ? 'x' : '2')
-        || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
-            (k.includes('second half') || k.includes('2nd half')) && (k.includes('result') || k.includes('winner')) && k.includes(lado)
-          )?.[1] ?? null;
+        || (r2t ? r2t[1] : null);
   }
 
   return null;
