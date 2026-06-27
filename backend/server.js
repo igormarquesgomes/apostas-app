@@ -581,6 +581,7 @@ const LIGAS_IGNORAR = new Set([
   // Ligas sem cobertura de odds na API-Football (sempre descartados)
   1232, 1229,  // Copa De La Liga Peru, Liga Women Peru
   711,         // Segunda División Chile — mercados indisponíveis na API
+  1113,        // Copa Venezuela — sem cobertura de odds
 ]);
 
 // Países com ligas muito fracas — evitar como complementar
