@@ -1794,7 +1794,57 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
   // Margem de reserva: quanto maior, mais candidatos analisados → menor risco de faltar jogos
   // Com Copa Chile/Paraguay (~35% falha em odds), precisamos de buffer generoso
   // Custo extra: ~$0.003 por jogo adicional no Haiku — vale a pena vs faltar jogos
-  const MARGEM_RESERVA = Math.max(10, Math.ceil(metaJogos * 0.7)); // mínimo 10, ou 70% da meta
+  // ── PRÉ-VALIDAÇÃO DE ODDS: filtrar candidatos sem cobertura na API ──────────
+  // Verifica rapidamente quais fixtures têm odds disponíveis antes de enviar à IA
+  // Garante que jogos como Rangers/Nublense (sem odds) nunca ocupem slots
+  console.log(`\n🔍 Pré-validando odds para ${jogos.length} candidatos...`);
+  const jogosComOdds = [];
+  const jogosSemOdds = [];
+
+  for (const j of jogos) {
+    if (!j.fixtureId) { jogosSemOdds.push(j); continue; }
+    // Jogos prioritários (pri < 10): aceitar mesmo sem odds confirmadas (tentar na análise)
+    const isPriAlta = j.pri != null && j.pri < 10;
+    const odds = await buscarOddsFixture(j.fixtureId, data);
+    if (odds && Object.keys(odds).length > 0) {
+      jogosComOdds.push(j);
+    } else if (isPriAlta) {
+      // Série A, Série B e Copa do Mundo sempre entram, odds ou não
+      console.log(`  ⚠️ ${j.time_casa} x ${j.time_fora} (pri=${j.pri}) sem odds mas incluído por prioridade`);
+      jogosComOdds.push(j);
+    } else {
+      jogosSemOdds.push(j);
+      console.log(`  ✂️ ${j.time_casa} x ${j.time_fora} (${j.liga}) removido — sem odds na API`);
+    }
+  }
+
+  console.log(`  ✅ ${jogosComOdds.length} com odds | ✂️ ${jogosSemOdds.length} sem odds removidos`);
+
+  // Se removemos candidatos e ficamos abaixo da meta, buscar mais do pool complementar
+  if (jogosComOdds.length < metaJogos) {
+    const jaIncluidos = new Set(jogosComOdds.map(j => `${j.timeCasa}-${j.timeFora}`));
+    const jaRemovidos = new Set(jogosSemOdds.map(j => j.fixtureId));
+    const extras = Array.from(jogosComp.values())
+      .filter(j => !timesIgnorar.has(j.timeCasa?.toLowerCase()) && !timesIgnorar.has(j.timeFora?.toLowerCase()))
+      .filter(j => !jaIncluidos.has(`${j.timeCasa}-${j.timeFora}`) && !jaRemovidos.has(j.fixtureId))
+      .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
+
+    console.log(`  🔄 Buscando ${metaJogos - jogosComOdds.length} candidatos extras com odds...`);
+    for (const j of extras) {
+      if (jogosComOdds.length >= metaJogos + 5) break;
+      if (!j.fixtureId) continue;
+      const odds = await buscarOddsFixture(j.fixtureId, data);
+      if (odds && Object.keys(odds).length > 0) {
+        jogosComOdds.push(j);
+        console.log(`  ➕ ${j.time_casa||j.timeCasa} x ${j.time_fora||j.timeFora} (${j.liga}) adicionado`);
+      }
+    }
+  }
+
+  jogos = jogosComOdds;
+  console.log(`  📋 Pool final: ${jogos.length} candidatos com odds confirmadas`);
+
+  const MARGEM_RESERVA = Math.max(5, Math.ceil(metaJogos * 0.5));
   const totalComMargem = Math.min(metaJogos + MARGEM_RESERVA, jogos.length);
   jogos = jogos.slice(0, totalComMargem);
 
