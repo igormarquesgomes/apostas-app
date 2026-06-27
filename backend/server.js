@@ -361,6 +361,67 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
         || buscarPorPalavras(['card','booking','cartao'], `${dir} ${linha}`);
   }
 
+  // ── COMBO (resultado + gols / resultado + BTTS) ───────────────────────────
+  if (mercado === 'combo') {
+    const ncasa = norm(timeCasa), nfora = norm(timeFora);
+    const pcasa = ncasa.split(' ')[0], pfora = nfora.split(' ')[0];
+    const mencCasa = pcasa.length > 2 && a.includes(pcasa);
+    const mencFora = pfora.length > 2 && a.includes(pfora);
+    const temCasa = mencCasa || a.includes('home') || a.includes('casa');
+    const temFora = mencFora || a.includes('away') || a.includes('fora');
+    const temEmpate = a.includes('empat') || a.includes('draw');
+
+    const ladoResult = temEmpate ? 'draw' : temFora ? 'away' : 'home';
+
+    // Combo resultado + Over/Under gols
+    if (linha) {
+      const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
+      const comboVal = `${ladoResult} & ${dir} ${linha}`;
+      const found = buscar(['result/total goals','match result and total goals','result & total goals','double result'], comboVal)
+          || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+              (k.includes('result') && k.includes('total') || k.includes('result') && k.includes('goal')) &&
+              k.includes(`${dir} ${linha}`) && k.includes(ladoResult)
+            )?.[1] ?? null;
+      if (found) return found;
+    }
+
+    // Combo resultado + BTTS
+    if (a.includes('btts') || a.includes('ambos') || a.includes('both teams')) {
+      const comboVal = `${ladoResult} & yes`;
+      return buscar(['result/both teams score','match result and btts','result & btts'], comboVal)
+          || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+              (k.includes('btts') || k.includes('both teams')) && k.includes('result') && k.includes('yes') && k.includes(ladoResult)
+            )?.[1] ?? null;
+    }
+  }
+
+  // ── 1º TEMPO RESULTADO ───────────────────────────────────────────────────
+  if (mercado === 'resultado_1t' || (mercado === 'resultado' && (a.includes('primeiro tempo') || a.includes('1o tempo') || a.includes('1st half') || a.includes('halftime') || a.includes('ht ')))) {
+    const ncasa = norm(timeCasa); const pfora = norm(timeFora).split(' ')[0];
+    const lado = a.includes('empat') || a.includes('draw') ? 'draw'
+               : (pfora.length > 2 && a.includes(pfora)) || a.includes('away') ? 'away'
+               : 'home';
+    return buscar(['1st half winner','first half result','halftime result','half time result','1st half - match result'], lado)
+        || buscar(['1st half winner','first half result','halftime result','half time result'], lado === 'home' ? '1' : lado === 'draw' ? 'x' : '2')
+        || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+            (k.includes('first half') || k.includes('1st half') || k.includes('halftime') || k.includes('half time')) &&
+            k.includes('result') || k.includes('winner') && k.includes(lado)
+          )?.[1] ?? null;
+  }
+
+  // ── 2º TEMPO RESULTADO ───────────────────────────────────────────────────
+  if (mercado === 'resultado_2t') {
+    const pfora = norm(timeFora).split(' ')[0];
+    const lado = a.includes('empat') || a.includes('draw') ? 'draw'
+               : (pfora.length > 2 && a.includes(pfora)) || a.includes('away') ? 'away'
+               : 'home';
+    return buscar(['2nd half winner','second half result','2nd half - match result'], lado)
+        || buscar(['2nd half winner','second half result'], lado === 'home' ? '1' : lado === 'draw' ? 'x' : '2')
+        || Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
+            (k.includes('second half') || k.includes('2nd half')) && (k.includes('result') || k.includes('winner')) && k.includes(lado)
+          )?.[1] ?? null;
+  }
+
   return null;
 }
 
@@ -475,8 +536,20 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
  */
 function formatarMercadosDisponiveisParaIA(oddsFixture) {
   if (!oddsFixture) return 'Nenhum mercado disponível na API.';
-  // Mercados relevantes para sugestão — inclui tempo parcial explicitamente
-  const RELEVANTES = ['goals over/under','match winner','double chance','both teams','corners','cards','first half','second half','1st half','2nd half','total goals','result'];
+  // Mercados relevantes — inclui tempo parcial, combos e handicap asiático
+  const RELEVANTES = [
+    'goals over/under','total goals','over/under',
+    'match winner','1x2','home/draw/away',
+    'double chance',
+    'both teams','btts','goals scored',
+    'corners','corner',
+    'cards','booking',
+    'first half','second half','1st half','2nd half','halftime','half time',
+    'result/total goals','result & total','match result and total',
+    'asian handicap','handicap',
+    'winning margin',
+    'to score','anytime',
+  ];
   const linhas = [];
   for (const [chave, odd] of Object.entries(oddsFixture).sort()) {
     const [betNome, valor] = chave.split('|');
@@ -1904,57 +1977,121 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       for (const { jogo, motivo, oddsFixture } of descartados) {
         if (!oddsFixture) { console.log(`  ⏭️ ${jogo.time_casa} x ${jogo.time_fora}: sem odds disponíveis`); continue; }
         const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
+        const isPrioritarioReanalise = jogo.pri != null && jogo.pri < 60;
         console.log(`  🔍 Re-analisando ${jogo.time_casa} x ${jogo.time_fora} | motivo: ${motivo}`);
 
-        const isPrioritarioReanalise = jogo.pri != null && jogo.pri < 60;
+        // ── Agente 1: mercados completos (gols, resultado, escanteios, cartões) ──
         const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})
 Motivo do descarte anterior: ${motivo}
-${isPrioritarioReanalise ? '\n⚠️ LIGA PRIORITÁRIA — você DEVE encontrar uma aposta válida. Não retorne confiança nao_recomendado.' : ''}
+${isPrioritarioReanalise ? '\n⚠️ LIGA PRIORITÁRIA — você DEVE encontrar uma aposta válida.' : ''}
 
-Mercados DISPONÍVEIS na API com odd ≥ 1.25 (estes são os únicos que podem ser apostados):
+Mercados DISPONÍVEIS na API com odd ≥ 1.25:
 ${mercadosDisp}
 
-Dados do jogo:
-- Forma casa: ${jogo.forma_casa || '?'} | Forma fora: ${jogo.forma_fora || '?'}
-- Gols média: ${jogo.media_gols_casa || '?'} (casa) + ${jogo.media_gols_fora || '?'} (fora)
-- Escanteios: ${jogo.media_escanteios || '?'} | Cartões: ${jogo.media_cartoes || '?'}
+Dados: forma casa ${jogo.forma_casa||'?'} | fora ${jogo.forma_fora||'?'} | gols ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | esc ${jogo.media_escanteios||'?'} | cart ${jogo.media_cartoes||'?'}
 
-MISSÃO: Escolha a MELHOR aposta dentre os mercados disponíveis acima.
-${isPrioritarioReanalise ? 'Liga prioritária: aceite confiança "media" se não houver opção "alta".' : 'A aposta deve ter confiança ALTA e odd ≥ 1.25.'}
-Use apenas mercados da lista acima — outros não estão disponíveis para apostar.
+MISSÃO: Escolha a MELHOR aposta. ${isPrioritarioReanalise ? 'Aceite confiança "media" se necessário.' : 'Confiança ALTA, odd ≥ 1.25.'}
+Mercados válidos: gols, resultado, escanteios, cartoes, combo (ex: "Argentina vence e over 2.5 gols"), resultado_1t (1º tempo), resultado_2t (2º tempo).
+Para combos use mercado "combo" e aposta no formato "[time] vence e over X.X gols".
 
-Retorne JSON com: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes|combo|resultado_1t|resultado_2t","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
 
-        try {
-          const resposta = await chamarIA(promptReanalise, 800);
-          if (resposta) {
-            const jsonMatch = resposta.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const nova = JSON.parse(jsonMatch[0]);
-              const confOkReanalise = nova.confianca === 'alta' || (isPrioritarioReanalise && nova.confianca === 'media');
-              if (nova.aposta && nova.mercado && confOkReanalise) {
-                // Verifica se a odd sugerida existe de fato nos mercados disponíveis
-                const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
-                const oddNum = oddReal ? parseFloat(oddReal) : null;
-                if (oddNum && oddNum >= ODD_MINIMA) {
-                  console.log(`  ✅ Re-análise OK: ${nova.aposta} (${nova.mercado}) @ ${oddNum}`);
-                  jogo.aposta_original = jogo.aposta;
-                  jogo.mercado_original = jogo.mercado;
-                  jogo.aposta = nova.aposta;
-                  jogo.mercado = nova.mercado;
-                  jogo.odd_mercado = oddNum;
-                  jogo.confianca = nova.confianca || 'alta';
-                  jogo.descartado = false;
-                  jogo.descartado_motivo = null;
-                  jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
-                  console.log(`  ✅ Re-análise OK: ${nova.aposta} (${nova.mercado}) @ ${oddNum} [${jogo.confianca}]`);
-                } else {
-                  console.log(`  ⚠️ Re-análise sugeriu "${nova.aposta}" mas odd não confirmada. ${isPrioritarioReanalise ? 'PRIORITÁRIO — será marcado como descartado mesmo assim.' : 'Jogo descartado.'}`);
-                }
-              }
-            }
+        const aplicarNovaAposta = async (nova) => {
+          const confOk = nova.confianca === 'alta' || (isPrioritarioReanalise && nova.confianca === 'media');
+          if (!nova.aposta || !nova.mercado || !confOk) return false;
+          const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
+          const oddNum = oddReal ? parseFloat(oddReal) : null;
+          if (oddNum && oddNum >= ODD_MINIMA) {
+            jogo.aposta_original = jogo.aposta; jogo.mercado_original = jogo.mercado;
+            jogo.aposta = nova.aposta; jogo.mercado = nova.mercado;
+            jogo.odd_mercado = oddNum; jogo.confianca = nova.confianca || 'alta';
+            jogo.descartado = false; jogo.descartado_motivo = null;
+            jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
+            console.log(`  ✅ Re-análise OK: ${nova.aposta} (${nova.mercado}) @ ${oddNum} [${jogo.confianca}]`);
+            return true;
           }
-        } catch(e) { console.error(`  Erro re-análise ${jogo.time_casa}: ${e.message}`); }
+          console.log(`  ⚠️ "${nova.aposta}" (${nova.mercado}) → odd não confirmada na API`);
+          return false;
+        };
+
+        let resolvido = false;
+
+        // Agente 1: re-análise geral
+        try {
+          const resp1 = await chamarIA(promptReanalise, 800);
+          if (resp1) {
+            const m1 = resp1.match(/\{[\s\S]*\}/);
+            if (m1) resolvido = await aplicarNovaAposta(JSON.parse(m1[0]));
+          }
+        } catch(e) { console.error(`  Erro agente-1 ${jogo.time_casa}: ${e.message}`); }
+
+        // ── Agente 2: 1º e 2º tempo — só para prioritários que ainda falharam ──
+        if (!resolvido && isPrioritarioReanalise) {
+          const mercados1t2t = Object.entries(oddsFixture)
+            .filter(([k,v]) => v >= ODD_MINIMA && v <= 10 &&
+              (k.includes('first half') || k.includes('1st half') || k.includes('second half') || k.includes('2nd half') || k.includes('halftime')))
+            .map(([k,v]) => `  ${k}: ${v}`).join('\n');
+
+          if (mercados1t2t) {
+            console.log(`  ⏱️ Agente 1º/2º tempo: ${jogo.time_casa} x ${jogo.time_fora}`);
+            const prompt2t = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga})
+Dados: gols/jogo casa=${jogo.media_gols_casa||'?'} fora=${jogo.media_gols_fora||'?'} | forma casa=${jogo.forma_casa||'?'} fora=${jogo.forma_fora||'?'}
+
+Mercados de 1º e 2º TEMPO disponíveis na API (odd ≥ 1.25):
+${mercados1t2t}
+
+MISSÃO: Escolha a melhor aposta de 1º OU 2º tempo para este jogo.
+- resultado_1t: vencedor do 1º tempo (home/draw/away)
+- resultado_2t: vencedor do 2º tempo
+- gols com "Primeiro Tempo" ou "Segundo Tempo" explícito na aposta
+
+Retorne JSON: {"aposta":"...","mercado":"resultado_1t|resultado_2t|gols","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+            try {
+              const resp2 = await chamarIA(prompt2t, 600);
+              if (resp2) {
+                const m2 = resp2.match(/\{[\s\S]*\}/);
+                if (m2) resolvido = await aplicarNovaAposta(JSON.parse(m2[0]));
+              }
+            } catch(e) { console.error(`  Erro agente-2t ${jogo.time_casa}: ${e.message}`); }
+          }
+        }
+
+        // ── Agente 3: combo fallback — resultado + gols para prioritários ──
+        if (!resolvido && isPrioritarioReanalise) {
+          const mercadosCombo = Object.entries(oddsFixture)
+            .filter(([k,v]) => v >= ODD_MINIMA && v <= 10 &&
+              (k.includes('result') && (k.includes('total') || k.includes('goal') || k.includes('btts'))))
+            .map(([k,v]) => `  ${k}: ${v}`).join('\n');
+
+          if (mercadosCombo) {
+            console.log(`  🔗 Agente combo: ${jogo.time_casa} x ${jogo.time_fora}`);
+            const promptCombo = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga})
+Dados: gols/jogo=${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} forma casa=${jogo.forma_casa||'?'} fora=${jogo.forma_fora||'?'}
+
+Mercados COMBO disponíveis (resultado + gols):
+${mercadosCombo}
+
+MISSÃO: Escolha o melhor combo disponível acima.
+Use mercado "combo" e formato de aposta: "[time] vence e over X.X gols" ou "[time] vence e BTTS".
+Exemplo: "Argentina vence e over 2.5 gols"
+
+Retorne JSON: {"aposta":"...","mercado":"combo","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+            try {
+              const resp3 = await chamarIA(promptCombo, 600);
+              if (resp3) {
+                const m3 = resp3.match(/\{[\s\S]*\}/);
+                if (m3) resolvido = await aplicarNovaAposta(JSON.parse(m3[0]));
+              }
+            } catch(e) { console.error(`  Erro agente-combo ${jogo.time_casa}: ${e.message}`); }
+          } else {
+            // Sem combo disponível na API — tentar sugerir combo com base nos dados mesmo sem chave específica
+            console.log(`  ⚠️ Nenhum mercado combo disponível para ${jogo.time_casa} x ${jogo.time_fora}`);
+          }
+        }
+
+        if (!resolvido) {
+          console.log(`  ❌ ${isPrioritarioReanalise ? '[PRIORITÁRIO] ' : ''}${jogo.time_casa} x ${jogo.time_fora}: sem mercado válido após todos os agentes`);
+        }
       }
     } else if (descartados.length > 0) {
       console.log(`\n📋 ${ativosAposOdds}/${metaJogos} jogos ativos — ${descartados.length} descartado(s) sem re-análise (meta atingida):`);
