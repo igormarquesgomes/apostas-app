@@ -551,6 +551,7 @@ const LIGAS_IGNORAR = new Set([
   921, 928, 914, 973, // UEFA U17, ASEAN U19, Tournoi Revello, CAF U17
   // Ligas sem cobertura de odds na API-Football (sempre descartados)
   1232, 1229,  // Copa De La Liga Peru, Liga Women Peru
+  711,         // Segunda División Chile — mercados indisponíveis na API
 ]);
 
 // Países com ligas muito fracas — evitar como complementar
@@ -1648,6 +1649,11 @@ PASSO 4 — Escolha o mercado com maior confiança E coerente com a análise.
 REGRA CRÍTICA: a justificativa DEVE explicar por que escolheu ESSE mercado e não outro.
 Se escrever "Under 2.5 é confiável" mas apostar Over 1.5, está ERRADO — seja coerente.
 NUNCA retorne confiança baixa como aposta principal — se o melhor disponível é baixa, pivote para o segundo melhor.
+
+REGRA DE MERCADO PARA FAVORITOS ABSOLUTOS (Copa do Mundo e grandes seleções):
+- Se um time é favorito com odd de vitória simples < 1.40, NÃO escolha Dupla Chance ou vitória simples como aposta principal — a odd real será < 1.25 e o jogo será descartado.
+- Nesses casos, PRIORIZE: Over 2.5 gols (favorito forte marca muito), escanteios (favorito domina posse), ou Over 3.5 gols se os dados apontarem.
+- Dupla Chance X2 com favorito claro = aposta sem valor, sempre resultará em descarte.
 
 CAMPO justificativa — REGRAS OBRIGATÓRIAS:
 - É o texto exibido ao PÚBLICO FINAL. Escreva como um especialista em apostas explicando sua análise, em português natural.
