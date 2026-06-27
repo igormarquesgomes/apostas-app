@@ -1806,7 +1806,9 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     // Jogos prioritários (pri < 10): aceitar mesmo sem odds confirmadas (tentar na análise)
     const isPriAlta = j.pri != null && j.pri < 10;
     const odds = await buscarOddsFixture(j.fixtureId, data);
-    if (odds && Object.keys(odds).length > 0) {
+    // Verificar se tem ao menos 1 mercado relevante com odd ≥ 1.25
+    const temMercadoValido = odds && formatarMercadosDisponiveisParaIA(odds) !== 'Nenhum mercado com odd ≥ 1.25.';
+    if (temMercadoValido) {
       jogosComOdds.push(j);
     } else if (isPriAlta) {
       // Série A, Série B e Copa do Mundo sempre entram, odds ou não
