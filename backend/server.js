@@ -5076,6 +5076,39 @@ app.get('/health', (req, res) => res.json({
 }));
 
 // Busca fixtures por time e data, retorna odds brutas do fixture encontrado
+// Lista todos os fixtures de uma data com status de odds apostáveis
+app.get('/fixtures-odds', async (req, res) => {
+  const dataAlvo = req.query.data || hojeStr();
+  try {
+    const fixtures = await buscarFixturesPorData(dataAlvo);
+    const result = [];
+    for (const f of fixtures) {
+      const status = f.fixture?.status?.short;
+      const liga = f.league?.name || '';
+      const pais = f.league?.country || '';
+      const fixtureId = f.fixture?.id;
+      const home = f.teams?.home?.name;
+      const away = f.teams?.away?.name;
+      const odds = fixtureId ? await buscarOddsFixture(fixtureId, dataAlvo) : null;
+      const apostavel = odds ? Object.entries(odds).filter(([k,v]) =>
+        v >= ODD_MINIMA && v <= 5 &&
+        MERCADOS_APOSTAVEL.some(p => k.startsWith(p)) &&
+        !k.includes('total - home') && !k.includes('total - away')
+      ) : [];
+      result.push({
+        fixture_id: fixtureId,
+        liga, pais, status,
+        casa: home, fora: away,
+        tem_odds: !!odds,
+        mercados_apostavel: apostavel.length,
+        melhor: apostavel.length ? apostavel.sort((a,b) => Math.abs(a[1]-1.7) - Math.abs(b[1]-1.7))[0] : null,
+      });
+    }
+    result.sort((a,b) => b.mercados_apostavel - a.mercados_apostavel);
+    res.json({ data: dataAlvo, total: result.length, com_odds: result.filter(r=>r.mercados_apostavel>0).length, fixtures: result });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
 app.get('/odds-jogo', async (req, res) => {
   const { casa, fora, data } = req.query;
   if (!casa || !fora) return res.status(400).json({ erro: 'Informe casa e fora' });
