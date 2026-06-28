@@ -594,6 +594,25 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
 }
 
 /**
+ * Verifica se um fixture tem ao menos 1 mercado apostável confirmável.
+ * Usa os MESMOS critérios do fallback em aplicarOddsEPivotar (MERCADOS_PREF)
+ * para garantir que pré-validação e fallback estejam alinhados.
+ */
+const MERCADOS_APOSTAVEL = [
+  'goals over/under|', 'goals over/under first half|', 'goals over/under - second half|',
+  'goal line|', 'match winner|', 'double chance|', 'both teams score|',
+  'corners over under|', 'cards over/under|',
+];
+function temMercadoApostavel(oddsFixture) {
+  if (!oddsFixture) return false;
+  return Object.entries(oddsFixture).some(([k, v]) =>
+    v >= ODD_MINIMA && v <= 5 &&
+    MERCADOS_APOSTAVEL.some(p => k.startsWith(p)) &&
+    !k.includes('total - home') && !k.includes('total - away')
+  );
+}
+
+/**
  * Formata todos os mercados disponíveis de um fixture para apresentar ao agente.
  * Retorna string formatada com: mercado | aposta | odd
  */
@@ -787,7 +806,7 @@ let apiSuspensa = false;
 let apiErrorMsg = '';
 let reqHoje = 0;
 let reqDia = '';
-const LIMITE_SEGURO = 1000;
+const LIMITE_SEGURO = 7500; // limite real da API-Football por dia
 const LIMITE_ALERTA = 800;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1856,9 +1875,10 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     // Jogos prioritários (pri < 10): aceitar mesmo sem odds confirmadas (tentar na análise)
     const isPriAlta = j.pri != null && j.pri < 10;
     const odds = await buscarOddsFixture(j.fixtureId, data);
-    // Verificar se tem ao menos 1 mercado relevante com odd ≥ 1.25
-    const temMercadoValido = odds && formatarMercadosDisponiveisParaIA(odds) !== 'Nenhum mercado com odd ≥ 1.25.';
+    // Alinhado com fallback: exige mercado do grupo MERCADOS_APOSTAVEL com odd 1.25–5.00
+    const temMercadoValido = odds && temMercadoApostavel(odds);
     if (temMercadoValido) {
+      j._odds = odds; // armazena para reutilizar sem depender de lookup por nome no post-IA
       jogosComOdds.push(j);
     } else if (isPriAlta) {
       // Série A, Série B e Copa do Mundo sempre entram, odds ou não
@@ -1889,8 +1909,9 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
       if (!j.fixtureId) continue;
       const odds = await buscarOddsFixture(j.fixtureId, data);
       // Mesma verificação rigorosa: exige ao menos 1 mercado relevante ≥ 1.25
-      const temMercado = odds && formatarMercadosDisponiveisParaIA(odds) !== 'Nenhum mercado com odd ≥ 1.25.';
+      const temMercado = odds && temMercadoApostavel(odds);
       if (temMercado) {
+        j._odds = odds; // armazena para reutilizar no post-IA
         jogosComOdds.push(j);
         console.log(`  ➕ ${j.time_casa||j.timeCasa} x ${j.time_fora||j.timeFora} (${j.liga}) adicionado`);
       } else {
@@ -2081,15 +2102,26 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
     if (semFixture.length) console.log(`⚠️ Jogos sem fixtureId: ${semFixture.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
   }
 
+  // Mapa de odds pré-validadas por fixtureId — garante que o post-IA sempre
+  // tem as odds corretas mesmo quando o lookup por nome da IA falha
+  const oddsPrevalidadas = new Map();
+  for (const jg of jogos) {
+    if (jg.fixtureId && jg._odds) oddsPrevalidadas.set(jg.fixtureId, jg._odds);
+  }
+  console.log(`\n💰 Odds pré-validadas disponíveis: ${oddsPrevalidadas.size} fixtures`);
+
   // Buscar odds reais — mínima 1.25, confiança alta obrigatória
   const poucosJogosDia = jogos.length < LIMITE_JOGOS_MUITOS;
-  console.log(`\n💰 Buscando odds reais — mínima 1.25, confiança alta | dia ${poucosJogosDia ? 'com poucos' : 'com muitos'} jogos (${jogos.length} disponíveis)...`);
+  console.log(`💰 Buscando odds reais — mínima 1.25, confiança alta | dia ${poucosJogosDia ? 'com poucos' : 'com muitos'} jogos (${jogos.length} disponíveis)...`);
   const descartados = []; // { jogo, motivo, oddsFixture }
 
   if (resultado.jogos) {
     for (const jogo of resultado.jogos) {
       if (!jogo.fixtureId) continue;
-      const oddsFixture = await buscarOddsFixture(jogo.fixtureId, data);
+      // Usa odds pré-validadas primeiro (bypass do problema de nome mal casado pela IA)
+      // só busca na API se não encontrar no mapa local
+      const oddsFixture = oddsPrevalidadas.get(jogo.fixtureId)
+        || await buscarOddsFixture(jogo.fixtureId, data);
       const motivo = aplicarOddsEPivotar(jogo, oddsFixture);
       if (motivo) descartados.push({ jogo, motivo, oddsFixture });
     }
