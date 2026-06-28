@@ -379,11 +379,11 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
 
     // Combo resultado + Over/Under gols
     if (linha) {
-      const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
-      const comboVal = `${ladoResult} & ${dir} ${linha}`;
+      const dirCombo = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
+      const comboVal = `${ladoResult} & ${dirCombo} ${linha}`;
       const rc = Object.entries(odds).find(([k,v]) => v >= ODD_MINIMA &&
         (k.includes('result') && (k.includes('total') || k.includes('goal'))) &&
-        k.includes(`${dir} ${linha}`) && k.includes(ladoResult));
+        k.includes(`${dirCombo} ${linha}`) && k.includes(ladoResult));
       const found = buscar(['result/total goals','match result and total goals','result & total goals','double result'], comboVal)
           || (rc ? rc[1] : null);
       if (found) return found;
@@ -1874,11 +1874,13 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
 
   // Se removemos candidatos e ficamos abaixo da meta, buscar mais do pool complementar
   if (jogosComOdds.length < metaJogos) {
-    const jaIncluidos = new Set(jogosComOdds.map(j => `${j.timeCasa}-${j.timeFora}`));
+    // Normaliza a chave para cobrir tanto timeCasa (camelCase) quanto time_casa (snake_case)
+    const normKey = j => `${j.timeCasa||j.time_casa||''}-${j.timeFora||j.time_fora||''}`;
+    const jaIncluidos = new Set(jogosComOdds.map(normKey));
     const jaRemovidos = new Set(jogosSemOdds.map(j => j.fixtureId));
     const extras = Array.from(jogosComp.values())
-      .filter(j => !timesIgnorar.has(j.timeCasa?.toLowerCase()) && !timesIgnorar.has(j.timeFora?.toLowerCase()))
-      .filter(j => !jaIncluidos.has(`${j.timeCasa}-${j.timeFora}`) && !jaRemovidos.has(j.fixtureId))
+      .filter(j => !timesIgnorar.has((j.timeCasa||j.time_casa||'').toLowerCase()) && !timesIgnorar.has((j.timeFora||j.time_fora||'').toLowerCase()))
+      .filter(j => !jaIncluidos.has(normKey(j)) && !jaRemovidos.has(j.fixtureId))
       .sort((a, b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
 
     console.log(`  🔄 Buscando ${metaJogos - jogosComOdds.length} candidatos extras com odds...`);
@@ -1900,7 +1902,9 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
   jogos = jogosComOdds;
   console.log(`  📋 Pool final: ${jogos.length} candidatos com odds confirmadas`);
 
-  const MARGEM_RESERVA = Math.max(5, Math.ceil(metaJogos * 0.5));
+  // Margem mínima de 10 candidatos extras para absorver falhas pós-IA
+  // Para metaJogos pequenos (complemento), garante candidatos suficientes
+  const MARGEM_RESERVA = Math.max(10, metaJogos * 3);
   const totalComMargem = Math.min(metaJogos + MARGEM_RESERVA, jogos.length);
   jogos = jogos.slice(0, totalComMargem);
 
