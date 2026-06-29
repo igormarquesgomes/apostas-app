@@ -1,15 +1,11 @@
 ﻿﻿const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const telegramAgendaRoutes = require('./routes/telegram-agenda');
 const { agendarCronTelegram } = require('./crons/telegram-crons');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// Servir arquivos estáticos da raiz do projeto (index.html, dashboard.html, etc.)
-app.use(express.static(path.join(__dirname, '..')));
 
 app.use('/api/telegram', telegramAgendaRoutes);
 
