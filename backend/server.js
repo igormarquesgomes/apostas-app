@@ -724,7 +724,7 @@ const LIGAS_PRIORITY = {
 
 // IDs a ignorar explicitamente (ligas brasileiras que NÃO são prioritárias)
 const LIGAS_IGNORAR = new Set([
-  75,          // Série C (sem cobertura de odds)
+  // 75 Série C removido — tem odds apostáveis na API (65-115 mercados) e serve como complementar
   // 76 Série D removido — tem odds apostáveis na API e serve como complementar em dias fracos
   1098,        // Paulista Série B
   851,         // Carioca A2
