@@ -1556,6 +1556,10 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
       } else if (AFRICA_ORIENTE.includes(paisLower)) {
         tipoComp = 'af';
         priComp = 80;
+      } else if (paisLower === 'brazil' || paisLower === 'brasil') {
+        // Ligas brasileiras complementares (Série C, D, etc.) — prioridade alta por ter cobertura de odds
+        tipoComp = 'b';
+        priComp = 60;
       } else {
         // Todo o resto — menor prioridade possível
         priComp = 200;
@@ -2478,6 +2482,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
       if (EUROPEUS.includes(paisLower)) { tipoComp = 'eu'; priComp = isTimesEuropaB(timeCasa, timeFora) ? 50 : 90; }
       else if (SUL_AMERICANOS.includes(paisLower)) { tipoComp = 'sul'; priComp = 70; }
       else if (AFRICA_ORIENTE.includes(paisLower)) { tipoComp = 'af'; priComp = 80; }
+      else if (paisLower === 'brazil' || paisLower === 'brasil') { tipoComp = 'b'; priComp = 60; }
       if (!jogosComp.has(key)) { dbSaveLiga(`${ligaNome} (${pais})`, ligaId, pais).catch(()=>{}); jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); }
     }
   }
