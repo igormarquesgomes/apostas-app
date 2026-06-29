@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · OddLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F0EDEA;--s1:#FFFFFF;--s2:#FAF7F2;--s3:#F1F5F9;
+  --border:#E2E8F0;--border2:#CBD5E1;
+  --text:#1E293B;--text2:#475569;--text3:#94A3B8;
+  --green:#0F766E;--red:#DC2626;--amber:#D97706;--purple:#7C3AED;
+  --red2:#BE123C;--nav-h:46px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;min-height:100vh;}
+.tn{background:var(--s2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:var(--nav-h);position:sticky;top:0;z-index:200;}
+.br{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.4px;margin-right:24px;flex-shrink:0;text-decoration:none;}
+.br span{color:var(--green);font-weight:300;}
+.nls{display:flex;gap:0;flex:1;}
+.nl{font-size:12px;color:var(--text3);padding:0 12px;height:var(--nav-h);display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;transition:color .12s;}
+.nl:hover{color:var(--text2);}
+.nl.a{color:var(--green);border-bottom-color:var(--green);font-weight:600;}
+.pg{padding:22px 24px 40px;max-width:1200px;}
+.ph{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.pt{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-0.5px;}
+.ps{font-size:12px;color:var(--text3);margin-top:3px;}
+.sc{background:var(--s1);border-radius:10px;padding:14px 16px;border:1px solid var(--border);}
+.sc.hl{background:#F0FDFA;border-color:#99F6E4;}
+.sl{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
+.sv{font-size:24px;font-weight:800;color:var(--text);letter-spacing:-0.8px;line-height:1;}
+.sv.g{color:var(--green);} .sv.r{color:#E11D48;}
+.ss{font-size:10px;color:var(--text3);margin-top:3px;}
+.mkt-card{background:var(--s1);border-radius:10px;border:1px solid var(--border);padding:14px 18px;}
+.mkt-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.mkt-name{font-size:13px;font-weight:700;color:var(--text);}
+.mkt-pct{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1;}
+.mkt-gr{font-size:11px;color:var(--text3);margin-top:3px;}
+.bw{height:5px;background:var(--s3);border-radius:4px;overflow:hidden;margin:5px 0 2px;}
+.bf{height:5px;border-radius:4px;}
+.mkt-note{font-size:10px;color:var(--text3);margin-top:6px;padding-top:6px;border-top:1px solid #F1F5F9;font-style:italic;}
+.pn{background:var(--s1);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.pnh{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.pnt{font-size:10px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.6px;}
+.ri{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #F1F5F9;}
+.ri:last-child{border-bottom:none;}
+.rn{font-size:12px;font-weight:600;color:var(--text);}
+.rs{font-size:10px;color:var(--text3);margin-top:1px;}
+.tg{font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700;white-space:nowrap;}
+.gg{color:var(--green);background:#CCFBF1;} .gr{color:var(--red2);background:#FFE4E6;}
+.gp{color:var(--text3);background:#F1F5F9;} .gw{color:#B45309;background:#FEF3C7;}
+.mult-row{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #F1F5F9;}
+.mult-row:last-child{border-bottom:none;}
+.ac{background:var(--s1);border-radius:10px;border:1px solid var(--border);padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer;font-family:'Inter',sans-serif;text-align:left;}
+.ac:hover{border-color:var(--border2);background:#FAFAF8;}
+.ac-title{font-size:12px;font-weight:700;color:var(--text);}
+.ac-desc{font-size:11px;color:var(--text3);}
+.hist-tab{font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--s1);color:var(--text2);cursor:pointer;transition:all .12s;font-family:'Inter',sans-serif;}
+.hist-tab.a{background:var(--green);color:#fff;border-color:var(--green);}
+.daily-item{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:6px;}
+.daily-hd{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;}
+.daily-hd:hover{background:#FAFAF8;}
+.daily-date{font-size:12px;font-weight:500;color:var(--text2);width:70px;flex-shrink:0;}
+.daily-bar{flex:1;height:4px;background:var(--s3);border-radius:2px;overflow:hidden;}
+.daily-bar-fill{height:100%;border-radius:2px;}
+.daily-pct{font-size:16px;font-weight:700;width:46px;text-align:right;flex-shrink:0;}
+.daily-gr{display:flex;gap:8px;flex-shrink:0;}
+.daily-g{font-size:12px;font-weight:600;color:var(--green);}
+.daily-r{font-size:12px;font-weight:600;color:var(--red);}
+.daily-chev{font-size:12px;color:var(--text3);flex-shrink:0;transition:transform .15s;}
+.daily-chev.open{transform:rotate(90deg);color:var(--green);}
+.daily-apostas{display:none;border-top:1px solid var(--border);}
+.daily-apostas.open{display:block;}
+.ap-row{padding:8px 14px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ap-row:last-child{border-bottom:none;}
+.ap-odd{font-size:12px;font-weight:600;color:var(--amber);}
+.sec-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:18px 0 8px;}
+.loading{text-align:center;padding:2rem;}
+.spin{width:22px;height:22px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 6px;}
+.empty{text-align:center;padding:1.5rem;color:var(--text3);font-size:12px;}
+@keyframes sp{to{transform:rotate(360deg);}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+<nav class="tn">
+  <a class="br" href="index.html">Odd<span>Lab</span></a>
+  <div class="nls">
+    <a class="nl" href="index.html">Apostas</a>
+    <a class="nl a" href="dashboard.html">Dashboard</a>
+    <a class="nl" href="ligas.html">Ligas</a>
+    <a class="nl" href="mercados.html">Mercados</a>
+    <a class="nl" href="relatorios.html">Relatórios</a>
+    <a class="nl" href="experimental.html">Experimental</a>
+    <a class="nl" href="aluno.html">Aluno</a>
+  </div>
+</nav>
+
+<div class="pg">
+  <div class="ph">
+    <div><div class="pt">Dashboard</div><div class="ps" id="dash-sub">carregando...</div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px">
+    <div class="sc hl"><div class="sl">Total</div><div class="sv" id="st-total">--</div></div>
+    <div class="sc hl"><div class="sl">Green</div><div class="sv g" id="st-green">--</div></div>
+    <div class="sc"><div class="sl">Red</div><div class="sv r" id="st-red">--</div></div>
+    <div class="sc"><div class="sl">Anulados</div><div class="sv" style="color:var(--purple)" id="st-void">--</div></div>
+    <div class="sc hl"><div class="sl">Assert. mês</div><div class="sv g" id="st-mes">--</div><div class="ss" id="st-mes-sub"></div></div>
+    <div class="sc hl"><div class="sl">Assert. semana</div><div class="sv g" id="st-sem">--</div><div class="ss" id="st-sem-sub"></div></div>
+  </div>
+
+  <div class="sec-label">Assertividade por mercado · apostas principais do mês</div>
+  <div id="mkt-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+    <div style="grid-column:1/-1" class="loading"><div class="spin"></div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px">
+    <div class="pn">
+      <div class="pnh"><span class="pnt">Por período</span></div>
+      <div id="periodo-panel"><div class="loading"><div class="spin"></div></div></div>
+    </div>
+    <div class="pn">
+      <div class="pnh"><span class="pnt">Por confiança · mês</span></div>
+      <div style="padding:12px 14px" id="conf-panel"><div class="loading" style="padding:.5rem 0"><div class="spin"></div></div></div>
+    </div>
+    <div class="pn">
+      <div class="pnh"><span class="pnt">Múltiplas · histórico</span></div>
+      <div id="mult-hist"><div class="loading"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+  <div class="sec-label">Ações administrativas</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px">
+    <button class="ac" id="btn-r" onclick="rotina()"><span style="font-size:18px">⚡</span><span class="ac-title" id="r-label">Rotina noturna</span><span class="ac-desc">Forçar execução manual</span></button>
+    <button class="ac" onclick="validarHoje(true)"><span style="font-size:18px">🔄</span><span class="ac-title">Revalidar hoje</span><span class="ac-desc">Forçar validação completa</span></button>
+    <button class="ac" onclick="validarDataEspecifica()"><span style="font-size:18px">📅</span><span class="ac-title">Validar data</span><span class="ac-desc">Buscar resultados de um dia</span></button>
+    <button class="ac" id="btn-sinc" onclick="sincronizarLigas()"><span style="font-size:18px">🏆</span><span class="ac-title" id="sinc-label">Sincronizar ligas</span><span class="ac-desc">Histórico 60 dias</span></button>
+  </div>
+
+  <div class="pn" style="margin-bottom:24px">
+    <div class="pnh">
+      <span class="pnt" style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;background:var(--green);border-radius:50%;display:inline-block;animation:pulse 2s infinite"></span>Hoje em tempo real</span>
+      <div style="display:flex;gap:6px">
+        <button id="btn-hoje" onclick="validarHoje(false)" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--s2);color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;font-weight:500">Atualizar</button>
+        <button onclick="validarHoje(true)" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--s2);color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;font-weight:500">Forçar</button>
+      </div>
+    </div>
+    <div id="hoje-conteudo" style="padding:14px"><div class="empty" style="padding:.25rem 0">Clique em Atualizar para ver os resultados de hoje</div></div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div class="sec-label" style="margin:0">Histórico</div>
+    <div style="display:flex;gap:4px">
+      <button class="hist-tab a" id="hb-dias" onclick="switchHist('dias')">Dias</button>
+      <button class="hist-tab" id="hb-semanas" onclick="switchHist('semanas')">Semanas</button>
+      <button class="hist-tab" id="hb-meses" onclick="switchHist('meses')">Meses</button>
+    </div>
+  </div>
+  <div id="hist-dias"><div id="daily-list"><div class="loading"><div class="spin"></div></div></div></div>
+  <div id="hist-semanas" style="display:none"><div id="periodos-semanas"></div></div>
+  <div id="hist-meses" style="display:none"><div id="periodos-meses"></div></div>
+</div>
+
+<script>
+const B='https://apostas-app.onrender.com';
+function corP(p){return p>=80?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
+function hoje(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function off(b,n){const d=new Date(b+'T12:00:00');d.setDate(d.getDate()+n);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function fmtD(s){if(!s)return'-';const[a,m,d]=s.split('-');return`${d}/${m}/${a}`;}
+function fmtDs(s){if(!s)return'-';const[a,m,d]=s.split('-');return`${d}/${m}`;}
+function fmtM(s){if(!s)return'-';const[a,m]=s.split('-');const ns=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];return`${ns[parseInt(m)-1]} ${a}`;}
+function tg(c,l){const cl={green:'gg',red:'gr',pendente:'gp',cancelado:'gp',amber:'gw'};return`<span class="tg ${cl[c]||'gp'}">${l}</span>`;}
+
+async function load(){
+  const h=hoje(),ps=[];
+  for(let i=0;i<30;i++) ps.push(fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null).then(async d=>{
+    if(!d?.apostas)return null;
+    try{const m=await fetch(`${B}/multiplas/${off(h,-i)}`).then(r=>r.ok?r.json():null);if(m){d.multiplas=m.multiplas;d.resultados_multiplas=m.resultados_multiplas;}}catch(e){}
+    return d;
+  }));
+  const dias=(await Promise.all(ps)).filter(Boolean);
+  processar(dias,h);
+}
+
+function processar(dias,h){
+  const hoje_d=new Date(h+'T12:00:00'),ds=hoje_d.getDay(),diasSeg=ds===0?6:ds-1;
+  const sw=off(h,-diasSeg),sm=h.substring(0,8)+'01';
+  let tG=0,tR=0,tV=0,tT=0,mG=0,mR=0,sG=0,sR=0;
+  const mktMap={},confMap={alta:{g:0,r:0},media:{g:0,r:0},baixa:{g:0,r:0}};
+  const diasP=[],diasMult=[];
+  for(const dia of dias){
+    const ap=dia.apostas?.jogos||[],res=dia.resultados?.apostas||[];
+    let dG=0,dR=0;
+    const apR=ap.map(a=>{
+      const r=res.find(x=>x.jogo_id===a.id),rv=r?.resultado_aposta||'pendente';
+      if(rv==='green'){dG++;tG++;}else if(rv==='red'){dR++;tR++;}else if(rv==='cancelado')tV++;
+      tT++;
+      if(rv!=='pendente'&&rv!=='cancelado'){
+        if(dia.data>=sm){
+          const mkt=detectMercado(a);
+          if(!mktMap[mkt])mktMap[mkt]={g:0,r:0,total:0};
+          if(rv==='green')mktMap[mkt].g++;else mktMap[mkt].r++;
+          mktMap[mkt].total++;
+          const cf=(a.confianca||a.confianca||'media').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+          if(confMap[cf]){if(rv==='green')confMap[cf].g++;else confMap[cf].r++;}
+        }
+        if(dia.data>=sw){if(rv==='green')sG++;else sR++;}
+        if(dia.data>=sm){if(rv==='green')mG++;else mR++;}
+      }
+      return{...a,resultado:rv,placar:r?.placar||null};
+    });
+    const dt=dG+dR,da=dt>0?Math.round(dG/dt*100):null;
+    const rM=dia.resultados_multiplas,rA=rM?.multipla_a?.resultado||(dia.multiplas?.multipla_a?'pendente':null),rB=rM?.multipla_b?.resultado||(dia.multiplas?.multipla_b?'pendente':null);
+    if(rA||rB)diasMult.push({data:dia.data,rA,rB,oddA:dia.multiplas?.multipla_a?.odd_total,oddB:dia.multiplas?.multipla_b?.odd_total});
+    diasP.push({data:dia.data,apostas:apR,green:dG,red:dR,total:ap.length,assert:da});
+  }
+  const pMes=mG+mR>0?Math.round(mG/(mG+mR)*100):null,pSem=sG+sR>0?Math.round(sG/(sG+sR)*100):null;
+  document.getElementById('st-total').textContent=tT;
+  document.getElementById('st-green').textContent=tG;
+  document.getElementById('st-red').textContent=tR;
+  document.getElementById('st-void').textContent=tV;
+  const me=document.getElementById('st-mes');me.textContent=pMes!==null?pMes+'%':'--';if(pMes!==null)me.style.color=corP(pMes);
+  document.getElementById('st-mes-sub').textContent=`${mG}G · ${mR}R`;
+  const se=document.getElementById('st-sem');se.textContent=pSem!==null?pSem+'%':'--';if(pSem!==null)se.style.color=corP(pSem);
+  document.getElementById('st-sem-sub').textContent=`${sG}G · ${sR}R`;
+  document.getElementById('dash-sub').textContent=`${fmtM(sm.substring(0,7))} · assertividade desde 1/${sm.substring(5,7)} · últimos 30 dias`;
+  renderMercados(mktMap);renderPeriodosPanel(diasP,h,sw,sm);renderConfPanel(confMap);renderMultHist(diasMult);renderDiario(diasP);renderPeriodosHist(diasP);
+}
+
+function detectMercado(a){
+  const t=(a.aposta||a.mercado||'').toLowerCase();
+  if(/escan|corner/i.test(t))return'Escanteios';
+  if(/cart[aã]o|yellow|red card/i.test(t))return'Cartões';
+  if(/resultado|home|away|casa|fora|vence|empat|1x2/i.test(t))return'Resultado';
+  if(/gol|over|under|\d\.\d/i.test(t))return'Gols';
+  return'Outros';
+}
+const mktNotas={'Escanteios':'Analisar média combinada ≥ 9.5 antes de apostar','Gols':'Maior volume — verificar média de gols H2H','Resultado':'Usar apenas com confiança alta em favorito claro','Cartões':'Reservar para rivalidades com árbitro permissivo','Outros':'Mercados variados — avaliar caso a caso'};
+
+function renderMercados(mktMap){
+  const ordem=['Escanteios','Gols','Resultado','Cartões','Outros'];
+  const mkts=ordem.map(k=>({k,d:mktMap[k]||null})).filter(x=>x.d&&x.d.total>=2);
+  if(!mkts.length){document.getElementById('mkt-grid').innerHTML='<div style="grid-column:1/-1" class="empty">Sem dados de mercado suficientes este mês.</div>';return;}
+  document.getElementById('mkt-grid').style.gridTemplateColumns=`repeat(${Math.min(mkts.length,4)},1fr)`;
+  document.getElementById('mkt-grid').innerHTML=mkts.slice(0,4).map(({k,d})=>{
+    const pct=Math.round(d.g/d.total*100),cor=corP(pct);
+    return`<div class="mkt-card" style="border-top:3px solid ${cor}"><div class="mkt-top"><div><div class="mkt-name">${k}</div><div class="mkt-gr">${d.g}G · ${d.r}R · ${d.total} jogos</div></div><div class="mkt-pct" style="color:${cor}">${pct}%</div></div><div class="bw"><div class="bf" style="width:${pct}%;background:${cor}"></div></div><div class="mkt-note">${mktNotas[k]||''}</div></div>`;
+  }).join('');
+}
+
+function renderPeriodosPanel(diasP,h,sw,sm){
+  const ontem=off(h,-1);
+  const periodos=[
+    {label:fmtM(sm.substring(0,7)),filter:d=>d.data>=sm,hl:true},
+    {label:'Esta semana',filter:d=>d.data>=sw},
+    {label:'Ontem',filter:d=>d.data===ontem},
+  ];
+  const meses={};
+  for(const d of diasP){const k=d.data.substring(0,7);if(!meses[k])meses[k]={g:0,r:0};meses[k].g+=d.green;meses[k].r+=d.red;}
+  const pRows=periodos.map(p=>{
+    const f=diasP.filter(d=>p.filter(d)),g=f.reduce((s,d)=>s+d.green,0),r=f.reduce((s,d)=>s+d.red,0),t=g+r,pct=t>0?Math.round(g/t*100):null;
+    const cl=pct===null?'gp':pct>=80?'gg':pct>=60?'gw':'gr';
+    return`<div class="ri" style="${p.hl?'background:#F0FDFA;':''}"><div style="padding:8px 14px"><div class="rn"${p.hl?' style="color:var(--green)"':''}>${p.label}</div><div class="rs">${t} apostas</div></div><span class="tg ${cl}" style="margin-right:14px">${pct!==null?pct+'%':'--'}</span></div>`;
+  });
+  const mRows=Object.entries(meses).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,5).map(([k,v])=>{
+    const t=v.g+v.r,pct=t>0?Math.round(v.g/t*100):null,cl=pct===null?'gp':pct>=80?'gg':pct>=60?'gw':'gr';
+    return`<div class="ri"><div style="padding:8px 14px"><div class="rn">${fmtM(k)}</div><div class="rs">${t} apostas</div></div><span class="tg ${cl}" style="margin-right:14px">${pct!==null?pct+'%':'--'}</span></div>`;
+  });
+  document.getElementById('periodo-panel').innerHTML=pRows.join('')+'<div style="height:1px;background:var(--border);margin:4px 0"></div>'+mRows.join('');
+}
+
+function renderConfPanel(confMap){
+  document.getElementById('conf-panel').innerHTML=['alta','media','baixa'].map(key=>{
+    const label={alta:'Alta',media:'Média',baixa:'Baixa'}[key],d=confMap[key],t=d.g+d.r,pct=t>0?Math.round(d.g/t*100):null,cor=pct!==null?corP(pct):'var(--text3)';
+    return`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;font-weight:600;color:var(--text)">${label}</span><span style="font-size:12px;font-weight:700;color:${cor}">${pct!==null?pct+'%':'--'}</span></div><div class="bw"><div class="bf" style="width:${pct||0}%;background:${cor}"></div></div><div style="font-size:10px;color:var(--text3)">${d.g}G · ${d.r}R · ${t} apostas</div></div>`;
+  }).join('');
+}
+
+function renderMultHist(diasMult){
+  if(!diasMult.length){document.getElementById('mult-hist').innerHTML='<div class="empty">Sem múltiplas ainda.</div>';return;}
+  document.getElementById('mult-hist').innerHTML=diasMult.slice(0,8).map(d=>{
+    const bA=d.rA==='green'?tg('green','GREEN'):d.rA==='red'?tg('red','RED'):tg('pendente','pendente');
+    const bB=d.rB==='green'?tg('green','GREEN'):d.rB==='red'?tg('red','RED'):tg('pendente','pendente');
+    return`<div class="mult-row"><div><div class="rn" style="font-size:11px">${fmtDs(d.data)} · A${d.oddA?' · odd '+parseFloat(d.oddA).toFixed(2):''}</div></div>${bA}</div>`+(d.rB?`<div class="mult-row"><div><div class="rn" style="font-size:11px">${fmtDs(d.data)} · B${d.oddB?' · odd '+parseFloat(d.oddB).toFixed(2):''}</div></div>${bB}</div>`:'');
+  }).join('');
+}
+
+function renderDiario(dias){
+  if(!dias.length){document.getElementById('daily-list').innerHTML='<div class="empty">Nenhum dado ainda.</div>';return;}
+  document.getElementById('daily-list').innerHTML=dias.map((d,i)=>{
+    const pct=d.assert,apHtml=d.apostas.map(a=>`<div class="ap-row"><div><div style="font-size:13px;font-weight:500">${a.time_casa} x ${a.time_fora}</div><div style="font-size:11px;color:var(--text2);margin-top:1px">${a.liga||''} · ${a.aposta}</div></div><div style="display:flex;align-items:center;gap:8px"><span class="ap-odd">${a.odd_mercado||a.odd_sugerida||''}</span>${a.resultado==='green'?tg('green','GREEN'):a.resultado==='red'?tg('red','RED'):tg('pendente','?')}</div></div>`).join('');
+    return`<div class="daily-item"><div class="daily-hd" onclick="togD(${i})"><span class="daily-date">${fmtD(d.data)}</span><div class="daily-bar"><div class="daily-bar-fill" style="width:${pct||0}%;background:${corP(pct||0)}"></div></div><span class="daily-pct" style="color:${pct!==null?corP(pct):'var(--text3)'}">${pct!==null?pct+'%':'--'}</span><div class="daily-gr"><span class="daily-g">${d.green}G</span><span class="daily-r">${d.red}R</span></div><span class="daily-chev" id="dc${i}">▶</span></div><div class="daily-apostas" id="da${i}">${apHtml}</div></div>`;
+  }).join('');
+}
+function togD(i){document.getElementById('da'+i).classList.toggle('open');document.getElementById('dc'+i).classList.toggle('open');}
+function switchHist(m){['dias','semanas','meses'].forEach(k=>{document.getElementById('hist-'+k).style.display=k===m?'block':'none';document.getElementById('hb-'+k).classList.toggle('a',k===m);});}
+
+function renderPeriodosHist(diasP){
+  const semanasMap={},mesesMap={};
+  for(const d of diasP){
+    const dt=new Date(d.data+'T12:00:00'),ds=dt.getDay(),d_=ds===0?6:ds-1,seg=new Date(dt);seg.setDate(dt.getDate()-d_);
+    const sk=seg.toISOString().substring(0,10),dom=new Date(seg);dom.setDate(seg.getDate()+6);
+    if(!semanasMap[sk])semanasMap[sk]={label:`${fmtDs(sk)} – ${fmtDs(dom.toISOString().substring(0,10))}`,g:0,r:0,dias:[]};
+    semanasMap[sk].g+=d.green;semanasMap[sk].r+=d.red;semanasMap[sk].dias.push(d);
+    const mk=d.data.substring(0,7);
+    if(!mesesMap[mk])mesesMap[mk]={label:fmtM(mk),g:0,r:0,dias:[]};
+    mesesMap[mk].g+=d.green;mesesMap[mk].r+=d.red;mesesMap[mk].dias.push(d);
+  }
+  const renderMap=(m,cid)=>{document.getElementById(cid).innerHTML=Object.entries(m).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>{
+    const t=v.g+v.r,pct=t>0?Math.round(v.g/t*100):null,cor=pct!==null?corP(pct):'var(--text3)',id='ph'+cid+k.replace(/\D/g,'');
+    return`<div class="daily-item"><div class="daily-hd" onclick="togPH('${id}')"><span style="flex:1;font-size:12px;font-weight:500;color:var(--text2)">${v.label}</span><div class="daily-bar"><div class="daily-bar-fill" style="width:${pct||0}%;background:${cor}"></div></div><span class="daily-pct" style="color:${cor}">${pct!==null?pct+'%':'--'}</span><div class="daily-gr"><span class="daily-g">${v.g}G</span><span class="daily-r">${v.r}R</span></div><span class="daily-chev" id="${id}c">▶</span></div><div class="daily-apostas" id="${id}b">${v.dias.sort((a,b)=>b.data.localeCompare(a.data)).map(d=>{const p=d.assert;return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;border-bottom:1px solid #F1F5F9"><span style="font-size:12px;color:var(--text2)">${fmtD(d.data)}</span><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:var(--text3)">${d.green}G ${d.red}R</span><span style="font-size:13px;font-weight:700;color:${p!==null?corP(p):'var(--text3)'}">${p!==null?p+'%':'--'}</span></div></div>`;}).join('')}</div></div>`;
+  }).join('')};
+  renderMap(semanasMap,'periodos-semanas');renderMap(mesesMap,'periodos-meses');
+}
+function togPH(id){document.getElementById(id+'b').classList.toggle('open');document.getElementById(id+'c').classList.toggle('open');}
+
+async function validarHoje(forcar=false){
+  const btn=document.getElementById('btn-hoje');btn.disabled=true;btn.textContent='...';
+  try{
+    await fetch(`${B}${forcar?`/validar/${hoje()}?forcar=true`:'/validar-agora'}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forcar})});
+    await new Promise(r=>setTimeout(r,7000));
+    const r=await fetch(`${B}/apostas-resultado/${hoje()}`),d=await r.json();
+    if(!d.apostas?.jogos?.length){document.getElementById('hoje-conteudo').innerHTML='<div class="empty">Sem apostas geradas para hoje ainda.</div>';return;}
+    const ap=d.apostas.jogos,res=d.resultados?.apostas||[],jR=ap.map(a=>{const rv=res.find(x=>x.jogo_id===a.id);return{...a,resultado:rv?.resultado_aposta||'pendente',placar:rv?.placar||null};});
+    const g=jR.filter(j=>j.resultado==='green').length,r2=jR.filter(j=>j.resultado==='red').length,p=jR.filter(j=>j.resultado==='pendente').length,t2=g+r2,pct=t2>0?Math.round(g/t2*100):null;
+    document.getElementById('hoje-conteudo').innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px"><div class="sc"><div class="sl">Total</div><div class="sv">${ap.length}</div></div><div class="sc hl"><div class="sl">Green</div><div class="sv g">${g}</div></div><div class="sc"><div class="sl">Red</div><div class="sv r">${r2}</div></div><div class="sc"><div class="sl">Pendente</div><div class="sv" style="color:var(--amber)">${p}</div></div></div>${pct!==null?`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Assertividade até agora: <strong style="color:${corP(pct)}">${pct}%</strong></div>`:''}<div style="display:flex;flex-direction:column;gap:5px">${jR.map(j=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--s2);border:1px solid var(--border);border-radius:8px;gap:8px;border-left:3px solid ${j.resultado==='green'?'var(--green)':j.resultado==='red'?'var(--red)':'var(--border)'}"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j.time_casa} x ${j.time_fora}</div><div style="font-size:11px;color:var(--text2)">${j.aposta}</div></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${j.placar?`<span style="font-size:12px;font-weight:600;color:var(--text2)">${j.placar}</span>`:''}${j.resultado==='green'?tg('green','GREEN'):j.resultado==='red'?tg('red','RED'):tg('pendente','?')}</div></div>`).join('')}</div>`;
+  }catch(e){document.getElementById('hoje-conteudo').innerHTML=`<div class="empty" style="color:var(--red)">Erro: ${e.message}</div>`;}
+  finally{btn.disabled=false;btn.textContent='Atualizar';}
+}
+async function validarDataEspecifica(){const data=prompt('Data (YYYY-MM-DD):',hoje());if(!data||!data.match(/^\d{4}-\d{2}-\d{2}$/))return;try{await fetch(`${B}/validar/${data}`,{method:'POST',headers:{'Content-Type':'application/json'}});alert('Validação iniciada!');}catch(e){alert('Erro: '+e.message);}}
+async function rotina(){const btn=document.getElementById('btn-r');btn.disabled=true;document.getElementById('r-label').textContent='Executando...';try{await fetch(`${B}/rotina-noturna`,{method:'POST'});document.getElementById('r-label').textContent='Concluído!';}catch(e){document.getElementById('r-label').textContent='Erro';}setTimeout(()=>{btn.disabled=false;document.getElementById('r-label').textContent='Rotina noturna';},3000);}
+async function sincronizarLigas(){const btn=document.getElementById('btn-sinc');btn.disabled=true;document.getElementById('sinc-label').textContent='Sincronizando...';try{await fetch(`${B}/sincronizar-ligas`,{method:'POST'});document.getElementById('sinc-label').textContent='Sincronizado!';}catch(e){document.getElementById('sinc-label').textContent='Erro';}setTimeout(()=>{btn.disabled=false;document.getElementById('sinc-label').textContent='Sincronizar ligas';},4000);}
+
+load();
+</script>
+</body>
+</html>
