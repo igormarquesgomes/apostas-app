@@ -856,6 +856,9 @@ function render(jogos,data){
             <div class="backup-label">⚡ Aposta backup</div>
             <div class="backup-content"><span>${j.aposta_backup}</span><span class="backup-merc">${mercNome[j.mercado_backup]||j.mercado_backup||'—'}</span></div>
           </div>`:''}
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px">
+            <button class="act-btn danger" onclick="excluirJogo(event,'${dataAtual}',${j.id})" style="display:flex;align-items:center;gap:4px">🗑️ Excluir jogo</button>
+          </div>
           <div class="stats-mini-row" style="margin-top:10px">
             <div class="sm-mini"><div class="sm-mini-l">Gols casa</div><div class="sm-mini-v">${j.media_gols_casa||'-'}</div></div>
             <div class="sm-mini"><div class="sm-mini-l">Gols fora</div><div class="sm-mini-v">${j.media_gols_fora||'-'}</div></div>
@@ -1037,6 +1040,17 @@ async function editarResultado(event,idx,data,jogoId,resultadoAtual){
       if(j.ok){ await _recarregarLista(data); }else{ alert('Erro: '+j.error); }
     }catch(e){ alert('Erro: '+e.message); }
   });
+}
+
+async function excluirJogo(event,data,jogoId){
+  event.stopPropagation();
+  if(!confirm('Excluir este jogo da lista? A ação não pode ser desfeita.')) return;
+  try{
+    const r=await fetch(`${BACKEND_URL}/excluir-jogo`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId})});
+    const j=await r.json();
+    if(j.ok){ await _recarregarLista(data); }
+    else{ alert('Erro ao excluir: '+(j.error||'desconhecido')); }
+  }catch(e){ alert('Erro: '+e.message); }
 }
 
 async function anularJogo(event,data,jogoId){
@@ -1264,6 +1278,24 @@ async function analisarJogoManual(){
   const data = document.getElementById('m-data').value;
   if(!data){ return; }
 
+  // Verificar duplicata via API
+  try{
+    const checkR = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const checkD = await checkR.json();
+    const jogosHoje = checkD.apostas?.jogos || [];
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+    const nCasa = norm(jogoSelecionado.time_casa), nFora = norm(jogoSelecionado.time_fora);
+    const jaExiste = jogosHoje.some(j => {
+      const jc = norm(j.time_casa), jf = norm(j.time_fora);
+      return (jc.includes(nCasa.split(' ')[0]) || nCasa.includes(jc.split(' ')[0])) &&
+             (jf.includes(nFora.split(' ')[0]) || nFora.includes(jf.split(' ')[0]));
+    });
+    if(jaExiste){
+      alert(`⚠️ ${jogoSelecionado.time_casa} x ${jogoSelecionado.time_fora} já está na lista de ${data}.\nExclua o jogo antes de adicionar novamente.`);
+      return;
+    }
+  }catch(e){}
+
   const btn = document.getElementById('m-btn-analisar');
   btn.disabled = true;
   const resDiv = document.getElementById('m-result');
@@ -1316,7 +1348,7 @@ function renderResultadoModal(jogo, data){
         <div>
           <span class="modal-result-aposta">${jogo.aposta}</span>
           <span class="modal-result-merc">${mercNomes[jogo.mercado]||jogo.mercado}</span>
-          <span style="font-size:14px;font-weight:700;color:var(--amber);margin-left:8px">@${jogo.odd_sugerida||'-'}</span>
+          <span style="font-size:14px;font-weight:700;color:var(--amber);margin-left:8px">@${jogo.odd_mercado||jogo.odd_sugerida||'-'}</span>
         </div>
         <div class="modal-result-just">${jogo.justificativa||'-'}</div>
         <div class="modal-result-stats">
