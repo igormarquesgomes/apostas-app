@@ -5864,6 +5864,26 @@ app.post('/confirmar-jogo-manual', async (req, res) => {
   }
 });
 
+// Excluir jogo do dia por ID
+app.delete('/excluir-jogo', async (req, res) => {
+  const { data, jogo_id } = req.body;
+  if (!data || jogo_id == null) return res.status(400).json({ error: 'data e jogo_id obrigatórios' });
+  try {
+    const row = await dbGet(data);
+    const jogosExistentes = row?.apostas?.jogos || [];
+    const novosJogos = jogosExistentes.filter(j => j.id !== Number(jogo_id));
+    if (novosJogos.length === jogosExistentes.length) return res.status(404).json({ error: `Jogo ${jogo_id} não encontrado` });
+    // Renumerar IDs
+    novosJogos.forEach((j, idx) => { j.id = idx + 1; });
+    await dbSave(data, { ...(row?.apostas || {}), jogos: novosJogos });
+    console.log(`🗑️ Jogo ${jogo_id} excluído de ${data} — restam ${novosJogos.length}`);
+    res.json({ ok: true, total: novosJogos.length, jogos: novosJogos });
+  } catch(e) {
+    console.error('❌ /excluir-jogo:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/calibracao', async (req, res) => {
   const [semestral, mensal, semanal, diario] = await Promise.all([
     dbGetCalibracao('semestral'), dbGetCalibracao('mensal'),
