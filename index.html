@@ -700,7 +700,7 @@ function render(jogos,data){
         <div class="odd-val">${odd}</div>
         <div><span class="conf ${confNorm}">${confNorm.charAt(0).toUpperCase()+confNorm.slice(1)}</span></div>
         <div class="result-col">${resBadge}</div>
-        <div class="act-col">${anularBtn}${excluirBtn}</div>
+        <div class="act-col">${anularBtn}</div>
       </div>
       <div class="expand-row" id="ex${i}">
         <div class="exp-alts">
@@ -733,6 +733,9 @@ function render(jogos,data){
             <div class="backup-label">⚡ Aposta backup</div>
             <div class="backup-content"><span>${j.aposta_backup}</span><span class="backup-merc">${mercNome[j.mercado_backup]||j.mercado_backup||'—'}</span></div>
           </div>`:''}
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+            <button class="act-btn danger" onclick="excluirJogo(event,'${dataAtual}',${j.id})" style="display:flex;align-items:center;gap:4px">🗑️ Excluir jogo</button>
+          </div>
           <div class="stats-mini-row" style="margin-top:10px">
             <div class="sm-mini"><div class="sm-mini-l">Gols casa</div><div class="sm-mini-v">${j.media_gols_casa||'-'}</div></div>
             <div class="sm-mini"><div class="sm-mini-l">Gols fora</div><div class="sm-mini-v">${j.media_gols_fora||'-'}</div></div>
