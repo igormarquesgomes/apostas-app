@@ -761,7 +761,7 @@ function ligaBrasileiraNaoRelevante(ligaNome, pais) {
     l.includes('sergipano') || l.includes('tocantinense') || l.includes('capixaba') ||
     l.includes('piauiense') || l.includes('amazonense') || l.includes('acreano') ||
     l.includes('estadual') || l.includes('copa espirito') || l.includes('copa gaucha') ||
-    l.includes('- 2') || l.includes('serie d') || l.includes('serie c')
+    l.includes('- 2') // serie c e serie d removidos — têm odds apostáveis na API
   );
 }
 
