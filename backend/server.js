@@ -5772,10 +5772,60 @@ app.post('/adicionar-jogo-manual', async (req, res) => {
       teamCasaId: tCasaId || null,
       teamForaId: tForaId || null,
       tipo_liga: jogosIA[0].tipo_liga || 'eu',
+      pri: 1, // manual sempre tratado como prioritário para não ser descartado
       adicionado_manualmente: true,
     });
 
-    console.log('  Analise manual OK: ' + jogoFinal.aposta + ' [' + jogoFinal.confianca + ']');
+    // 8. Validar odd real contra API-Football (mesmo fluxo da geração automática)
+    if (jogoFinal.fixtureId) {
+      try {
+        const oddsFixture = await buscarOddsFixture(jogoFinal.fixtureId, data, true); // forçar fresh
+        if (oddsFixture) {
+          const motivo = aplicarOddsEPivotar(jogoFinal, oddsFixture);
+          if (motivo) {
+            // IA escolheu mercado indisponível — tenta fallback de mercados disponíveis
+            const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
+            if (mercadosDisp !== 'Nenhum mercado com odd ≥ 1.25.') {
+              console.log('  ⚠️ Mercado original indisponível, re-analisando com mercados reais...');
+              const promptFallback = `Jogo: ${time_casa} x ${time_fora} (${ligaNome}, ${horario})
+Mercados DISPONÍVEIS na API (únicos apostáveis):
+${mercadosDisp}
+Forma casa: ${statsCasa?.forma||'?'} | Fora: ${statsFora?.forma||'?'} | Gols: ${statsCasa?.mediaGols||'?'}+${statsFora?.mediaGols||'?'}
+Escolha a MELHOR aposta. Confiança alta, odd ≥ 1.25.
+Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+              const respFallback = await chamarIA(promptFallback, 800);
+              if (respFallback) {
+                const mFb = respFallback.match(/\{[\s\S]*\}/);
+                if (mFb) {
+                  const novaFb = JSON.parse(mFb[0]);
+                  if (novaFb.aposta && novaFb.mercado && novaFb.confianca === 'alta') {
+                    const oddReal = selecionarOddFixture(oddsFixture, novaFb.aposta, novaFb.mercado, time_casa, time_fora);
+                    const oddNum = oddReal ? parseFloat(oddReal) : null;
+                    if (oddNum && oddNum >= ODD_MINIMA) {
+                      jogoFinal.aposta = novaFb.aposta;
+                      jogoFinal.mercado = novaFb.mercado;
+                      jogoFinal.odd_mercado = oddNum;
+                      jogoFinal.confianca = 'alta';
+                      jogoFinal.descartado = false;
+                      jogoFinal.justificativa = novaFb.justificativa || novaFb.razao;
+                      console.log(`  ✅ Re-análise manual: ${novaFb.aposta} @ ${oddNum}`);
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            console.log(`  ✅ Odd validada: ${jogoFinal.aposta} @ ${jogoFinal.odd_mercado}`);
+          }
+        } else {
+          console.log('  ⚠️ Sem odds na API para este fixture — odd sugerida pela IA mantida');
+        }
+      } catch(oddsErr) {
+        console.error('  Erro validando odds manual:', oddsErr.message);
+      }
+    }
+
+    console.log('  Analise manual OK: ' + jogoFinal.aposta + ' @ ' + jogoFinal.odd_mercado + ' [' + jogoFinal.confianca + ']');
     res.json({ ok: true, jogo: jogoFinal });
   } catch(errManual) {
     console.error('Erro /adicionar-jogo-manual:', errManual.message);
@@ -6293,7 +6343,6 @@ function agendarRotina() {
     const hoje = hojeStr();
     console.log(`⏰ [15h] Validação parcial — ${hoje}`);
     agentValidar(hoje, { forcarWebSearch: false }).catch(console.error);
-    reprocessarAnalisando(hoje).catch(console.error);
     setTimeout(tick15h, 24 * 60 * 60 * 1000);
   }, ms15h);
 
@@ -6304,7 +6353,6 @@ function agendarRotina() {
     const hoje = hojeStr();
     console.log(`⏰ [18h] Validação parcial — ${hoje}`);
     agentValidar(hoje, { forcarWebSearch: true }).catch(console.error);
-    reprocessarAnalisando(hoje).catch(console.error);
     setTimeout(tick18h, 24 * 60 * 60 * 1000);
   }, ms18h);
 }
