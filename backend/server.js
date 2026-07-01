@@ -5306,6 +5306,26 @@ app.post('/rotina-complemento', async (req, res) => {
   rotinaComplementoDiurno().catch(console.error);
 });
 
+// Debug: retorna jogos que _carregarFixturesComStats selecionaria para complemento
+app.get('/debug-complemento/:data', async (req, res) => {
+  const data = req.params.data;
+  try {
+    const row = await dbGet(data);
+    const jogos = row?.apostas?.jogos || [];
+    const ativos = jogos.filter(j => !j.descartado && !j.analisando);
+    const faltam = Math.max(0, 15 - ativos.length);
+    if (faltam === 0) return res.json({ ok: true, mensagem: `${data}: ${ativos.length} ativos — sem necessidade`, faltam: 0 });
+    const timesJa = new Set(jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean));
+    const loaded = await _carregarFixturesComStats(data, '07:00', faltam, timesJa);
+    res.json({
+      data, ativos: ativos.length, faltam,
+      jogos_selecionados: loaded?.jogos?.length || 0,
+      lista: loaded?.jogos?.map(j => ({ liga: j.liga, casa: j.timeCasa, fora: j.timeFora, horario: j.horario, pri: j.pri })) || [],
+      times_ignorados: [...timesJa].slice(0, 20)
+    });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
 app.post('/reprocessar-analisando', async (req, res) => {
   const { data } = req.body;
   const hoje = hojeStr();
