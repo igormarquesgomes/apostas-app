@@ -5301,6 +5301,11 @@ app.post('/rotina-05h', async (req, res) => {
   rotinaMultiplas().catch(console.error);
 });
 
+app.post('/rotina-complemento', async (req, res) => {
+  res.json({ mensagem: 'Complemento diurno iniciado — preenchendo slots vazios' });
+  rotinaComplementoDiurno().catch(console.error);
+});
+
 app.post('/reprocessar-analisando', async (req, res) => {
   const { data } = req.body;
   const hoje = hojeStr();
@@ -6312,6 +6317,67 @@ Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes|combo
   } catch(e) { console.error('[analisando] Erro:', e.message); }
 }
 
+// ── Rotina de complemento diurno (07h e 12h BRT) ──────────────────────────
+// Apenas preenche slots vazios — não toca em jogos já analisados nem em múltiplas OK
+async function rotinaComplementoDiurno() {
+  const hoje = hojeStr();
+  const amanha = diaOffset(hoje, 1);
+  console.log(`\n⏰ [Complemento diurno] Verificando ${hoje} e ${amanha}`);
+
+  for (const diaAlvo of [hoje, amanha]) {
+    try {
+      const row = await dbGet(diaAlvo);
+      const jogos = row?.apostas?.jogos || [];
+      const ativos = jogos.filter(j => !j.descartado && !j.analisando);
+
+      if (ativos.length >= 15) {
+        console.log(`✅ [${diaAlvo}] ${ativos.length} jogos ativos — sem necessidade de complemento`);
+        continue;
+      }
+
+      const faltam = 15 - ativos.length;
+      console.log(`⚠️ [${diaAlvo}] Apenas ${ativos.length}/15 ativos — complementando ${faltam} jogo(s)`);
+
+      // Times já selecionados (ativos + descartados) para evitar duplicatas
+      const timesJaSelecionados = new Set(
+        jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+      );
+
+      // Tenta multi-agente; fallback para gerarApostas
+      let resultado = null;
+      try {
+        resultado = await gerarApostasMultiAgente(diaAlvo, '07:00', faltam, timesJaSelecionados);
+        if (!resultado?.jogos?.length) resultado = null;
+      } catch(e) { console.error('❌ [Complemento] Multi-agente falhou:', e.message); }
+
+      if (!resultado) {
+        resultado = await gerarApostas(diaAlvo, '07:00', faltam, timesJaSelecionados);
+      }
+
+      if (resultado?.jogos?.length) {
+        const maxId = Math.max(...jogos.map(x => x.id || 0), 0);
+        const novosJogos = resultado.jogos.map((j, i) => ({ ...j, id: maxId + i + 1 }));
+        await dbSave(diaAlvo, { jogos: [...jogos, ...novosJogos] });
+        const totalAtivos = ativos.length + novosJogos.filter(j => !j.descartado).length;
+        console.log(`✅ [${diaAlvo}] Complemento: +${novosJogos.length} jogos → ${totalAtivos} ativos`);
+
+        // Regenerar múltiplas se ainda não existem ou faltavam jogos antes
+        const rowMult = await dbGetComMultiplas(diaAlvo);
+        if (!rowMult?.multiplas?.multipla_a || !rowMult?.multiplas?.multipla_b) {
+          const rowAtual = await dbGet(diaAlvo);
+          const novasMultiplas = await gerarMultiplasComAgentes(diaAlvo, rowAtual?.apostas?.jogos || []);
+          if (novasMultiplas) {
+            await dbSaveMultiplas(diaAlvo, novasMultiplas);
+            console.log(`✅ [${diaAlvo}] Múltiplas geradas após complemento`);
+          }
+        }
+      } else {
+        console.log(`⚠️ [${diaAlvo}] Complemento sem resultado — sem jogos com odds disponíveis`);
+      }
+    } catch(e) { console.error(`❌ [Complemento diurno] Erro em ${diaAlvo}:`, e.message); }
+  }
+}
+
 function agendarRotina() {
   // ── 00:00 BRT (03:00 UTC) — validação noturna inicial + calibrações ─────
   // SEM catch-up: não deve rodar fora da madrugada
@@ -6355,6 +6421,24 @@ function agendarRotina() {
     rotina05h().catch(console.error);
     setTimeout(tick0415, 24 * 60 * 60 * 1000);
   }, ms0415);
+
+  // ── 07:00 BRT (10:00 UTC) — complemento diurno 1 ────────────────────────
+  const ms07h = msAteHoraUTC(10, 0);
+  console.log(`⏰ Próximo complemento diurno (07h) em ${Math.round(ms07h/60000)} min`);
+  setTimeout(function tick07h() {
+    console.log(`⏰ [07h] Complemento diurno`);
+    rotinaComplementoDiurno().catch(console.error);
+    setTimeout(tick07h, 24 * 60 * 60 * 1000);
+  }, ms07h);
+
+  // ── 12:00 BRT (15:00 UTC) — complemento diurno 2 ────────────────────────
+  const ms12h = msAteHoraUTC(15, 0);
+  console.log(`⏰ Próximo complemento diurno (12h) em ${Math.round(ms12h/60000)} min`);
+  setTimeout(function tick12h() {
+    console.log(`⏰ [12h] Complemento diurno`);
+    rotinaComplementoDiurno().catch(console.error);
+    setTimeout(tick12h, 24 * 60 * 60 * 1000);
+  }, ms12h);
 
   // ── 15:00 BRT (18:00 UTC) — primeira validação parcial dos jogos do dia ─
   const ms15h = msAteHoraUTC(18, 0);
