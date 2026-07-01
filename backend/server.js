@@ -2693,6 +2693,7 @@ CRITÉRIOS DE DECISÃO (siga rigorosamente):
 5. Se melhor opção de um agente < 55%, use opcao_2 desse agente
 6. confianca: alta ≥ 75% | media 55–74% | baixa < 55%
 7. CAMPO alternativas: inclua APENAS mercados com dados reais acima. PROIBIDO criar uma entrada para mercado marcado "SEM DADOS" — omita-o completamente do array (nunca escreva "indisponível", "sem dados" ou similar como aposta)
+8. IMPORTANTE: se forma e gols forem todos "?" (dados ausentes) mas há odds disponíveis nos agentes, defina confiança MÍNIMA "media" — há mercado válido para apostar mesmo sem histórico
 
 CAMPO justificativa (PÚBLICO): escreva como especialista em apostas. PROIBIDO usar: "calibração", "assertividade %", "LigaMedia", "especialista", "agente", "sistema". Use apenas: forma recente, H2H, médias, contexto esportivo. 2–3 frases.
 
@@ -2978,7 +2979,7 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   for (const jogo of resultado.jogos) {
     const conf = jogo.confianca||'media';
     const isComp = (jogo.pri||99) >= 60;
-    if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { console.log(`  🗑️  Descartando complementar: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } jogosFinais.push(jogo); continue; }
+    if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { if (jogo.odd_mercado && jogo.odd_mercado >= ODD_MINIMA) { console.log(`  ⬆️  Promovendo baixa→media (odd confirmada ${jogo.odd_mercado}): ${jogo.time_casa} x ${jogo.time_fora}`); jogo.confianca = 'media'; } else { console.log(`  🗑️  Descartando complementar sem odd: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } } jogosFinais.push(jogo); continue; }
     if (conf === 'alta') { jogosFinais.push(jogo); continue; }
     const alvo = ['nao_recomendado','baixa'].includes(conf) ? ['alta','media'] : ['alta'];
     const melhor = jogo.alternativas.find(a => alvo.includes(a.confianca) && a.aposta);
