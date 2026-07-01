@@ -5306,34 +5306,63 @@ app.post('/rotina-complemento', async (req, res) => {
   rotinaComplementoDiurno().catch(console.error);
 });
 
-// Debug: mostra todos os fixtures do dia e como são classificados (liga, país, pri, horário)
+// Debug: mostra jogosComp ordenados que _carregarFixturesComStats selecionaria
 app.get('/debug-fixtures/:data', async (req, res) => {
   const data = req.params.data;
+  const metaJogos = parseInt(req.query.meta) || 7;
   try {
+    const row = await dbGet(data);
+    const jogosExistentes = row?.apostas?.jogos || [];
+    const timesIgnorar = new Set(jogosExistentes.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean));
+
     const fixtures = await buscarFixturesPorData(data);
-    const resultado = [];
+    const jogosMap = new Map(), jogosComp = new Map();
+    const [hM, mM] = ['07', '00'].map(Number);
+    const minMinutos = hM * 60 + mM;
+
     for (const f of fixtures) {
-      const ts = f.fixture?.timestamp, status = f.fixture?.status?.short;
-      const ligaId = f.league?.id, ligaNome = f.league?.name || '';
-      const pais = f.league?.country || '';
+      const ts = f.fixture?.timestamp, status = f.fixture?.status?.short, ligaId = f.league?.id;
       const timeCasa = f.teams?.home?.name, timeFora = f.teams?.away?.name;
       if (!ts || !timeCasa || !timeFora || status !== 'NS') continue;
+      const ligaNome = f.league?.name || '', pais = f.league?.country || '';
+      const subRegex = /\bU(1[7-9]|20)\b/i;
+      if (subRegex.test(timeCasa) || subRegex.test(timeFora) || subRegex.test(ligaNome)) continue;
+      const ligaLower = ligaNome.toLowerCase();
+      if (ligaLower.includes('amateur') || ligaLower.includes('reserve') || ligaLower.includes('youth')) continue;
       const dt = new Date(ts * 1000);
       let hBR = dt.getUTCHours() - 3; const mBR = dt.getUTCMinutes();
       if (hBR < 0) hBR += 24;
       const totalMin = hBR * 60 + mBR;
-      const horario = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
-      const filtrado = totalMin < 420 || (hBR >= 1 && hBR < 10);
-      const naLigasIgnorar = LIGAS_IGNORAR.has(ligaId);
-      const naLigasBR = ligaBrasileiraNaoRelevante(ligaNome, pais);
-      const naLigasPri = !!LIGAS_PRIORITY[ligaId];
-      const paisLower = pais.toLowerCase();
-      const AFRICA_ORIENTE = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
-      const isAfrica = AFRICA_ORIENTE.includes(paisLower);
-      resultado.push({ ligaId, ligaNome, pais, timeCasa, timeFora, horario, filtrado_hora: filtrado, na_ignorar: naLigasIgnorar, na_br_filter: naLigasBR, prioritario: naLigasPri, africa: isAfrica });
+      if (totalMin < minMinutos || (hBR >= 1 && hBR < 10)) continue;
+      const hStr = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
+      const key = `${timeCasa}-${timeFora}`, paisLower = pais.toLowerCase();
+      if (LIGAS_IGNORAR.has(ligaId) || ligaBrasileiraNaoRelevante(ligaNome, pais)) continue;
+      const ligaMatch = LIGAS_PRIORITY[ligaId];
+      if (ligaMatch) {
+        if (!jogosMap.has(key)) jogosMap.set(key, { liga: ligaMatch.nome, pri: ligaMatch.pri, timeCasa, timeFora, horario: hStr });
+      } else {
+        const EUROPEUS = ["england","scotland","spain","italy","france","germany","portugal","netherlands","belgium","turkey","austria","switzerland","denmark","norway","croatia","serbia","ukraine","greece","russia","poland","czech-republic","finland","sweden","hungary","romania","slovakia","bulgaria","georgia","albania","armenia","estonia","latvia","lithuania","luxembourg","malta","wales","ireland","iceland","cyprus","north macedonia","montenegro","kosovo","andorra","faroe islands","gibraltar","bosnia"];
+        const SUL_AMERICANOS = ["argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"];
+        const AFRICA_ORIENTE_L = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
+        let priComp = 200;
+        if (EUROPEUS.includes(paisLower)) priComp = 90;
+        else if (SUL_AMERICANOS.includes(paisLower)) priComp = 70;
+        else if (AFRICA_ORIENTE_L.includes(paisLower)) priComp = 80;
+        else if (paisLower === 'brazil' || paisLower === 'brasil') priComp = 60;
+        if (!jogosComp.has(key)) jogosComp.set(key, { liga: `${ligaNome} (${pais})`, ligaId, pri: priComp, pais, timeCasa, timeFora, horario: hStr });
+      }
     }
-    const marrocos = resultado.filter(r => r.pais === 'Morocco');
-    res.json({ total: resultado.length, marrocos_count: marrocos.length, marrocos, todos_ligaIds_africa: resultado.filter(r => r.africa).map(r => ({ ligaId: r.ligaId, liga: r.ligaNome, horario: r.horario, filtrado: r.filtrado_hora })) });
+
+    const compOrdenado = Array.from(jogosComp.values())
+      .filter(j => !timesIgnorar.has(j.timeCasa?.toLowerCase()) && !timesIgnorar.has(j.timeFora?.toLowerCase()))
+      .sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
+
+    res.json({
+      data, meta: metaJogos,
+      jogosMap_count: jogosMap.size, jogosComp_count: jogosComp.size,
+      comp_apos_filtro: compOrdenado.length,
+      top30_comp: compOrdenado.slice(0, 30).map(j => ({ pri: j.pri, liga: j.liga, casa: j.timeCasa, fora: j.timeFora, horario: j.horario }))
+    });
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
