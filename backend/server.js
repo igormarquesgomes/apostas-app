@@ -6417,12 +6417,12 @@ async function rotinaComplementoDiurno() {
       // Tenta multi-agente; fallback para gerarApostas
       let resultado = null;
       try {
-        resultado = await gerarApostasMultiAgente(diaAlvo, '07:00', faltam, timesJaSelecionados);
+        resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
         if (!resultado?.jogos?.length) resultado = null;
       } catch(e) { console.error('❌ [Complemento] Multi-agente falhou:', e.message); }
 
       if (!resultado) {
-        resultado = await gerarApostas(diaAlvo, '07:00', faltam, timesJaSelecionados);
+        resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
       }
 
       if (resultado?.jogos?.length) {
