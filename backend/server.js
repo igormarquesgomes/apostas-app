@@ -2966,14 +2966,15 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
       if (!oddsFixture) continue;
       const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
       const isPrioritarioMA = jogo.pri != null && jogo.pri < 60;
-      const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})\nMotivo do descarte: ${motivo}\n${isPrioritarioMA ? '⚠️ LIGA PRIORITÁRIA — DEVE ter aposta. Aceite confiança "media" se necessário.\n' : ''}\nMercados DISPONÍVEIS na API (únicos apostáveis):\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | Esc: ${jogo.media_escanteios||'?'} | Cart: ${jogo.media_cartoes||'?'}\n\nEscolha a MELHOR aposta dentre os mercados acima. ${isPrioritarioMA ? 'Confiança alta ou media, odd ≥ 1.25.' : 'Confiança ALTA, odd ≥ 1.25.'}\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+      const isCompMA = (jogo.pri || 99) >= 60;
+      const promptReanalise = `Jogo: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga}, ${jogo.horario})\nMotivo do descarte: ${motivo}\n${isPrioritarioMA ? '⚠️ LIGA PRIORITÁRIA — DEVE ter aposta. Aceite confiança "media" se necessário.\n' : ''}${isCompMA ? '⚠️ JOGO COMPLEMENTAR — escolha qualquer mercado com odd ≥ 1.25, qualquer confiança.\n' : ''}\nMercados DISPONÍVEIS na API (únicos apostáveis):\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | Esc: ${jogo.media_escanteios||'?'} | Cart: ${jogo.media_cartoes||'?'}\n\nEscolha a MELHOR aposta dentre os mercados acima. ${isPrioritarioMA ? 'Confiança alta ou media, odd ≥ 1.25.' : isCompMA ? 'Confiança alta, media ou baixa, odd ≥ 1.25.' : 'Confiança ALTA, odd ≥ 1.25.'}\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta|media|baixa","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
       try {
         const resp = await chamarIA(promptReanalise, 800);
         if (resp) {
           const m = resp.match(/\{[\s\S]*\}/);
           if (m) {
             const nova = JSON.parse(m[0]);
-            const confOkMA = nova.confianca === 'alta' || (isPrioritarioMA && nova.confianca === 'media');
+            const confOkMA = nova.confianca === 'alta' || (isPrioritarioMA && nova.confianca === 'media') || (isCompMA && ['media','baixa'].includes(nova.confianca));
             if (nova.aposta && nova.mercado && confOkMA) {
               const oddReal = selecionarOddFixture(oddsFixture, nova.aposta, nova.mercado, jogo.time_casa, jogo.time_fora);
               const oddNum = oddReal ? parseFloat(oddReal) : null;
@@ -2999,7 +3000,7 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   for (const jogo of resultado.jogos) {
     const conf = jogo.confianca||'media';
     const isComp = (jogo.pri||99) >= 60;
-    if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { if (jogo.odd_mercado && jogo.odd_mercado >= ODD_MINIMA) { jogo.confianca = 'media'; } if (!jogo.aposta || !jogo.mercado) { console.log(`  🗑️  Descartando complementar sem mercado: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } } jogosFinais.push(jogo); continue; }
+    if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { if (jogo.odd_mercado && jogo.odd_mercado >= ODD_MINIMA) { jogo.confianca = 'media'; } else { console.log(`  🗑️  Descartando complementar sem odd confirmada: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } } jogosFinais.push(jogo); continue; }
     if (conf === 'alta') { jogosFinais.push(jogo); continue; }
     const alvo = ['nao_recomendado','baixa'].includes(conf) ? ['alta','media'] : ['alta'];
     const melhor = jogo.alternativas.find(a => alvo.includes(a.confianca) && a.aposta);
