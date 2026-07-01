@@ -6098,99 +6098,57 @@ app.post('/informar-stats', async (req, res) => {
 
 // ── Correlação odd / aposta / mercado ────────────────────────────────────────
 // Analisa todos os resultados validados e cruza: odd_mercado × mercado × linha × resultado
-// Salva em calibracao tipo='correlacao_odds' para uso futuro nos prompts
+// Agrega correlação odd × mercado × resultado dos últimos 60 dias e salva em calibracao
+async function atualizarCorrelacaoOdds() {
+  const rowsResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,resultados&order=data.desc&limit=60`,
+    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+  );
+  const rows = await rowsResp.json();
+
+  const pontos = [];
+  const agr = {};
+  for (const row of rows || []) {
+    const jogos  = row.apostas?.jogos || [];
+    const resArr = row.resultados?.apostas || [];
+    for (const j of jogos) {
+      const res = resArr.find(r => r.jogo_id === j.id);
+      if (!res || !['green','red'].includes(res.resultado_aposta)) continue;
+      const oddM = j.odd_mercado ? parseFloat(j.odd_mercado) : null;
+      const oddS = j.odd_sugerida ? parseFloat(j.odd_sugerida) : null;
+      const linha = (j.aposta || '').match(/(\d+\.?\d*)/)?.[1] || null;
+      const faixaOdd = oddM ? (oddM < 1.40 ? '1.25-1.39' : oddM < 1.60 ? '1.40-1.59' : oddM < 1.80 ? '1.60-1.79' : oddM < 2.00 ? '1.80-1.99' : '2.00+') : 'sem_odd';
+      pontos.push({ data: row.data, liga: j.liga, tipo_liga: j.tipo_liga, mercado: j.mercado, aposta: j.aposta, linha, odd_mercado: oddM, odd_sugerida: oddS, confianca: j.confianca, resultado: res.resultado_aposta, faixa_odd: faixaOdd });
+      const chave = `${j.mercado}|${linha||'?'}|${faixaOdd}`;
+      if (!agr[chave]) agr[chave] = { mercado: j.mercado, linha, faixa_odd: faixaOdd, green: 0, red: 0, total: 0, odds: [] };
+      agr[chave].total++;
+      agr[chave][res.resultado_aposta]++;
+      if (oddM) agr[chave].odds.push(oddM);
+    }
+  }
+
+  const tabela = Object.values(agr)
+    .filter(b => b.total >= 3)
+    .map(b => ({ mercado: b.mercado, linha: b.linha, faixa_odd: b.faixa_odd, total: b.total, green: b.green, red: b.red, assertividade: parseFloat((b.green / b.total * 100).toFixed(1)), odd_media: b.odds.length ? parseFloat((b.odds.reduce((a,x)=>a+x,0)/b.odds.length).toFixed(2)) : null }))
+    .sort((a,b) => b.total - a.total);
+
+  const alertas = tabela.filter(b => b.assertividade < 60 && b.total >= 5)
+    .map(b => `${b.mercado} linha ${b.linha} odd ${b.faixa_odd}: ${b.assertividade}% (${b.green}G/${b.red}R)`);
+
+  const hoje = hojeStr();
+  await fetch(`${SUPABASE_URL}/rest/v1/calibracao`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ tipo: 'correlacao_odds', periodo_inicio: hoje, periodo_fim: hoje, relatorio: JSON.stringify({ gerado_em: hoje, total_apostas_analisadas: pontos.length, tabela_correlacao: tabela, alertas, pontos_raw: pontos }), assertividade: tabela.length > 0 ? parseFloat((tabela.reduce((s,b)=>s+b.green,0) / tabela.reduce((s,b)=>s+b.total,0) * 100).toFixed(1)) : null }),
+  });
+
+  return { total_apostas: pontos.length, tabela_correlacao: tabela, alertas };
+}
+
 app.get('/calibracao/correlacao-odds', async (req, res) => {
   try {
-    // Busca todos os dias com resultados
-    const rowsResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,resultados&order=data.desc&limit=60`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-    );
-    const rows = await rowsResp.json();
-
-    // Agrega ponto a ponto
-    const pontos = []; // { data, liga, mercado, aposta, linha, odd_mercado, odd_sugerida, confianca, resultado }
-    const agr = {}; // chave = mercado|linha|faixa_odd → { green, red, total, odds: [] }
-
-    for (const row of rows || []) {
-      const jogos    = row.apostas?.jogos || [];
-      const resArr   = row.resultados?.apostas || [];
-      for (const j of jogos) {
-        const res = resArr.find(r => r.jogo_id === j.id);
-        if (!res || !['green','red'].includes(res.resultado_aposta)) continue;
-        const oddM = j.odd_mercado ? parseFloat(j.odd_mercado) : null;
-        const oddS = j.odd_sugerida ? parseFloat(j.odd_sugerida) : null;
-        const linha = (j.aposta || '').match(/(\d+\.?\d*)/)?.[1] || null;
-        const faixaOdd = oddM ? (oddM < 1.40 ? '1.25-1.39' : oddM < 1.60 ? '1.40-1.59' : oddM < 1.80 ? '1.60-1.79' : oddM < 2.00 ? '1.80-1.99' : '2.00+') : 'sem_odd';
-
-        pontos.push({
-          data: row.data, liga: j.liga, tipo_liga: j.tipo_liga,
-          mercado: j.mercado, aposta: j.aposta, linha,
-          odd_mercado: oddM, odd_sugerida: oddS,
-          confianca: j.confianca, resultado: res.resultado_aposta,
-          faixa_odd: faixaOdd,
-        });
-
-        const chave = `${j.mercado}|${linha||'?'}|${faixaOdd}`;
-        if (!agr[chave]) agr[chave] = { mercado: j.mercado, linha, faixa_odd: faixaOdd, green: 0, red: 0, total: 0, odds: [] };
-        agr[chave].total++;
-        agr[chave][res.resultado_aposta]++;
-        if (oddM) agr[chave].odds.push(oddM);
-      }
-    }
-
-    // Calcula assertividade e odd média por bucket
-    const tabela = Object.values(agr)
-      .filter(b => b.total >= 3)
-      .map(b => ({
-        mercado:      b.mercado,
-        linha:        b.linha,
-        faixa_odd:    b.faixa_odd,
-        total:        b.total,
-        green:        b.green,
-        red:          b.red,
-        assertividade: parseFloat((b.green / b.total * 100).toFixed(1)),
-        odd_media:    b.odds.length ? parseFloat((b.odds.reduce((a,x)=>a+x,0)/b.odds.length).toFixed(2)) : null,
-      }))
-      .sort((a,b) => b.total - a.total);
-
-    // Pontos de atenção: buckets com assertividade < 60% e ≥ 5 amostras
-    const alertas = tabela.filter(b => b.assertividade < 60 && b.total >= 5)
-      .map(b => `${b.mercado} linha ${b.linha} odd ${b.faixa_odd}: ${b.assertividade}% (${b.green}✓/${b.red}✗)`);
-
-    // Salva snapshot na calibracao para uso futuro
-    const hoje = hojeStr();
-    const relatorio = {
-      gerado_em: hoje,
-      total_apostas_analisadas: pontos.length,
-      tabela_correlacao: tabela,
-      alertas,
-      pontos_raw: pontos,
-    };
-
-    await fetch(`${SUPABASE_URL}/rest/v1/calibracao`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates',
-      },
-      body: JSON.stringify({
-        tipo: 'correlacao_odds',
-        periodo_inicio: hoje,
-        periodo_fim: hoje,
-        relatorio: JSON.stringify(relatorio),
-        assertividade: tabela.length > 0
-          ? parseFloat((tabela.reduce((s,b)=>s+b.green,0) / tabela.reduce((s,b)=>s+b.total,0) * 100).toFixed(1))
-          : null,
-      }),
-    });
-
-    res.json({
-      gerado_em: hoje,
-      total_apostas: pontos.length,
-      tabela_correlacao: tabela,
-      alertas,
-    });
+    const resultado = await atualizarCorrelacaoOdds();
+    res.json({ gerado_em: hojeStr(), ...resultado });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
@@ -6334,6 +6292,11 @@ async function rotinaDas03h() {
       console.log(`✅ Relatório de ${ontem} já existe`);
     }
   }
+  // Atualizar correlação odd × mercado × resultado com todos os dados históricos
+  try {
+    const cor = await atualizarCorrelacaoOdds();
+    console.log(`✅ Correlação odds atualizada — ${cor.total_apostas} apostas, ${cor.tabela_correlacao.length} buckets`);
+  } catch(e) { console.error(`⚠️ Correlação odds falhou: ${e.message}`); }
 }
 
 // Reprocessa jogos marcados como "analisando=true" com nova chamada à API de odds
