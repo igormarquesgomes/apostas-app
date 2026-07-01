@@ -4695,6 +4695,15 @@ async function rotina04h() {
       continue;
     }
 
+    // Garantir horário mínimo 13:00 nos jogos novos (belt-and-suspenders)
+    resultado.jogos = resultado.jogos.filter(j => {
+      const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
+      const ok = hh * 60 + mm >= 13 * 60;
+      if (!ok) console.log(`  ⏰ Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
+      return ok;
+    });
+    if (!resultado.jogos.length) { console.log(`⚠️ ${diaAlvo}: todos os novos jogos rejeitados por horário`); continue; }
+
     if (total === 0) {
       // Primeiro preenchimento — salvar normalmente
       await dbSave(diaAlvo, resultado);
@@ -4818,11 +4827,19 @@ async function rotina05h() {
         } catch(e) { console.error('❌ Multi-agente falhou:', e.message); }
         if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
         if (resultado?.jogos?.length) {
-          const jogosCompletos = {
-            jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...(rowAtualizado?.apostas?.jogos||[]).map(x=>x.id||0), 0) + i + 1}))]
-          };
-          await dbSave(diaAlvo, jogosCompletos);
-          console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.length} jogos após complemento`);
+          resultado.jogos = resultado.jogos.filter(j => {
+            const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
+            const ok = hh * 60 + mm >= 13 * 60;
+            if (!ok) console.log(`  ⏰ Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
+            return ok;
+          });
+          if (resultado.jogos.length) {
+            const jogosCompletos = {
+              jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...(rowAtualizado?.apostas?.jogos||[]).map(x=>x.id||0), 0) + i + 1}))]
+            };
+            await dbSave(diaAlvo, jogosCompletos);
+            console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.length} jogos após complemento`);
+          }
         }
       }
     } else {
@@ -6437,6 +6454,14 @@ async function rotinaComplementoDiurno() {
       }
 
       if (resultado?.jogos?.length) {
+        // Filtro final: garantir horário mínimo 13:00
+        resultado.jogos = resultado.jogos.filter(j => {
+          const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
+          const ok = hh * 60 + mm >= 13 * 60;
+          if (!ok) console.log(`  ⏰ [Complemento] Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
+          return ok;
+        });
+        if (!resultado.jogos.length) { console.log(`⚠️ [${diaAlvo}] Todos os novos jogos rejeitados por horário`); continue; }
         const maxId = Math.max(...jogos.map(x => x.id || 0), 0);
         const novosJogos = resultado.jogos.map((j, i) => ({ ...j, id: maxId + i + 1 }));
         await dbSave(diaAlvo, { jogos: [...jogos, ...novosJogos] });
