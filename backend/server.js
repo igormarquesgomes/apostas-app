@@ -2319,10 +2319,10 @@ Retorne JSON: {"aposta":"...","mercado":"combo","confianca":"alta|media","odd_su
     const confAtual = jogo.confianca || 'media';
     const isComplementar = (jogo.pri || 99) >= 60; // pri >= 60 = complementar
 
-    // Sem alternativas — manter se prioritário, descartar se complementar sem confiança
+    // Sem alternativas — manter se tem mercado definido (confiança baixa é aceitável para complementar)
     if (!jogo.alternativas?.length) {
-      if (isComplementar && ['nao_recomendado', 'baixa'].includes(confAtual)) {
-        console.log(`  🗑️  Descartando complementar sem alternativas: ${jogo.time_casa} x ${jogo.time_fora} [${confAtual}]`);
+      if (!jogo.aposta || !jogo.mercado) {
+        console.log(`  🗑️  Descartando complementar sem mercado: ${jogo.time_casa} x ${jogo.time_fora}`);
         continue;
       }
       jogosFinais.push(jogo);
@@ -2999,7 +2999,7 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   for (const jogo of resultado.jogos) {
     const conf = jogo.confianca||'media';
     const isComp = (jogo.pri||99) >= 60;
-    if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { if (jogo.odd_mercado && jogo.odd_mercado >= ODD_MINIMA) { console.log(`  ⬆️  Promovendo baixa→media (odd confirmada ${jogo.odd_mercado}): ${jogo.time_casa} x ${jogo.time_fora}`); jogo.confianca = 'media'; } else { console.log(`  🗑️  Descartando complementar sem odd: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } } jogosFinais.push(jogo); continue; }
+    if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { if (jogo.odd_mercado && jogo.odd_mercado >= ODD_MINIMA) { jogo.confianca = 'media'; } if (!jogo.aposta || !jogo.mercado) { console.log(`  🗑️  Descartando complementar sem mercado: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } } jogosFinais.push(jogo); continue; }
     if (conf === 'alta') { jogosFinais.push(jogo); continue; }
     const alvo = ['nao_recomendado','baixa'].includes(conf) ? ['alta','media'] : ['alta'];
     const melhor = jogo.alternativas.find(a => alvo.includes(a.confianca) && a.aposta);
