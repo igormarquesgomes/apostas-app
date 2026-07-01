@@ -5306,23 +5306,34 @@ app.post('/rotina-complemento', async (req, res) => {
   rotinaComplementoDiurno().catch(console.error);
 });
 
-// Debug: retorna jogos que _carregarFixturesComStats selecionaria para complemento
-app.get('/debug-complemento/:data', async (req, res) => {
+// Debug: mostra todos os fixtures do dia e como são classificados (liga, país, pri, horário)
+app.get('/debug-fixtures/:data', async (req, res) => {
   const data = req.params.data;
   try {
-    const row = await dbGet(data);
-    const jogos = row?.apostas?.jogos || [];
-    const ativos = jogos.filter(j => !j.descartado && !j.analisando);
-    const faltam = Math.max(0, 15 - ativos.length);
-    if (faltam === 0) return res.json({ ok: true, mensagem: `${data}: ${ativos.length} ativos — sem necessidade`, faltam: 0 });
-    const timesJa = new Set(jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean));
-    const loaded = await _carregarFixturesComStats(data, '07:00', faltam, timesJa);
-    res.json({
-      data, ativos: ativos.length, faltam,
-      jogos_selecionados: loaded?.jogos?.length || 0,
-      lista: loaded?.jogos?.map(j => ({ liga: j.liga, casa: j.timeCasa, fora: j.timeFora, horario: j.horario, pri: j.pri })) || [],
-      times_ignorados: [...timesJa].slice(0, 20)
-    });
+    const fixtures = await buscarFixturesPorData(data);
+    const resultado = [];
+    for (const f of fixtures) {
+      const ts = f.fixture?.timestamp, status = f.fixture?.status?.short;
+      const ligaId = f.league?.id, ligaNome = f.league?.name || '';
+      const pais = f.league?.country || '';
+      const timeCasa = f.teams?.home?.name, timeFora = f.teams?.away?.name;
+      if (!ts || !timeCasa || !timeFora || status !== 'NS') continue;
+      const dt = new Date(ts * 1000);
+      let hBR = dt.getUTCHours() - 3; const mBR = dt.getUTCMinutes();
+      if (hBR < 0) hBR += 24;
+      const totalMin = hBR * 60 + mBR;
+      const horario = `${String(hBR).padStart(2,'0')}:${String(mBR).padStart(2,'0')}`;
+      const filtrado = totalMin < 420 || (hBR >= 1 && hBR < 10);
+      const naLigasIgnorar = LIGAS_IGNORAR.has(ligaId);
+      const naLigasBR = ligaBrasileiraNaoRelevante(ligaNome, pais);
+      const naLigasPri = !!LIGAS_PRIORITY[ligaId];
+      const paisLower = pais.toLowerCase();
+      const AFRICA_ORIENTE = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
+      const isAfrica = AFRICA_ORIENTE.includes(paisLower);
+      resultado.push({ ligaId, ligaNome, pais, timeCasa, timeFora, horario, filtrado_hora: filtrado, na_ignorar: naLigasIgnorar, na_br_filter: naLigasBR, prioritario: naLigasPri, africa: isAfrica });
+    }
+    const marrocos = resultado.filter(r => r.pais === 'Morocco');
+    res.json({ total: resultado.length, marrocos_count: marrocos.length, marrocos, todos_ligaIds_africa: resultado.filter(r => r.africa).map(r => ({ ligaId: r.ligaId, liga: r.ligaNome, horario: r.horario, filtrado: r.filtrado_hora })) });
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
