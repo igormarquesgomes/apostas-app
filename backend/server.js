@@ -2937,6 +2937,16 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
       const alt = jogos.find(jg => { const nc=norm(jg.timeCasa),nf=norm(jg.timeFora),jc=norm(j.time_casa),jf=norm(j.time_fora); return nc?.split(' ')[0]===jc?.split(' ')[0] && nf?.split(' ')[0]===jf?.split(' ')[0]; });
       if (alt) { fixtureId = alt.fixtureId; meta.ligaId = alt.ligaId; }
     }
+    // Fallback garantido: usar fixtureId preservado diretamente do jogo original
+    if (!fixtureId && j._srcFixtureId) {
+      fixtureId = j._srcFixtureId;
+      if (!meta.ligaId && j._srcLigaId) meta.ligaId = j._srcLigaId;
+      if (!meta.tipo && j._srcTipo) meta.tipo = j._srcTipo;
+      if (!meta.liga && j._srcLiga) meta.liga = j._srcLiga;
+      if (!meta.pri && j._srcPri) meta.pri = j._srcPri;
+      if (!meta.teamCasaId && j._srcTeamCasaId) meta.teamCasaId = j._srcTeamCasaId;
+      if (!meta.teamForaId && j._srcTeamForaId) meta.teamForaId = j._srcTeamForaId;
+    }
     return { ...j, tipo_liga: meta.tipo||j.tipo_liga||'eu', liga: meta.liga||j.liga||'Internacional', pri: meta.pri||20, fixtureId: fixtureId||null, ligaId: meta.ligaId||j.ligaId||null, teamCasaId: meta.teamCasaId||null, teamForaId: meta.teamForaId||null };
   }) };
   resultado.jogos.sort((a,b) => (a.pri||20)-(b.pri||20));
