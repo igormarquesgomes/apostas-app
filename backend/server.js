@@ -2854,7 +2854,17 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   for (const jogo of jogos) {
     try {
       const res = await _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df);
-      if (res) jogosResultado.push(res);
+      if (res) {
+        // Preservar metadados do fixture original para evitar falha de lookup por nome
+        res._srcFixtureId = jogo.fixtureId;
+        res._srcLigaId = jogo.ligaId;
+        res._srcPri = jogo.pri;
+        res._srcTipo = jogo.tipo;
+        res._srcLiga = jogo.liga;
+        res._srcTeamCasaId = jogo.teamCasaId;
+        res._srcTeamForaId = jogo.teamForaId;
+        jogosResultado.push(res);
+      }
     } catch(e) { console.error(`❌ Multi-agente erro ${jogo.timeCasa} x ${jogo.timeFora}:`, e.message); }
     await sleep(3000);
   }
