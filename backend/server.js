@@ -5661,6 +5661,26 @@ app.post('/corrigir-resultado', async (req, res) => {
   res.json({ ok: true, mensagem: `Corrigido: ${novoPlacar} → ${novoResultado}`, resultado: novoResultado, placar: novoPlacar });
 });
 
+// Corrigir campos de uma aposta (aposta, mercado, odd_mercado, descartado, etc.)
+app.post('/corrigir-aposta', async (req, res) => {
+  const { data, time_casa, campos } = req.body;
+  if (!data || !time_casa || !campos || typeof campos !== 'object') {
+    return res.status(400).json({ error: 'data, time_casa e campos obrigatórios' });
+  }
+  const row = await dbGet(data);
+  if (!row?.apostas?.jogos) return res.status(404).json({ error: 'Sem apostas para essa data' });
+
+  const idx = row.apostas.jogos.findIndex(j => j.time_casa === time_casa);
+  if (idx === -1) return res.status(404).json({ error: `Jogo de ${time_casa} não encontrado em ${data}` });
+
+  const antes = { ...row.apostas.jogos[idx] };
+  row.apostas.jogos[idx] = { ...antes, ...campos };
+  await dbSave(data, row.apostas);
+
+  console.log(`✏️ /corrigir-aposta [${data}] ${time_casa}: ${JSON.stringify(campos)}`);
+  res.json({ ok: true, antes, depois: row.apostas.jogos[idx] });
+});
+
 app.post('/anular-jogo', async (req, res) => {
   const { data, jogo_id } = req.body;
   if (!data || !jogo_id) return res.status(400).json({ error: 'data e jogo_id obrigatórios' });
