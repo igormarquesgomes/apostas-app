@@ -3000,6 +3000,12 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
   for (const jogo of resultado.jogos) {
     const conf = jogo.confianca||'media';
     const isComp = (jogo.pri||99) >= 60;
+    // Se aplicarOddsEPivotar já confirmou um mercado válido, não sobrescrever com pivot de confiança
+    // (pivot de confiança não verifica odds — pode trocar para mercado sem odd disponível)
+    if (jogo.odd_mercado && jogo.odd_mercado >= ODD_MINIMA && !jogo.descartado && !jogo.analisando) {
+      jogosFinais.push(jogo);
+      continue;
+    }
     if (!jogo.alternativas?.length) { if (isComp && ['nao_recomendado','baixa'].includes(conf)) { if (jogo.odd_mercado && jogo.odd_mercado >= ODD_MINIMA) { jogo.confianca = 'media'; } else { console.log(`  🗑️  Descartando complementar sem odd confirmada: ${jogo.time_casa} x ${jogo.time_fora}`); continue; } } jogosFinais.push(jogo); continue; }
     if (conf === 'alta') { jogosFinais.push(jogo); continue; }
     const alvo = ['nao_recomendado','baixa'].includes(conf) ? ['alta','media'] : ['alta'];
