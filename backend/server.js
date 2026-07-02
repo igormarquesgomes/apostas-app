@@ -3449,7 +3449,14 @@ async function validarMultipla(multipla, resultadosApostas) {
     };
     const mercadoFinal = normalizarMercado(j.mercado);
     const jogoComMercado = {...j, mercado: mercadoFinal};
-    const resultado = verificarAposta(jogoComMercado, gC, gF, null);
+    // Passar stats do resultado individual para validar escanteios/cartoes corretamente
+    const statsMultipla = (res.escanteios_total != null || res.cartoes_total != null) ? {
+      escanteiosTotal: res.escanteios_total ?? 0,
+      escanteiosCasa: null, escanteiosFora: null,
+      cartoesTotal: res.cartoes_total ?? 0,
+      confirmado: true,
+    } : null;
+    const resultado = verificarAposta(jogoComMercado, gC, gF, statsMultipla);
     console.log(`  📊 Múltipla: ${j.time_casa} x ${j.time_fora} | ${res.placar} | mercado:${j.mercado||'resultado'} | ${j.aposta} → ${resultado.toUpperCase()}`);
     return resultado;
   })];
