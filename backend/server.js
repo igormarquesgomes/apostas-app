@@ -3716,7 +3716,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
         ? { casa: stats.golsCasa1T, fora: stats.golsFora1T, total: stats.golsCasa1T + stats.golsFora1T }
         : { casa: golsCasa - stats.golsCasa1T, fora: golsFora - stats.golsFora1T, total: (golsCasa - stats.golsCasa1T) + (golsFora - stats.golsFora1T) };
       const valorPT = isAway ? golsPT.fora : isHome ? golsPT.casa : golsPT.total;
-      for (const linha of ['0.5','0.75','1','1.5','2','2.5','3','3.5','4','4.5']) {
+      for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5']) {
         const r = checkOverUnder(valorPT, linha);
         if (r) return r;
       }
@@ -3725,20 +3725,20 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
 
     // Apostas de time específico (full match)
     if (isAway || palavrasFora.some(p => apostaNorm.includes(p))) {
-      for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
+      for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5']) {
         const r = checkOverUnder(golsFora, linha);
         if (r) return r;
       }
     }
     if (isHome || palavrasCasa.some(p => apostaNorm.includes(p) && !isAway)) {
-      for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
+      for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5']) {
         const r = checkOverUnder(golsCasa, linha);
         if (r) return r;
       }
     }
 
-    // Over/Under total — inclui linhas inteiras (1, 2, 3) além das .5
-    for (const linha of ['0.5','1','1.5','2','2.5','3','3.5','4','4.5']) {
+    // Over/Under total — inclui linhas inteiras, .5 e linhas asiáticas (.25/.75)
+    for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5','4.75','5','5.5']) {
       const r = checkOverUnder(total, linha);
       if (r) return r;
     }
