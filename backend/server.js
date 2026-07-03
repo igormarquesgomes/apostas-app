@@ -2532,7 +2532,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
       if (timesIgnorar.size > 0 && (timesIgnorar.has(j.timeCasa?.toLowerCase()) || timesIgnorar.has(j.timeFora?.toLowerCase()))) continue;
       if (j.horario === '13:00') { cont13h++; if (cont13h <= 4) compFiltrado.push(j); } else compFiltrado.push(j);
     }
-    jogos = [...jogos, ...compFiltrado.slice(0, (metaJogos - jogos.length) * 3)];
+    jogos = [...jogos, ...compFiltrado.slice(0, Math.max(15, (metaJogos - jogos.length) * 3))];
   }
   if (!jogos.length) return null;
 
