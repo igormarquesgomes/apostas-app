@@ -1546,6 +1546,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
       const EUROPEUS = ["england","scotland","spain","italy","france","germany","portugal","netherlands","belgium","turkey","austria","switzerland","denmark","norway","croatia","serbia","ukraine","greece","russia","poland","czech-republic","finland","sweden","hungary","romania","slovakia","bulgaria","georgia","albania","armenia","estonia","latvia","lithuania","luxembourg","malta","wales","ireland","iceland","cyprus","north macedonia","montenegro","kosovo","andorra","faroe islands","gibraltar","bosnia"];
       const SUL_AMERICANOS = ["argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"];
       const AFRICA_ORIENTE = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
+      const CONCACAF = ["canada","usa","mexico","costa rica","honduras","el salvador","guatemala","panama","jamaica","trinidad and tobago"];
 
       if (EUROPEUS.includes(paisLower)) {
         tipoComp = 'eu';
@@ -1553,6 +1554,9 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
       } else if (SUL_AMERICANOS.includes(paisLower)) {
         tipoComp = 'sul';
         priComp = 70;
+      } else if (CONCACAF.includes(paisLower)) {
+        tipoComp = 'concacaf';
+        priComp = 75;
       } else if (AFRICA_ORIENTE.includes(paisLower)) {
         tipoComp = 'af';
         priComp = 80;
@@ -2479,8 +2483,10 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
       const EUROPEUS = ["england","scotland","spain","italy","france","germany","portugal","netherlands","belgium","turkey","austria","switzerland","denmark","norway","croatia","serbia","ukraine","greece","russia","poland","czech-republic","finland","sweden","hungary","romania","slovakia","bulgaria","georgia","albania","armenia","estonia","latvia","lithuania","luxembourg","malta","wales","ireland","iceland","cyprus","north macedonia","montenegro","kosovo","andorra","faroe islands","gibraltar","bosnia"];
       const SUL_AMERICANOS = ["argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"];
       const AFRICA_ORIENTE = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
+      const CONCACAF = ["canada","usa","mexico","costa rica","honduras","el salvador","guatemala","panama","jamaica","trinidad and tobago"];
       if (EUROPEUS.includes(paisLower)) { tipoComp = 'eu'; priComp = isTimesEuropaB(timeCasa, timeFora) ? 50 : 90; }
       else if (SUL_AMERICANOS.includes(paisLower)) { tipoComp = 'sul'; priComp = 70; }
+      else if (CONCACAF.includes(paisLower)) { tipoComp = 'concacaf'; priComp = 75; }
       else if (AFRICA_ORIENTE.includes(paisLower)) { tipoComp = 'af'; priComp = 80; }
       else if (paisLower === 'brazil' || paisLower === 'brasil') { tipoComp = 'b'; priComp = 60; }
       if (!jogosComp.has(key)) { dbSaveLiga(`${ligaNome} (${pais})`, ligaId, pais).catch(()=>{}); jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); }
@@ -5396,9 +5402,11 @@ app.get('/debug-fixtures/:data', async (req, res) => {
         const EUROPEUS = ["england","scotland","spain","italy","france","germany","portugal","netherlands","belgium","turkey","austria","switzerland","denmark","norway","croatia","serbia","ukraine","greece","russia","poland","czech-republic","finland","sweden","hungary","romania","slovakia","bulgaria","georgia","albania","armenia","estonia","latvia","lithuania","luxembourg","malta","wales","ireland","iceland","cyprus","north macedonia","montenegro","kosovo","andorra","faroe islands","gibraltar","bosnia"];
         const SUL_AMERICANOS = ["argentina","colombia","chile","uruguay","peru","venezuela","bolivia","ecuador","paraguay"];
         const AFRICA_ORIENTE_L = ["egypt","morocco","algeria","tunisia","saudi-arabia","uae","qatar","kuwait","jordan","iran","nigeria","ghana","senegal","ivory coast","cameroon","south africa"];
+        const CONCACAF_L = ["canada","usa","mexico","costa rica","honduras","el salvador","guatemala","panama","jamaica","trinidad and tobago"];
         let priComp = 200;
         if (EUROPEUS.includes(paisLower)) priComp = 90;
         else if (SUL_AMERICANOS.includes(paisLower)) priComp = 70;
+        else if (CONCACAF_L.includes(paisLower)) priComp = 75;
         else if (AFRICA_ORIENTE_L.includes(paisLower)) priComp = 80;
         else if (paisLower === 'brazil' || paisLower === 'brasil') priComp = 60;
         if (!jogosComp.has(key)) jogosComp.set(key, { liga: `${ligaNome} (${pais})`, ligaId, pri: priComp, pais, timeCasa, timeFora, horario: hStr });
