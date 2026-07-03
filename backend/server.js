@@ -2530,7 +2530,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   }
   if (!jogos.length) return null;
 
-  const MARGEM = 7;
+  const MARGEM = Math.max(15, metaJogos * 2);
   jogos = jogos.slice(0, Math.min(metaJogos + MARGEM, jogos.length));
   console.log(`\nMulti-agente — jogos selecionados: ${jogos.length}`);
   jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
@@ -6526,6 +6526,10 @@ function agendarRotina() {
   }, ms0415);
 
   // ── 07:00 BRT (10:00 UTC) — complemento diurno 1 ────────────────────────
+  if (deveExecutarCatchup(10, 0)) {
+    console.log(`⚡ Catch-up 07h: complemento diurno`);
+    setTimeout(() => rotinaComplementoDiurno().catch(console.error), 5000);
+  }
   const ms07h = msAteHoraUTC(10, 0);
   console.log(`⏰ Próximo complemento diurno (07h) em ${Math.round(ms07h/60000)} min`);
   setTimeout(function tick07h() {
@@ -6535,6 +6539,10 @@ function agendarRotina() {
   }, ms07h);
 
   // ── 12:00 BRT (15:00 UTC) — complemento diurno 2 ────────────────────────
+  if (deveExecutarCatchup(15, 0)) {
+    console.log(`⚡ Catch-up 12h: complemento diurno`);
+    setTimeout(() => rotinaComplementoDiurno().catch(console.error), 5000);
+  }
   const ms12h = msAteHoraUTC(15, 0);
   console.log(`⏰ Próximo complemento diurno (12h) em ${Math.round(ms12h/60000)} min`);
   setTimeout(function tick12h() {
