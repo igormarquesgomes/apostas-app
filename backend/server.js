@@ -462,11 +462,23 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
     return null;
   };
 
+  // Coleta todas as alternativas que têm odd confirmada na API (usada pelo pool de múltiplas)
+  const coletarOddsConfirmadas = () => {
+    jogo.odds_confirmadas = [{ aposta: jogo.aposta, mercado: jogo.mercado, odd: jogo.odd_mercado }];
+    for (const alt of (jogo.alternativas || []).filter(a => a.aposta && a.mercado)) {
+      if (alt.aposta === jogo.aposta && alt.mercado === jogo.mercado) continue;
+      const oddV = selecionarOddFixture(oddsFixture, alt.aposta, alt.mercado, jogo.time_casa, jogo.time_fora);
+      const oddN = oddV ? parseFloat(oddV) : null;
+      if (oddN && oddN >= ODD_MINIMA) jogo.odds_confirmadas.push({ aposta: alt.aposta, mercado: alt.mercado, odd: oddN });
+    }
+  };
+
   // Caso 1: aposta principal com odd ≥ mínima e confiança alta
   const oddPrincipal = tentarAposta(jogo.aposta, jogo.mercado, jogo.confianca);
   if (oddPrincipal) {
     jogo.odd_mercado = oddPrincipal;
     jogo.descartado = false;
+    coletarOddsConfirmadas();
     console.log(`  ✅ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} @ ${oddPrincipal} (alta)`);
     return null;
   }
@@ -495,6 +507,7 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
       jogo.justificativa = gerarJustificativaPosPivot(alt.aposta, alt.mercado, alt.razao || '', jogo);
       const proxAlt = todasAlts.find(a => a.aposta !== jogo.aposta);
       if (proxAlt) { jogo.aposta_backup = proxAlt.aposta; jogo.mercado_backup = proxAlt.mercado; }
+      coletarOddsConfirmadas();
       return null;
     }
   }
@@ -513,6 +526,7 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
         jogo.justificativa = gerarJustificativaPosPivot(alt.aposta, alt.mercado, alt.razao || '', jogo);
         const proxAlt = todasAlts.find(a => a.aposta !== jogo.aposta);
         if (proxAlt) { jogo.aposta_backup = proxAlt.aposta; jogo.mercado_backup = proxAlt.mercado; }
+        coletarOddsConfirmadas();
         return null;
       }
     }
@@ -521,6 +535,7 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
     if (oddPrincipalMedia) {
       jogo.odd_mercado = oddPrincipalMedia;
       jogo.descartado = false;
+      coletarOddsConfirmadas();
       console.log(`  ✅ [PRIORITÁRIO] ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} @ ${oddPrincipalMedia} (media aceita)`);
       return null;
     }
@@ -572,6 +587,7 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
       jogo.confianca = melhor.odd >= 1.50 ? 'alta' : 'media';
       jogo.descartado = false; jogo.analisando = false; jogo.descartado_motivo = null;
       jogo.justificativa = `Mercado disponível confirmado na API com odd ${melhor.odd}.`;
+      coletarOddsConfirmadas();
       console.log(`  🎯 [FALLBACK] ${jogo.time_casa} x ${jogo.time_fora} → ${apostaFinal} (${mercadoMap}) @ ${melhor.odd}`);
       return null;
     }
@@ -3255,17 +3271,14 @@ function montarPoolJogosDia(jogosDodia, agentesRawMap) {
     const key = `${(j.time_casa||'').toLowerCase()}|${(j.time_fora||'').toLowerCase()}`;
     const raw = agentesRawMap?.get(key);
     const opcoes = [];
-    if (j.aposta && j.mercado) opcoes.push({ mercado: j.mercado, aposta: j.aposta, probabilidade: j.probabilidade_estimada ?? null, fonte: 'principal' });
-    for (const a of (j.alternativas || [])) {
-      if (a.aposta && a.mercado && !(a.mercado === j.mercado && a.aposta === j.aposta)) {
-        opcoes.push({ mercado: a.mercado, aposta: a.aposta, confianca: a.confianca, fonte: 'alternativa' });
+    // Usar odds_confirmadas quando disponível (coletadas em aplicarOddsEPivotar)
+    if (j.odds_confirmadas && j.odds_confirmadas.length > 0) {
+      for (const oc of j.odds_confirmadas) {
+        opcoes.push({ mercado: oc.mercado, aposta: oc.aposta, odd: oc.odd, fonte: 'confirmada' });
       }
-    }
-    if (raw?.length) {
-      for (const ag of raw) {
-        if (ag.opcao_1?.aposta) opcoes.push({ mercado: ag.mercado, aposta: ag.opcao_1.aposta, probabilidade: ag.opcao_1.probabilidade, fonte: 'agente_especializado' });
-        if (ag.opcao_2?.aposta) opcoes.push({ mercado: ag.mercado, aposta: ag.opcao_2.aposta, probabilidade: ag.opcao_2.probabilidade, fonte: 'agente_especializado' });
-      }
+    } else {
+      // Fallback: apenas aposta principal
+      if (j.aposta && j.mercado) opcoes.push({ mercado: j.mercado, aposta: j.aposta, odd: j.odd_mercado, fonte: 'confirmada' });
     }
     return { time_casa: j.time_casa, time_fora: j.time_fora, liga: j.liga, horario: j.horario, odd_mercado: j.odd_mercado || null, opcoes };
   }).filter(j => j.opcoes.length);
@@ -3273,12 +3286,8 @@ function montarPoolJogosDia(jogosDodia, agentesRawMap) {
 
 function montarBlocoJogosDia(pool) {
   return pool.map((j, i) => {
-    const opcoesTxt = j.opcoes.map(o => {
-      const p = o.probabilidade != null ? `${Math.round(o.probabilidade*100)}%` : (o.confianca || '?');
-      return `${o.mercado}: "${o.aposta}" (${p})`;
-    }).join(' | ');
-    const oddConf = j.odd_mercado ? ` | ODD CONFIRMADA API: ${j.odd_mercado}` : '';
-    return `${i+1}. ${j.time_casa} x ${j.time_fora} | ${j.liga} | ${j.horario}${oddConf}\n   Opções: ${opcoesTxt}`;
+    const opcoesTxt = j.opcoes.map(o => `${o.mercado}: "${o.aposta}" @ ${o.odd}`).join(' | ');
+    return `${i+1}. ${j.time_casa} x ${j.time_fora} | ${j.liga} | ${j.horario}\n   Opções confirmadas: ${opcoesTxt}`;
   }).join('\n');
 }
 
@@ -3287,12 +3296,12 @@ function _promptAgenteMultiplaA(digest, blocoJogos) {
 
 ${digest}
 
-JOGOS DISPONÍVEIS HOJE (com todas as opções identificadas pelos agentes especializados — pode escolher QUALQUER uma, não precisa ser a aposta principal):
+JOGOS DISPONÍVEIS HOJE (cada opção tem odd real confirmada pela API — pode escolher qualquer opção, não precisa ser a aposta principal do dia):
 ${blocoJogos}
 
 ⚠️ REGRAS OBRIGATÓRIAS DE ODD:
-- Use SEMPRE a "ODD CONFIRMADA API" exibida acima para o campo "odd" de cada jogo. NUNCA invente odds.
-- Se um jogo não tem "ODD CONFIRMADA API", NÃO o inclua na múltipla.
+- Cada opção listada acima tem sua odd já confirmada pela API no formato "@ X.XX". Use EXATAMENTE essa odd no campo "odd" do JSON.
+- NUNCA invente odds. Se escolher "Over 2.5 gols @ 1.66", o campo odd deve ser 1.66.
 - A odd_total deve estar entre 3.50 e 5.00. NÃO ultrapasse 5.00.
 
 RACIOCÍNIO OBRIGATÓRIO (siga os 4 passos antes de responder):
@@ -3310,12 +3319,12 @@ function _promptAgenteMultiplaB(digest, blocoJogos) {
 
 ${digest}
 
-JOGOS DISPONÍVEIS HOJE (com todas as opções identificadas pelos agentes especializados — pode escolher QUALQUER uma, não precisa ser a aposta principal):
+JOGOS DISPONÍVEIS HOJE (cada opção tem odd real confirmada pela API — pode escolher qualquer opção, não precisa ser a aposta principal do dia):
 ${blocoJogos}
 
 ⚠️ REGRAS OBRIGATÓRIAS DE ODD:
 - Use SEMPRE a "ODD CONFIRMADA API" exibida acima para o campo "odd" de cada jogo. NUNCA invente odds.
-- Se um jogo não tem "ODD CONFIRMADA API", NÃO o inclua na múltipla.
+- NUNCA invente odds. Se escolher "Over 2.5 gols @ 1.66", o campo odd deve ser 1.66.
 - A odd_total deve estar entre 2.50 e 3.49.
 
 DIFERENÇA EM RELAÇÃO AO AGENTE A: selecione os jogos com MAIOR probabilidade individual (não precisa ser os mesmos do A). Máximo 3 jogos. Foco em P(conjunta) > 45% — segurança acima de tudo. Pode repetir 1 jogo do A se for o mais seguro disponível, mas evite repetir todos.
