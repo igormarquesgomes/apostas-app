@@ -3251,7 +3251,7 @@ TIMES QUE MAIS APARECERAM EM QUEBRAS: ${timesQuebrTxt}`;
 // Montar pool de opções por jogo do dia — aposta principal + alternativas do coordenador
 // + outputs brutos dos 4 agentes especializados (com probabilidade exata), quando disponíveis
 function montarPoolJogosDia(jogosDodia, agentesRawMap) {
-  return jogosDodia.map(j => {
+  return jogosDodia.filter(j => !j.descartado && !j.analisando && j.odd_mercado && j.odd_mercado >= 1.25).map(j => {
     const key = `${(j.time_casa||'').toLowerCase()}|${(j.time_fora||'').toLowerCase()}`;
     const raw = agentesRawMap?.get(key);
     const opcoes = [];
@@ -3277,7 +3277,8 @@ function montarBlocoJogosDia(pool) {
       const p = o.probabilidade != null ? `${Math.round(o.probabilidade*100)}%` : (o.confianca || '?');
       return `${o.mercado}: "${o.aposta}" (${p})`;
     }).join(' | ');
-    return `${i+1}. ${j.time_casa} x ${j.time_fora} | ${j.liga} | ${j.horario}\n   Opções: ${opcoesTxt}`;
+    const oddConf = j.odd_mercado ? ` | ODD CONFIRMADA API: ${j.odd_mercado}` : '';
+    return `${i+1}. ${j.time_casa} x ${j.time_fora} | ${j.liga} | ${j.horario}${oddConf}\n   Opções: ${opcoesTxt}`;
   }).join('\n');
 }
 
@@ -3288,6 +3289,11 @@ ${digest}
 
 JOGOS DISPONÍVEIS HOJE (com todas as opções identificadas pelos agentes especializados — pode escolher QUALQUER uma, não precisa ser a aposta principal):
 ${blocoJogos}
+
+⚠️ REGRAS OBRIGATÓRIAS DE ODD:
+- Use SEMPRE a "ODD CONFIRMADA API" exibida acima para o campo "odd" de cada jogo. NUNCA invente odds.
+- Se um jogo não tem "ODD CONFIRMADA API", NÃO o inclua na múltipla.
+- A odd_total deve estar entre 3.50 e 5.00. NÃO ultrapasse 5.00.
 
 RACIOCÍNIO OBRIGATÓRIO (siga os 4 passos antes de responder):
 Passo 1 — Analisar histórico: quais mercados/ligas têm maior % de GREEN nas múltiplas A? Quais foram os quebradores mais frequentes?
@@ -3307,6 +3313,11 @@ ${digest}
 JOGOS DISPONÍVEIS HOJE (com todas as opções identificadas pelos agentes especializados — pode escolher QUALQUER uma, não precisa ser a aposta principal):
 ${blocoJogos}
 
+⚠️ REGRAS OBRIGATÓRIAS DE ODD:
+- Use SEMPRE a "ODD CONFIRMADA API" exibida acima para o campo "odd" de cada jogo. NUNCA invente odds.
+- Se um jogo não tem "ODD CONFIRMADA API", NÃO o inclua na múltipla.
+- A odd_total deve estar entre 2.50 e 3.49.
+
 DIFERENÇA EM RELAÇÃO AO AGENTE A: selecione os jogos com MAIOR probabilidade individual (não precisa ser os mesmos do A). Máximo 3 jogos. Foco em P(conjunta) > 45% — segurança acima de tudo. Pode repetir 1 jogo do A se for o mais seguro disponível, mas evite repetir todos.
 
 RACIOCÍNIO OBRIGATÓRIO (mesmos 4 passos do Agente A, com threshold mais conservador):
@@ -3319,9 +3330,10 @@ Retorne SOMENTE JSON:
 {"tipo":"B","jogos":[{"time_casa":"...","time_fora":"...","liga":"...","horario":"...","aposta":"...","mercado":"...","odd":1.65,"razao_inclusao":"..."}],"odd_total":2.85,"probabilidade_conjunta":0.52,"justificativa":"..."}`;
 }
 
-function _validarMultiplaAgente(obj, { minJogos = 2, minOdd = 1.8 } = {}) {
+function _validarMultiplaAgente(obj, { minJogos = 2, minOdd = 1.8, maxOdd = null } = {}) {
   if (!obj?.jogos?.length || obj.jogos.length < minJogos) return false;
   if (!obj.odd_total || obj.odd_total < minOdd) return false;
+  if (maxOdd && obj.odd_total > maxOdd) return false;
   if (obj.jogos.some(j => !j.time_casa || !j.time_fora || !j.aposta || !j.mercado || !j.odd || j.odd < 1.20)) return false;
   return true;
 }
@@ -3351,8 +3363,8 @@ async function gerarMultiplasComAgentes(data, jogosDodia) {
 
     const objA = _parseAgenteJson(txtA);
     const objB = _parseAgenteJson(txtB);
-    const validA = _validarMultiplaAgente(objA, { minJogos: 2, minOdd: 2.5 });
-    const validB = _validarMultiplaAgente(objB, { minJogos: 2, minOdd: 1.8 });
+    const validA = _validarMultiplaAgente(objA, { minJogos: 2, minOdd: 2.5, maxOdd: 6.0 });
+    const validB = _validarMultiplaAgente(objB, { minJogos: 2, minOdd: 1.8, maxOdd: 4.0 });
 
     if (!validA || !validB) {
       const diagnosticar = (obj, txt, nome) => {
