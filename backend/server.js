@@ -4897,10 +4897,10 @@ async function rotina05h() {
           });
           if (resultado.jogos.length) {
             const jogosCompletos = {
-              jogos: [...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...(rowAtualizado?.apostas?.jogos||[]).map(x=>x.id||0), 0) + i + 1}))]
+              jogos: aplicarTetoAtivos([...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...(rowAtualizado?.apostas?.jogos||[]).map(x=>x.id||0), 0) + i + 1}))])
             };
             await dbSave(diaAlvo, jogosCompletos);
-            console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.length} jogos após complemento`);
+            console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.filter(j=>!j.descartado).length} ativos após complemento`);
           }
         }
       }
