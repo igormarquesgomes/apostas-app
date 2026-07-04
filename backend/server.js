@@ -3903,6 +3903,9 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
     if (aposta.includes('vence') || aposta.includes('vitória') || aposta.includes('vitoria')) {
       if (apostaMencCasa) return casaVence ? 'green' : 'red';
       if (apostaMencFora) return foraVence ? 'green' : 'red';
+      // Fallback quando aposta usa keyword genérica sem nome do time (ex: "Fora vence (2)")
+      if (apostaNorm.includes('fora vence') || apostaNorm.includes('away wins') || apostaNorm.includes('visitante vence') || apostaNorm.includes('away (2)')) return foraVence ? 'green' : 'red';
+      if (apostaNorm.includes('casa vence') || apostaNorm.includes('home wins') || apostaNorm.includes('mandante vence') || apostaNorm.includes('home (1)')) return casaVence ? 'green' : 'red';
     }
   }
 
