@@ -5690,22 +5690,27 @@ app.post('/corrigir-resultado', async (req, res) => {
 
   if (resultado && ['green','red','cancelado','pendente'].includes(resultado)) {
     novoResultado = resultado;
-  } else if (placar && placar.match(/^\d+-\d+$/)) {
-    const [gC, gF] = placar.split('-').map(Number);
-    novoPlacar = placar;
-    if (jogo) {
-      // Monta stats com placar de intervalo se fornecido
-      let statsParaVerif = null;
-      if (placar_ht && placar_ht.match(/^\d+-\d+$/)) {
-        const [gC1T, gF1T] = placar_ht.split('-').map(Number);
-        statsParaVerif = { golsCasa1T: gC1T, golsFora1T: gF1T, confirmado: true };
-      }
-      novoResultado = verificarAposta(jogo, gC, gF, statsParaVerif);
-      if (novoResultado === 'sem_stats' && !statsParaVerif) {
-        novoResultado = 'pendente'; // Aposta de tempo parcial sem placar de intervalo
-      }
+  } else if (jogo && (placar?.match(/^\d+-\d+$/) || placar_ht?.match(/^\d+-\d+$/))) {
+    // Monta stats de intervalo se placar_ht fornecido
+    let statsParaVerif = null;
+    if (placar_ht && placar_ht.match(/^\d+-\d+$/)) {
+      const [gC1T, gF1T] = placar_ht.split('-').map(Number);
+      statsParaVerif = { golsCasa1T: gC1T, golsFora1T: gF1T, confirmado: true };
     }
-    console.log(`✏️ ${apostaRes.time_casa}: ${apostaRes.placar}→${placar}${placar_ht?' (1T:'+placar_ht+')':''} | ${apostaRes.resultado_aposta}→${novoResultado}`);
+
+    if (placar && placar.match(/^\d+-\d+$/)) {
+      // Placar final informado — calcula resultado completo
+      const [gC, gF] = placar.split('-').map(Number);
+      novoPlacar = placar;
+      novoResultado = verificarAposta(jogo, gC, gF, statsParaVerif);
+      if (novoResultado === 'sem_stats') novoResultado = statsParaVerif ? 'pendente' : 'pendente';
+    } else if (statsParaVerif) {
+      // Só placar_ht informado — calcula usando gols do HT como placar final (para mercados de 1º tempo)
+      const [gC1T, gF1T] = placar_ht.split('-').map(Number);
+      const tentativa = verificarAposta(jogo, gC1T, gF1T, statsParaVerif);
+      if (tentativa !== 'sem_stats') novoResultado = tentativa;
+    }
+    console.log(`✏️ ${apostaRes.time_casa}: placar=${placar||'—'} ht=${placar_ht||'—'} | ${apostaRes.resultado_aposta}→${novoResultado}`);
   }
 
   const apostas = row.resultados.apostas.map(a =>
