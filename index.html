@@ -720,7 +720,7 @@ function render(jogos,data){
         <div class="exp-just">
           <div class="expand-col-title">Análise</div>
           ${j.placar?
-            `<button class="btn-informar-analise" onclick="informarAnalise(event,'${dataAtual}',${j.id})">📐 Informar escanteios/cartões</button>`:''}
+            `<button class="btn-informar-analise" onclick="abrirModalCorrigir(event,'${dataAtual}',${j.id},'Informar resultado / estatísticas')">📐 Informar escanteios/cartões</button>`:''}
           <div class="analysis-box">
             <div class="analysis-label">Justificativa</div>
             ${j.justificativa||'-'}
@@ -824,27 +824,75 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
 }
 
 // ─── Ações ────────────────────────────────────────────────────────────────────
-async function editarResultado(event,idx,data,jogoId,resultadoAtual){
+function abrirModalCorrigir(event, data, jogoId, titulo){
   event.stopPropagation();
-  const novosPlacar=prompt(`Placar final real (ex: 4-3):\nDeixe em branco para manter.`,'');
-  if(novosPlacar===null) return;
-  const novosPlacarHT=prompt(`Placar do 1º tempo (ex: 1-0):\nDeixe em branco se não se aplica.`,'');
-  if(novosPlacarHT===null) return;
-  const payload={data,jogo_id:jogoId,placar:novosPlacar.trim()||null};
-  if(novosPlacarHT.trim()) payload.placar_ht=novosPlacarHT.trim();
+  document.getElementById('modal-corrigir')?.remove();
+  const m=document.createElement('div');
+  m.id='modal-corrigir';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999';
+  m.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:320px;max-width:400px;width:90%">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;color:var(--text)">${titulo||'Corrigir resultado'}</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <label style="font-size:12px;color:var(--text3)">Placar final (ex: 2-1)
+        <input id="mc-placar" placeholder="2-1" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Placar 1º tempo (ex: 1-0) — opcional
+        <input id="mc-placar-ht" placeholder="1-0" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Escanteios totais — opcional
+        <input id="mc-esc" type="number" min="0" placeholder="ex: 9" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Cartões amarelos — opcional
+        <input id="mc-amarelos" type="number" min="0" placeholder="ex: 3" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Cartões vermelhos — opcional
+        <input id="mc-vermelhos" type="number" min="0" placeholder="ex: 1" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+      <button onclick="document.getElementById('modal-corrigir').remove()" style="padding:7px 16px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text3);cursor:pointer;font-size:13px">Cancelar</button>
+      <button id="mc-salvar" style="padding:7px 16px;border-radius:7px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600">Salvar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+  document.getElementById('mc-salvar').onclick=()=>_salvarCorrecao(data,jogoId);
+}
+
+async function _salvarCorrecao(data,jogoId){
+  const placar=document.getElementById('mc-placar')?.value.trim();
+  const placarHT=document.getElementById('mc-placar-ht')?.value.trim();
+  const esc=document.getElementById('mc-esc')?.value.trim();
+  const amarelos=document.getElementById('mc-amarelos')?.value.trim();
+  const vermelhos=document.getElementById('mc-vermelhos')?.value.trim();
+  const temPlacar=placar&&/^\d+-\d+$/.test(placar);
+  const temStats=esc||amarelos||vermelhos;
+  if(!temPlacar&&!temStats){alert('Informe ao menos o placar final ou as estatísticas.');return;}
+  document.getElementById('mc-salvar').textContent='Salvando...';
   try{
-    const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const j=await r.json();
-    if(j.ok){
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
-      const d2=await r2.json();
-      if(d2.apostas?.jogos?.length>0){
-        const resultados=d2.resultados?.apostas||[];
-        const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
-        render(jogosComRes,data);
-      }
-    }else{alert('Erro: '+j.error);}
+    if(temPlacar){
+      const payload={data,jogo_id:jogoId,placar};
+      if(placarHT&&/^\d+-\d+$/.test(placarHT)) payload.placar_ht=placarHT;
+      const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const j=await r.json();
+      if(!j.ok){alert('Erro: '+j.error);return;}
+    }
+    if(temStats){
+      const cartoes=(amarelos?parseInt(amarelos):0)+(vermelhos?parseInt(vermelhos)*2:0)||null;
+      const payload={data,jogo_id:jogoId,escanteios:esc?parseInt(esc):null,cartoes,cartoes_amarelos:amarelos?parseInt(amarelos):null,cartoes_vermelhos:vermelhos?parseInt(vermelhos):null};
+      const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const j=await r.json();
+      if(!j.ok){alert('Erro stats: '+(j.error||'desconhecido'));return;}
+    }
+    document.getElementById('modal-corrigir')?.remove();
+    const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const d2=await r2.json();
+    if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
   }catch(e){alert('Erro: '+e.message);}
+}
+
+async function editarResultado(event,idx,data,jogoId,resultadoAtual){
+  abrirModalCorrigir(event,data,jogoId,'Corrigir resultado');
 }
 
 async function excluirJogo(event,data,jogoId){
