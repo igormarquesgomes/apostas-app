@@ -446,19 +446,24 @@ const LIMITE_JOGOS_MUITOS = 20;
 
 // Teto de jogos ativos por dia — excedente é descartado por prioridade (pri menor = mais importante)
 function aplicarTetoAtivos(jogos, teto = 15) {
-  const ativos = jogos.filter(j => !j.descartado && !j.analisando);
-  if (ativos.length <= teto) return jogos;
-  ativos.sort((a, b) => (a.pri || 99) - (b.pri || 99));
-  const manter = new Set(ativos.slice(0, teto).map(j => j.id));
+  // Slots ocupados = ativos + analisando (ambos contam para o teto)
+  const ocupados = jogos.filter(j => !j.descartado);
+  if (ocupados.length <= teto) return jogos;
+  // Prioridade de corte: analisando primeiro (sem odd confirmada), depois menor pri
+  ocupados.sort((a, b) => {
+    if (a.analisando !== b.analisando) return a.analisando ? 1 : -1; // analisando corta primeiro
+    return (a.pri || 99) - (b.pri || 99);
+  });
+  const manter = new Set(ocupados.slice(0, teto).map(j => j.id));
   let cortados = 0;
   const resultado = jogos.map(j => {
-    if (!j.descartado && !j.analisando && !manter.has(j.id)) {
+    if (!j.descartado && !manter.has(j.id)) {
       cortados++;
-      return { ...j, descartado: true, descartado_motivo: 'excede_meta_jogos' };
+      return { ...j, descartado: true, analisando: false, descartado_motivo: 'excede_meta_jogos' };
     }
     return j;
   });
-  if (cortados > 0) console.log(`✂️ aplicarTetoAtivos: ${ativos.length} ativos → cortando ${cortados} (excede teto ${teto})`);
+  if (cortados > 0) console.log(`✂️ aplicarTetoAtivos: ${ocupados.length} ocupados → cortando ${cortados} (excede teto ${teto})`);
   return resultado;
 }
 
@@ -6480,13 +6485,14 @@ async function rotinaComplementoDiurno() {
       const row = await dbGet(diaAlvo);
       const jogos = row?.apostas?.jogos || [];
       const ativos = jogos.filter(j => !j.descartado && !j.analisando);
+      const ocupados = jogos.filter(j => !j.descartado).length; // ativos + analisando = slots tomados
 
-      if (ativos.length >= 15) {
-        console.log(`✅ [${diaAlvo}] ${ativos.length} jogos ativos — sem necessidade de complemento`);
+      if (ocupados >= 15) {
+        console.log(`✅ [${diaAlvo}] ${ocupados} slots ocupados (${ativos.length} ativos + ${ocupados - ativos.length} analisando) — sem complemento`);
         continue;
       }
 
-      const faltam = 15 - ativos.length;
+      const faltam = 15 - ocupados;
       console.log(`⚠️ [${diaAlvo}] Apenas ${ativos.length}/15 ativos — complementando ${faltam} jogo(s)`);
 
       // Times já selecionados (ativos + descartados) para evitar duplicatas
