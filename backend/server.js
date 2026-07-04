@@ -3759,8 +3759,8 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
   // ── MERCADO GOLS ──────────────────────────────────────────
   if (mercado === 'gols') {
     // Detecta tempo parcial na aposta
-    const isPrimTempo = apostaNorm.includes('primeiro tempo') || apostaNorm.includes('1st half') || apostaNorm.includes('first half') || apostaNorm.includes('1o tempo') || apostaNorm.includes('ht') || apostaNorm.includes('halftime');
-    const isSegTempo  = apostaNorm.includes('segundo tempo')  || apostaNorm.includes('2nd half') || apostaNorm.includes('second half') || apostaNorm.includes('2o tempo');
+    const isPrimTempo = apostaNorm.includes('primeiro tempo') || apostaNorm.includes('1st half') || apostaNorm.includes('first half') || apostaNorm.includes('1o tempo') || apostaNorm.includes('1º tempo') || apostaNorm.includes('1° tempo') || apostaNorm.includes('halftime') || /\b1[°º]\s*tempo/i.test(jogo.aposta||'') || /(1st|first|1\s*t)\s*(half|time|tempo)/i.test(jogo.aposta||'') || apostaNorm.includes('ht');
+    const isSegTempo  = apostaNorm.includes('segundo tempo')  || apostaNorm.includes('2nd half') || apostaNorm.includes('second half') || apostaNorm.includes('2o tempo') || apostaNorm.includes('2º tempo') || apostaNorm.includes('2° tempo') || /\b2[°º]\s*tempo/i.test(jogo.aposta||'');
     // Detecta time específico
     const isAway = apostaNorm.includes('away') || apostaNorm.includes('visitante') || apostaNorm.includes('fora over') || apostaNorm.includes('fora under');
     const isHome = apostaNorm.includes('home ') || apostaNorm.includes('mandante') || apostaNorm.includes('casa over') || apostaNorm.includes('casa under');
