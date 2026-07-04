@@ -839,6 +839,15 @@ function abrirModalCorrigir(event, data, jogoId, titulo){
       <label style="font-size:12px;color:var(--text3)">Placar 1º tempo (ex: 1-0) — opcional
         <input id="mc-placar-ht" placeholder="1-0" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
       </label>
+      <label style="font-size:12px;color:var(--text3)">Resultado direto — opcional (sobrepõe cálculo do placar)
+        <select id="mc-resultado" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="">— Calcular pelo placar —</option>
+          <option value="green">✅ Green</option>
+          <option value="red">❌ Red</option>
+          <option value="cancelado">↩️ Cancelado</option>
+          <option value="pendente">⏳ Pendente</option>
+        </select>
+      </label>
       <label style="font-size:12px;color:var(--text3)">Escanteios totais — opcional
         <input id="mc-esc" type="number" min="0" placeholder="ex: 9" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
       </label>
@@ -862,16 +871,20 @@ function abrirModalCorrigir(event, data, jogoId, titulo){
 async function _salvarCorrecao(data,jogoId){
   const placar=document.getElementById('mc-placar')?.value.trim();
   const placarHT=document.getElementById('mc-placar-ht')?.value.trim();
+  const resultadoDireto=document.getElementById('mc-resultado')?.value;
   const esc=document.getElementById('mc-esc')?.value.trim();
   const amarelos=document.getElementById('mc-amarelos')?.value.trim();
   const vermelhos=document.getElementById('mc-vermelhos')?.value.trim();
   const temPlacar=placar&&/^\d+-\d+$/.test(placar);
+  const temResultado=!!resultadoDireto;
   const temStats=esc||amarelos||vermelhos;
-  if(!temPlacar&&!temStats){alert('Informe ao menos o placar final ou as estatísticas.');return;}
+  if(!temPlacar&&!temResultado&&!temStats){alert('Informe ao menos o placar, o resultado direto ou as estatísticas.');return;}
   document.getElementById('mc-salvar').textContent='Salvando...';
   try{
-    if(temPlacar){
-      const payload={data,jogo_id:jogoId,placar};
+    if(temPlacar||temResultado){
+      const payload={data,jogo_id:jogoId};
+      if(temPlacar) payload.placar=placar;
+      if(temResultado) payload.resultado=resultadoDireto;
       if(placarHT&&/^\d+-\d+$/.test(placarHT)) payload.placar_ht=placarHT;
       const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const j=await r.json();
