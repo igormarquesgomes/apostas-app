@@ -637,6 +637,7 @@ let expSet=new Set();
 
 function render(jogos,data){
   if(data) dataAtual=data;
+  jogos=jogos.filter(j=>!j.descartado);
   if(!jogos.length){document.getElementById('tw').innerHTML='<div class="empty-state"><p>Nenhum jogo encontrado.</p></div>';return;}
   jogos.forEach(j=>{if(j.confianca==='nao_recomendado') j.confianca='baixa';});
 
