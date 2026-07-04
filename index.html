@@ -719,7 +719,7 @@ function render(jogos,data){
         </div>
         <div class="exp-just">
           <div class="expand-col-title">Análise</div>
-          ${j.placar&&j.alternativas?.some(a=>['escanteios','cartoes'].includes(a.mercado))?
+          ${j.placar?
             `<button class="btn-informar-analise" onclick="informarAnalise(event,'${dataAtual}',${j.id})">📐 Informar escanteios/cartões</button>`:''}
           <div class="analysis-box">
             <div class="analysis-label">Justificativa</div>
@@ -826,10 +826,14 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
 // ─── Ações ────────────────────────────────────────────────────────────────────
 async function editarResultado(event,idx,data,jogoId,resultadoAtual){
   event.stopPropagation();
-  const novosPlacar=prompt(`Placar real (ex: 4-3):\nDeixe em branco para manter.`,'');
+  const novosPlacar=prompt(`Placar final real (ex: 4-3):\nDeixe em branco para manter.`,'');
   if(novosPlacar===null) return;
+  const novosPlacarHT=prompt(`Placar do 1º tempo (ex: 1-0):\nDeixe em branco se não se aplica.`,'');
+  if(novosPlacarHT===null) return;
+  const payload={data,jogo_id:jogoId,placar:novosPlacar.trim()||null};
+  if(novosPlacarHT.trim()) payload.placar_ht=novosPlacarHT.trim();
   try{
-    const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,placar:novosPlacar.trim()||null})});
+    const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const j=await r.json();
     if(j.ok){
       const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
