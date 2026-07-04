@@ -444,6 +444,24 @@ function gerarJustificativaPosPivot(aposta, mercado, razao, jogo) {
 // Dia com muitos jogos disponíveis — não reutiliza descartados
 const LIMITE_JOGOS_MUITOS = 20;
 
+// Teto de jogos ativos por dia — excedente é descartado por prioridade (pri menor = mais importante)
+function aplicarTetoAtivos(jogos, teto = 15) {
+  const ativos = jogos.filter(j => !j.descartado && !j.analisando);
+  if (ativos.length <= teto) return jogos;
+  ativos.sort((a, b) => (a.pri || 99) - (b.pri || 99));
+  const manter = new Set(ativos.slice(0, teto).map(j => j.id));
+  let cortados = 0;
+  const resultado = jogos.map(j => {
+    if (!j.descartado && !j.analisando && !manter.has(j.id)) {
+      cortados++;
+      return { ...j, descartado: true, descartado_motivo: 'excede_meta_jogos' };
+    }
+    return j;
+  });
+  if (cortados > 0) console.log(`✂️ aplicarTetoAtivos: ${ativos.length} ativos → cortando ${cortados} (excede teto ${teto})`);
+  return resultado;
+}
+
 /**
  * Aplica odds reais ao jogo e pivota para a melhor alternativa.
  * Para ligas prioritárias (pri < 60): NUNCA descarta — aceita media se não houver alta.
@@ -4749,19 +4767,20 @@ async function rotina04h() {
 
     if (total === 0) {
       // Primeiro preenchimento — salvar normalmente
+      resultado.jogos = aplicarTetoAtivos(resultado.jogos);
       await dbSave(diaAlvo, resultado);
       console.log(`✅ ${diaAlvo}: ${resultado.jogos.length} jogos salvos`);
     } else {
       // Complemento — mesclar com jogos existentes usando maior ID existente para evitar colisão
       const maxIdExistente = todosjogos.reduce((max, j) => Math.max(max, j.id || 0), 0);
       const jogosCompletos = {
-        jogos: [...jogosExistentes, ...resultado.jogos.map((j, i) => ({
+        jogos: aplicarTetoAtivos([...jogosExistentes, ...resultado.jogos.map((j, i) => ({
           ...j,
           id: maxIdExistente + i + 1
-        }))]
+        }))])
       };
       await dbSave(diaAlvo, jogosCompletos);
-      console.log(`✅ ${diaAlvo}: complementado para ${jogosCompletos.jogos.length} jogos`);
+      console.log(`✅ ${diaAlvo}: complementado para ${jogosCompletos.jogos.filter(j=>!j.descartado).length} ativos`);
     }
 
     // Gerar múltiplas em background
@@ -4850,8 +4869,8 @@ async function rotina05h() {
             }
           } catch(e) { console.error(`  Erro re-análise ${jogo.time_casa}:`, e.message); jogo.descartado = true; }
         }
-        // Salva jogos atualizados antes de complementar
-        await dbSave(diaAlvo, { jogos: jogosAtualizados });
+        // Salva jogos atualizados antes de complementar (aplica teto para re-análise que reativou demais)
+        await dbSave(diaAlvo, { jogos: aplicarTetoAtivos(jogosAtualizados) });
       }
 
       // Complementar se ainda faltam jogos (descontando descartados)
@@ -6492,7 +6511,7 @@ async function rotinaComplementoDiurno() {
         if (!resultado.jogos.length) { console.log(`⚠️ [${diaAlvo}] Todos os novos jogos rejeitados por horário`); continue; }
         const maxId = Math.max(...jogos.map(x => x.id || 0), 0);
         const novosJogos = resultado.jogos.map((j, i) => ({ ...j, id: maxId + i + 1 }));
-        await dbSave(diaAlvo, { jogos: [...jogos, ...novosJogos] });
+        await dbSave(diaAlvo, { jogos: aplicarTetoAtivos([...jogos, ...novosJogos]) });
         const totalAtivos = ativos.length + novosJogos.filter(j => !j.descartado).length;
         console.log(`✅ [${diaAlvo}] Complemento: +${novosJogos.length} jogos → ${totalAtivos} ativos`);
 
