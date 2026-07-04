@@ -2,7 +2,6 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<script>if(new URLSearchParams(location.search).get('embedded')==='true'){document.write('<style>.nav-brand,.nav-links,.bottom-nav{display:none!important}.main{padding-bottom:0!important}.nav{height:38px;padding:0 16px;justify-content:flex-end;}.nav-actions{gap:6px;}</style>');}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apostas · OddLab</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -18,19 +17,19 @@
   --nav-h:46px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:15px;line-height:1.5;min-height:100vh;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;min-height:100vh;}
 
 /* ── Nav ──────────────────────────────────────────── */
-.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:0;}
-.nav-brand{display:flex;align-items:center;gap:0;text-decoration:none;flex-shrink:0;margin-right:8px;}
-.nav-brand-name{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-0.4px;}
+.nav{position:sticky;top:0;z-index:200;height:var(--nav-h);background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;}
+.nav-brand{display:flex;align-items:center;gap:0;text-decoration:none;flex-shrink:0;margin-right:24px;}
+.nav-brand-name{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.4px;}
 .nav-brand-name span{color:var(--green);font-weight:300;}
-.nav-links{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px;justify-content:center;overflow-x:auto;}
-.nav-link{padding:0 16px;height:var(--nav-h);display:flex;align-items:center;font-size:13px;font-weight:500;color:var(--text3);text-decoration:none;transition:color .12s;white-space:nowrap;border-bottom:2px solid transparent;}
+.nav-links{display:flex;align-items:center;gap:0;flex:1;}
+.nav-link{padding:0 12px;height:var(--nav-h);display:flex;align-items:center;font-size:12px;font-weight:500;color:var(--text3);text-decoration:none;transition:color .12s;white-space:nowrap;border-bottom:2px solid transparent;}
 .nav-link:hover{color:var(--text2);}
 .nav-link.active{color:var(--green);border-bottom-color:var(--green);font-weight:600;}
 .nav-actions{display:flex;gap:8px;flex-shrink:0;}
-.nav-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--surface);color:var(--text2);}
+.nav-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--surface);color:var(--text2);}
 .nav-btn:hover{border-color:var(--border2);color:var(--text);}
 .nav-btn.primary{background:var(--green);color:#fff;border-color:var(--green);}
 .nav-btn.primary:hover{background:#0d6b63;}
@@ -38,7 +37,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 /* ── Layout ───────────────────────────────────────── */
 .layout{display:flex;min-height:calc(100vh - var(--nav-h));}
 .sidebar{width:260px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);padding:1rem;overflow-y:auto;}
-.main{flex:1;padding:1.5rem 2rem;min-width:0;}
+.main{flex:1;padding:1.25rem;min-width:0;}
 
 /* ── Day switcher ─────────────────────────────────── */
 .day-bar{display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
@@ -56,10 +55,10 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .btn-analisar:disabled{opacity:.5;cursor:not-allowed;}
 
 /* ── Stats bar ────────────────────────────────────── */
-.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:1.25rem;}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;}
-.stat-card-l{font-size:12px;color:var(--text3);font-weight:500;margin-bottom:6px;}
-.stat-card-v{font-size:24px;font-weight:700;line-height:1;}
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:1rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.stat-card-l{font-size:11px;color:var(--text3);font-weight:500;margin-bottom:4px;}
+.stat-card-v{font-size:22px;font-weight:700;line-height:1;}
 .stat-card-v.green{color:var(--green);}
 .stat-card-v.red{color:var(--red);}
 .stat-card-v.amber{color:var(--amber);}
@@ -67,7 +66,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 
 /* ── Section header ───────────────────────────────── */
 .section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;}
-.section-title{font-size:14px;font-weight:600;color:var(--text2);}
+.section-title{font-size:13px;font-weight:600;color:var(--text2);}
 .section-count{font-size:11px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 8px;}
 
 /* ── Liga group header ────────────────────────────── */
@@ -76,10 +75,10 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 
 /* ── Bet panel (table-grid) ───────────────────────── */
 .pn{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem;}
-.pnh{padding:12px 20px;font-size:12px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);}
-.cols{display:grid;grid-template-columns:16px 20px 1fr minmax(180px,260px) 75px 90px 80px 70px;gap:14px;align-items:center;}
-.brow-hd{padding:8px 20px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
-.brow{padding:14px 20px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background .1s;}
+.pnh{padding:10px 16px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);}
+.cols{display:grid;grid-template-columns:16px 20px 1fr 120px 80px 80px 70px 70px;gap:12px;align-items:center;}
+.brow-hd{padding:7px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
+.brow{padding:11px 16px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background .1s;}
 .brow:hover{background:#FAFAFA;}
 .brow.open{background:#F8FFFE;border-bottom:none;}
 .brow.green-res{background:var(--green-lt);}
@@ -91,10 +90,10 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .dot.green{background:var(--green);}
 .dot.red{background:var(--red);}
 .dot.void{background:var(--purple);}
-.match{font-size:15px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
-.pick-txt{font-size:14px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.meta-txt{font-size:12px;color:var(--text3);overflow:hidden;line-height:1.3;}
-.odd-val{font-size:16px;font-weight:700;color:var(--amber);white-space:nowrap;}
+.match{font-size:13px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;}
+.pick-txt{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meta-txt{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.odd-val{font-size:14px;font-weight:700;color:var(--amber);white-space:nowrap;}
 .conf{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;white-space:nowrap;}
 .conf.alta{background:var(--green-lt);color:var(--green);}
 .conf.media{background:var(--amber-lt);color:var(--amber);}
@@ -112,9 +111,8 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .act-btn.danger:hover{background:var(--purple);color:#fff;}
 .expand-row{display:none;border-bottom:1px solid #E2E8F0;background:#F8FFFE;}
 .expand-row.open{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-.exp-alts{padding:16px 20px 18px 60px;border-right:1px solid #E2E8F0;}
-.exp-just{padding:16px 20px 18px 20px;}
-.mobile-just{display:none;}
+.exp-alts{padding:12px 16px 14px 60px;border-right:1px solid #E2E8F0;}
+.exp-just{padding:12px 16px 14px 16px;}
 .expand-col-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;}
 
 /* Alternatives */
@@ -171,7 +169,6 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .mult-jogo-info{flex:1;min-width:0;}
 .mult-jogo-teams{font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mult-jogo-meta{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.mult-jogo-aposta{font-size:11px;font-weight:600;color:var(--text2);margin-top:2px;white-space:normal;line-height:1.3;}
 .mult-jogo-odd{font-size:12px;font-weight:700;color:var(--amber);flex-shrink:0;}
 .mult-total-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:4px;}
 .mult-total-badge.green{background:var(--green-lt);color:var(--green);border:1px solid var(--green-bd);}
@@ -247,97 +244,22 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .modal-result-alts{margin-top:12px;}
 .modal-result-alts-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;}
 
-/* ── Mobile card layout ───────────────────────────── */
-.mob-expand-hint{display:none;}
+/* ── Mobile ───────────────────────────────────────── */
 @media(max-width:900px){
   .sidebar{display:none;}
   .nav-links{display:none;}
   .nav-actions .nav-btn span{display:none;}
-
-  /* Stats: 3 colunas, mostrar só Green/Red/Assert */
-  .stats-bar{grid-template-columns:repeat(3,1fr);}
-  .stats-bar .stat-card:nth-child(1){display:none;} /* Jogos hoje */
-  .stats-bar .stat-card:nth-child(4){display:none;} /* Anulados */
-
-  /* Ocultar cabeçalho de tabela no mobile */
-  .brow-hd{display:none;}
-
-  /* Card layout para cada aposta */
-  .brow.cols{
-    display:grid;
-    grid-template-columns:1fr auto;
-    grid-template-areas:
-      "info  result"
-      "info  odd"
-      "meta  conf"
-      "act   act";
-    gap:2px 10px;
-    padding:12px 14px;
-  }
-  .brow>.chevron{display:none;}
-  .brow>.dot{display:none;}
-  .brow-info{grid-area:info;min-width:0;}
-  .brow .meta-txt{grid-area:meta;display:block;align-self:center;}
-  .brow .odd-val{grid-area:odd;text-align:right;align-self:end;font-size:16px;}
-  .brow .brow-conf{grid-area:conf;display:flex!important;justify-content:flex-end;align-self:center;}
-  .brow .result-col{grid-area:result;display:flex!important;justify-content:flex-end;align-self:start;}
-  .brow .act-col{grid-area:act;display:flex!important;align-items:center;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;}
-  .mob-expand-hint{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--green);}
-  .brow.open .mob-expand-hint{opacity:.5;}
-
-  /* Expand row: single column */
+  .stats-bar{grid-template-columns:repeat(2,1fr);}
+  .stats-bar .stat-card:nth-child(5){display:none;}
+  .cols{grid-template-columns:16px 20px 1fr 70px 60px;}
+  .brow-hd span:nth-child(n+4):not(:nth-child(4)):not(:nth-child(5)){display:none;}
+  .brow>*:nth-child(n+6){display:none;}
   .expand-row.open{grid-template-columns:1fr;}
   .exp-alts{border-right:none;}
-
-  /* Mobile-just: 2 linhas de justificativa */
-  .mobile-just{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px;color:var(--text3);margin-top:3px;line-height:1.4;}
-}
-/* ── Múltiplas mobile ──────────────────────────────── */
-.mob-mult-section{display:none;}
-@media(max-width:900px){
-  .mob-mult-section{
-    display:block;
-    margin:.75rem 0 0;
-    border:1px solid var(--border);
-    border-radius:10px;
-    overflow:hidden;
-    background:var(--surface);
-  }
-  .mob-mult-toggle{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:10px 14px;cursor:pointer;user-select:none;
-    font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);
-    background:var(--surface2);
-  }
-  .mob-mult-toggle svg{transition:transform .2s;}
-  .mob-mult-section.open .mob-mult-toggle svg{transform:rotate(180deg);}
-  .mob-mult-body{display:none;padding:12px;}
-  .mob-mult-section.open .mob-mult-body{display:block;}
-  .mob-mult-day-bar{display:flex;gap:4px;margin-bottom:10px;}
-  .mob-mult-day-bar .mult-day-btn{flex:1;}
 }
 @media(max-width:640px){
   .main{padding:.75rem;}
   .day-date-wrap{display:none;}
-}
-
-/* ── Bottom Nav Mobile ────────────────────────────────── */
-.bottom-nav{display:none;}
-@media(max-width:900px){
-  .bottom-nav{
-    display:flex;position:fixed;bottom:0;left:0;right:0;z-index:300;
-    background:var(--surface);border-top:1px solid var(--border);
-    height:56px;align-items:stretch;
-  }
-  .bottom-nav a{
-    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:3px;font-size:9px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
-    color:var(--text3);text-decoration:none;transition:color .12s;
-    border-top:2px solid transparent;padding-bottom:2px;
-  }
-  .bottom-nav a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-  .bottom-nav a.active{color:var(--green);border-top-color:var(--green);}
-  .main{padding-bottom:64px;}
 }
 </style>
 </head>
@@ -426,26 +348,6 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
         <p>Selecione a data ou use os atalhos acima</p>
       </div>
     </div>
-
-    <!-- Múltiplas mobile (oculto em desktop, sidebar cuida disso) -->
-    <div class="mob-mult-section" id="mob-mult-section">
-      <div class="mob-mult-toggle" onclick="toggleMobMult()">
-        <span>Múltiplas</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-      </div>
-      <div class="mob-mult-body">
-        <div class="mob-mult-day-bar">
-          <button class="mult-day-btn" onclick="carregarMultiplas(offsetData(hojeStr,-1),'Ontem')">Ontem</button>
-          <button class="mult-day-btn" onclick="carregarMultiplas(hojeStr,'Hoje')">Hoje</button>
-          <button class="mult-day-btn" onclick="carregarMultiplas(offsetData(hojeStr,1),'Amanhã')">Amanhã</button>
-        </div>
-        <div id="mob-mult-content">
-          <div class="empty-state" style="padding:1.5rem 0">
-            <p>Selecione um dia</p>
-          </div>
-        </div>
-      </div>
-    </div>
   </main>
 </div>
 
@@ -497,17 +399,6 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
   </div>
 </div>
 
-<!-- MODAL: Editar resultado / Informar stats / Informar análise -->
-<div class="modal-overlay" id="modal-stats" onclick="if(event.target===this)fecharModalStats()">
-  <div class="modal" style="max-width:400px">
-    <div class="modal-hd">
-      <span class="modal-title" id="mst-titulo">Informar dados</span>
-      <button class="modal-close" onclick="fecharModalStats()">×</button>
-    </div>
-    <div class="modal-body" id="mst-body"></div>
-  </div>
-</div>
-
 <script>
 const BACKEND_URL='https://apostas-app.onrender.com';
 
@@ -520,7 +411,6 @@ const hojeStr=hoje();
 document.getElementById('d-input').value=offsetData(hojeStr,1);
 let dataMin=null,dataMax=offsetData(hojeStr,1);
 let dataAtual='';
-const _apostasCache={}; // cache de jogos por data para uso no modal de correção
 
 // Init sidebar mult buttons with data-dtm
 (function(){
@@ -576,13 +466,10 @@ async function carregarDia(data,label){
     const j=await r.json();
     if(j.apostas?.jogos?.length>0){
       const resultados=j.resultados?.apostas||[];
-      const jogosComRes=j.apostas.jogos
-        .filter(jg=>!jg.descartado) // não exibe jogos descartados (sem odd válida)
-        .map(jg=>{
-          const res=resultados.find(x=>x.jogo_id===jg.id);
-          return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
-        });
-      _apostasCache[data]=j.apostas.jogos;
+      const jogosComRes=j.apostas.jogos.map(jg=>{
+        const res=resultados.find(x=>x.jogo_id===jg.id);
+        return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
+      });
       render(jogosComRes,data);
     }else{
       document.getElementById('tw').innerHTML=`<div class="aviso">⚠ Sem apostas para ${fmtDL(data)}.<br><small>Use "Analisar" para gerar.</small></div>`;
@@ -609,7 +496,7 @@ async function buscar(){
     const j=await r.json();
     if(j.apostas?.jogos?.length>0){
       const resultados=j.resultados?.apostas||[];
-      const jogosComRes=j.apostas.jogos.filter(jg=>!jg.descartado).map(jg=>{
+      const jogosComRes=j.apostas.jogos.map(jg=>{
         const res=resultados.find(x=>x.jogo_id===jg.id);
         return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};
       });
@@ -650,16 +537,6 @@ async function buscar(){
 // ─── Múltiplas (sidebar) ──────────────────────────────────────────────────────
 let dataMultAtual=null;
 
-function toggleMobMult(){
-  document.getElementById('mob-mult-section').classList.toggle('open');
-}
-
-function _setMultHTML(html){
-  document.getElementById('mult-content').innerHTML=html;
-  const mob=document.getElementById('mob-mult-content');
-  if(mob) mob.innerHTML=html;
-}
-
 function setMultDayActive(dt){
   document.querySelectorAll('[data-dtm]').forEach(b=>b.classList.toggle('active',b.getAttribute('data-dtm')===dt));
 }
@@ -667,7 +544,7 @@ function setMultDayActive(dt){
 async function carregarMultiplas(data,label){
   dataMultAtual=data;
   setMultDayActive(data);
-  _setMultHTML(`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Carregando...</div></div>`);
+  document.getElementById('mult-content').innerHTML=`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Carregando...</div></div>`;
   try{
     const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
     const j=await r.json();
@@ -676,36 +553,40 @@ async function carregarMultiplas(data,label){
         const ra=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
         const ja=await ra.json();
         if(!ja.apostas?.jogos?.length){
-          _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Sem apostas para ${fmtDL(data)}</p></div>`);
+          document.getElementById('mult-content').innerHTML=`<div class="empty-state" style="padding:1.5rem 0"><p>Sem apostas para ${fmtDL(data)}</p></div>`;
           return;
         }
       }catch(e){}
-      _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Múltiplas não geradas</p></div><button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🎯 Gerar múltiplas</button>`);
+      document.getElementById('mult-content').innerHTML=`
+        <div class="empty-state" style="padding:1.5rem 0"><p>Múltiplas não geradas</p></div>
+        <button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🎯 Gerar múltiplas</button>`;
       return;
     }
     const mA=j.multiplas?.multipla_a,mB=j.multiplas?.multipla_b;
     const validas=mA?.odd_total>0&&mB?.odd_total>0&&mA?.jogos?.length>0;
     if(!validas){
-      _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Odds inválidas</p></div><button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🔄 Regerar</button>`);
+      document.getElementById('mult-content').innerHTML=`
+        <div class="empty-state" style="padding:1.5rem 0"><p>Odds inválidas</p></div>
+        <button class="mult-gerar-btn" onclick="gerarMultiplasManual('${data}')">🔄 Regerar</button>`;
       return;
     }
     renderMultiplas(j.multiplas,j.resultados_multiplas);
   }catch(e){
-    _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Erro ao carregar</p></div>`);
+    document.getElementById('mult-content').innerHTML=`<div class="empty-state" style="padding:1.5rem 0"><p>Erro ao carregar</p></div>`;
   }
 }
 
 async function gerarMultiplasManual(data){
-  _setMultHTML(`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Gerando...</div></div>`);
+  document.getElementById('mult-content').innerHTML=`<div class="loading-state" style="padding:2rem 0"><div class="spin"></div><div class="loading-txt">Gerando...</div></div>`;
   try{
     await fetch(`${BACKEND_URL}/gerar-multiplas/${data}`,{method:'POST'});
     await new Promise(r=>setTimeout(r,35000));
     const r=await fetch(`${BACKEND_URL}/multiplas/${data}`);
     const j=await r.json();
     if(j.multiplas) renderMultiplas(j.multiplas,j.resultados_multiplas);
-    else _setMultHTML(`<div class="empty-state" style="padding:1.5rem 0"><p>Não foi possível gerar.</p></div>`);
+    else document.getElementById('mult-content').innerHTML=`<div class="empty-state" style="padding:1.5rem 0"><p>Não foi possível gerar.</p></div>`;
   }catch(e){
-    _setMultHTML(`<div class="errmsg">❌ ${e.message}</div>`);
+    document.getElementById('mult-content').innerHTML=`<div class="errmsg">❌ ${e.message}</div>`;
   }
 }
 
@@ -719,8 +600,7 @@ function renderMultiplas(multiplas,resultados){
     return`<div class="mult-jogo">
       <div class="mult-jogo-info">
         <div class="mult-jogo-teams">${jogo.time_casa} x ${jogo.time_fora}</div>
-        <div class="mult-jogo-meta">${jogo.liga||''} · ${jogo.horario||''}</div>
-        <div class="mult-jogo-aposta">${jogo.aposta}</div>
+        <div class="mult-jogo-meta">${jogo.liga||''} · ${jogo.horario||''} · ${jogo.aposta}</div>
       </div>
       <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
         <span class="mult-jogo-odd">${jogo.odd}</span>
@@ -745,9 +625,9 @@ function renderMultiplas(multiplas,resultados){
       ${(mult.jogos||[]).map(j=>renderJogo(j,res?.jogos_resultado)).join('')}
     </div>`;
   };
-  const html=renderCard(multiplas.multipla_a,rA,'Múltipla A — Maior odd','red-odd')+
+  document.getElementById('mult-content').innerHTML=
+    renderCard(multiplas.multipla_a,rA,'Múltipla A — Maior odd','red-odd')+
     renderCard(multiplas.multipla_b,rB,'Múltipla B — Mais segura','amber-odd');
-  _setMultHTML(html);
 }
 
 // ─── Render apostas ────────────────────────────────────────────────────────────
@@ -806,44 +686,41 @@ function render(jogos,data){
       const anularBtn=j.resultado!=='cancelado'
         ?`<button class="act-btn danger" onclick="anularJogo(event,'${dataAtual}',${j.id})">Anular</button>`:'';
 
+      // Botão excluir: sempre disponível (remove o jogo da lista completamente)
+      const excluirBtn=`<button class="act-btn danger" style="margin-left:4px" onclick="excluirJogo(event,'${dataAtual}',${j.id})" title="Excluir jogo da lista">🗑️</button>`;
+
       rows+=`<div class="brow cols ${resCls}" id="jc${i}" onclick="tog(${i})">
         <span class="chevron" id="cv${i}">›</span>
         <span class="dot ${dotCls}"></span>
-        <div class="brow-info">
+        <div style="min-width:0">
           <div class="match">${j.time_casa} x ${j.time_fora}</div>
           <div class="pick-txt">${j.aposta} · ${mercNome[j.mercado]||j.mercado}</div>
-          ${j.justificativa?`<div class="mobile-just">${j.justificativa}</div>`:''}
         </div>
         <div class="meta-txt">${j.liga||''}${j.horario?` · ${j.horario}`:''}${j.placar?` · ${j.placar}`:''}</div>
         <div class="odd-val">${odd}</div>
-        <div class="brow-conf"><span class="conf ${confNorm}">${confNorm.charAt(0).toUpperCase()+confNorm.slice(1)}</span></div>
+        <div><span class="conf ${confNorm}">${confNorm.charAt(0).toUpperCase()+confNorm.slice(1)}</span></div>
         <div class="result-col">${resBadge}</div>
-        <div class="act-col"><span class="mob-expand-hint">► Alternativas e análise</span>${anularBtn}</div>
+        <div class="act-col">${anularBtn}</div>
       </div>
       <div class="expand-row" id="ex${i}">
         <div class="exp-alts">
           <div class="expand-col-title">Alternativas</div>
-          ${(()=>{
-            const alts=[...(j.alternativas||[])];
-            const temPrincipal=alts.some(a=>(a.mercado||'')===(j.mercado||'')&&(a.aposta||'').trim().toLowerCase()===(j.aposta||'').trim().toLowerCase());
-            if(!temPrincipal&&j.aposta) alts.unshift({mercado:j.mercado,aposta:j.aposta,confianca:j.confianca,_injetado:true});
-            return alts.length?alts.map(alt=>{
-              const isPrincipal=(alt.mercado===j.mercado&&(alt.aposta||'').trim().toLowerCase()===(j.aposta||'').trim().toLowerCase())||alt._injetado;
-              const resAlt=calcularResultadoAlt(alt,j.placar,j.mercados_resultado,j.time_casa,j.time_fora);
-              const resHtml=resAlt?`<span class="alt-res-badge ${resAlt}">${resAlt.toUpperCase()}</span>`:'';
-              return`<div class="alt-item${isPrincipal?' principal':''}">
-                <span class="alt-merc${isPrincipal?' principal-merc':''}">${mercNome[alt.mercado]||alt.mercado}${isPrincipal?' ★':''}</span>
-                <span class="alt-aposta">${alt.aposta||'-'}</span>
-                <span class="alt-conf-badge ${alt.confianca||'baixa'}">${alt.confianca||'-'}</span>
-                ${resHtml}
-              </div>`;
-            }).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px 0">Sem alternativas registradas</div>';
-          })()}
+          ${j.alternativas?.length?j.alternativas.map(alt=>{
+            const isPrincipal=alt.mercado===j.mercado&&alt.aposta===j.aposta;
+            const resAlt=calcularResultadoAlt(alt,j.placar,j.mercados_resultado,j.time_casa,j.time_fora);
+            const resHtml=resAlt?`<span class="alt-res-badge ${resAlt}">${resAlt.toUpperCase()}</span>`:'';
+            return`<div class="alt-item${isPrincipal?' principal':''}">
+              <span class="alt-merc${isPrincipal?' principal-merc':''}">${mercNome[alt.mercado]||alt.mercado}${isPrincipal?' ★':''}</span>
+              <span class="alt-aposta">${alt.aposta||'-'}</span>
+              <span class="alt-conf-badge ${alt.confianca||'baixa'}">${alt.confianca||'-'}</span>
+              ${resHtml}
+            </div>`;
+          }).join(''):`<div style="color:var(--text3);font-size:12px;padding:8px 0">Sem alternativas registradas</div>`}
         </div>
         <div class="exp-just">
           <div class="expand-col-title">Análise</div>
-          ${j.placar&&j.alternativas?.some(a=>['escanteios','cartoes'].includes(a.mercado))?
-            `<button class="btn-informar-analise" onclick="informarAnalise(event,'${dataAtual}',${j.id})">📐 Informar escanteios/cartões</button>`:''}
+          ${j.placar?
+            `<button class="btn-informar-analise" onclick="abrirModalCorrigir(event,'${dataAtual}',${j.id},'Informar resultado / estatísticas')">📐 Informar escanteios/cartões</button>`:''}
           <div class="analysis-box">
             <div class="analysis-label">Justificativa</div>
             ${j.justificativa||'-'}
@@ -856,7 +733,7 @@ function render(jogos,data){
             <div class="backup-label">⚡ Aposta backup</div>
             <div class="backup-content"><span>${j.aposta_backup}</span><span class="backup-merc">${mercNome[j.mercado_backup]||j.mercado_backup||'—'}</span></div>
           </div>`:''}
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px">
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
             <button class="act-btn danger" onclick="excluirJogo(event,'${dataAtual}',${j.id})" style="display:flex;align-items:center;gap:4px">🗑️ Excluir jogo</button>
           </div>
           <div class="stats-mini-row" style="margin-top:10px">
@@ -915,54 +792,12 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
   const ap=(alt.aposta||'').toLowerCase();
   if(merc==='gols'){
     const n=parseFloat(ap.match(/[\d.]+/)?.[0]);
-    const normAccG=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'');
-    const apNG=normAccG(ap);
-    const nomeCasaG=normAccG((timeCasa||'').toLowerCase()),nomeForaG=normAccG((timeFora||'').toLowerCase());
-    const primCasaG=nomeCasaG.split(' ')[0],primForaG=nomeForaG.split(' ')[0];
-
-    // Apostas de tempo parcial — frontend não tem placar de intervalo, não pode validar
-    const eParcial=ap.includes('1st half')||ap.includes('first half')||ap.includes('primeiro tempo')||
-                   ap.includes('2nd half')||ap.includes('second half')||ap.includes('segundo tempo')||
-                   ap.includes('halftime')||ap.includes('ht)');
-    if(eParcial) return null;
-
-    // Apostas de time específico — usa gols do time correto
-    const eAway=ap.includes('away')||ap.includes('visitante')||ap.includes('fora over')||ap.includes('fora under');
-    const eHome=ap.includes('home ')||ap.includes('mandante')||ap.includes('casa over')||ap.includes('casa under');
-    if(eAway&&!isNaN(n)){
-      if(ap.includes('over')||ap.includes('mais')) return gf>n?'green':'red';
-      if(ap.includes('under')||ap.includes('menos')) return gf<n?'green':'red';
-    }
-    if(eHome&&!isNaN(n)){
-      if(ap.includes('over')||ap.includes('mais')) return gc>n?'green':'red';
-      if(ap.includes('under')||ap.includes('menos')) return gc<n?'green':'red';
-    }
-
-    if(apNG.includes('marca')){
-      let golsTime=null;
-      if(apNG.includes('fora')||apNG.includes('away')) golsTime=gf;
-      else if(apNG.includes('casa')||apNG.includes('home')) golsTime=gc;
-      else if(primForaG&&apNG.includes(primForaG)) golsTime=gf;
-      else if(primCasaG&&apNG.includes(primCasaG)) golsTime=gc;
-      if(golsTime!==null){
-        if(!isNaN(n)){
-          if(apNG.includes('over')||apNG.includes('mais')) return golsTime>n?'green':'red';
-          if(apNG.includes('under')||apNG.includes('menos')) return golsTime<n?'green':'red';
-        }
-        return golsTime>0?'green':'red';
-      }
-    }
-    // Match exato da linha — evita "over 2.5" casar com linha "2" via substring
-    const linhaStr=isNaN(n)?'':String(n);
-    const linhaExataFE=(pfx,l)=>{const idx=ap.indexOf(`${pfx} ${l}`);if(idx===-1)return false;const nx=ap[idx+pfx.length+1+l.length];return!nx||!/[0-9.]/.test(nx);};
-    if(linhaExataFE('over',linhaStr)||linhaExataFE('mais',linhaStr)) return total>n?'green':'red';
-    if(linhaExataFE('under',linhaStr)||linhaExataFE('menos',linhaStr)) return total<n?'green':'red';
-    if(ap.includes('ambas')||ap.includes('ambos')||ap.includes('btts')) return(gc>0&&gf>0)?'green':'red';
+    if(ap.includes('over')||ap.includes('mais')) return total>n?'green':'red';
+    if(ap.includes('under')||ap.includes('menos')) return total<n?'green':'red';
+    if(ap.includes('ambas')||ap.includes('ambos')||ap.includes('btts')||ap.includes('ambas marcam')||ap.includes('ambos marcam')) return(gc>0&&gf>0)?'green':'red';
   }
   if(merc==='resultado'){
     const casaVence=gc>gf,foraVence=gf>gc,empate=gc===gf;
-    // BTTS pode cair aqui quando a IA salva com mercado='resultado'
-    if(ap.includes('ambas')||ap.includes('ambos')||ap.includes('btts')) return(gc>0&&gf>0)?'green':'red';
     const normAcc=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'');
     const apN=normAcc(ap);
     if((apN.includes('empate')||apN==='x')&&!apN.includes('dupla')&&!apN.includes('ou empat')&&!apN.includes('1x')&&!apN.includes('x2')) return empate?'green':'red';
@@ -974,9 +809,9 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
     }
     const nomeCasa=normAcc((timeCasa||'').toLowerCase()),nomeFora=normAcc((timeFora||'').toLowerCase());
     const primCasa=nomeCasa.split(' ')[0],primFora=nomeFora.split(' ')[0];
-    if(apN.includes('ou empat')||apN.includes('nao perde')||apN.includes('dnb')){
-      if(primCasa&&apN.includes(primCasa)) return empate?'cancelado':(casaVence?'green':'red');
-      if(primFora&&apN.includes(primFora)) return empate?'cancelado':(foraVence?'green':'red');
+    if(apN.includes('ou empat')||apN.includes('nao perde')){
+      if(primCasa&&apN.includes(primCasa)) return(casaVence||empate)?'green':'red';
+      if(primFora&&apN.includes(primFora)) return(foraVence||empate)?'green':'red';
     }
     if(apN.includes('vence')||apN.includes('vitoria')){
       if(primCasa&&apN.includes(primCasa)) return casaVence?'green':'red';
@@ -988,58 +823,76 @@ function calcularResultadoAlt(alt,placar,mercadosResult,timeCasa,timeFora){
   return null;
 }
 
-// ─── Modal de stats/resultado (Item 9) ───────────────────────────────────────
-let _mstCallback = null;
-
-function fecharModalStats(){
-  document.getElementById('modal-stats').classList.remove('open');
-  _mstCallback = null;
-}
-
-function _mstInput(id){ return document.getElementById(id); }
-
-function _abrirModalStats(titulo, bodyHtml, callback){
-  document.getElementById('mst-titulo').textContent = titulo;
-  document.getElementById('mst-body').innerHTML = bodyHtml;
-  _mstCallback = callback;
-  document.getElementById('modal-stats').classList.add('open');
-  // focar primeiro input
-  setTimeout(() => { const f = document.querySelector('#mst-body input'); if(f) f.focus(); }, 80);
-}
-
 // ─── Ações ────────────────────────────────────────────────────────────────────
-async function editarResultado(event,idx,data,jogoId,resultadoAtual){
+function abrirModalCorrigir(event, data, jogoId, titulo){
   event.stopPropagation();
-  // Detecta se a aposta é de tempo parcial para pedir placar de intervalo
-  const jogo = _apostasCache?.[data]?.find?.(j=>j.id===jogoId);
-  const aposta = (jogo?.aposta||'').toLowerCase();
-  const eParcial = aposta.includes('1st half')||aposta.includes('first half')||aposta.includes('primeiro tempo')||
-                   aposta.includes('2nd half')||aposta.includes('second half')||aposta.includes('segundo tempo')||
-                   aposta.includes('halftime')||aposta.includes('ht)');
-  const campoHT = eParcial ? `
-    <div class="modal-field" style="margin-top:10px">
-      <label class="modal-label">Placar do 1º tempo (ex: 1-1) <span style="color:var(--amber);font-size:11px">— necessário para aposta de tempo parcial</span></label>
-      <input class="modal-input" id="mst-placar-ht" placeholder="1-1" style="font-size:16px;font-weight:700;text-align:center;letter-spacing:2px">
-    </div>` : '';
-  _abrirModalStats('Corrigir placar', `
-    <div class="modal-field">
-      <label class="modal-label">Placar final (ex: 2-1)</label>
-      <input class="modal-input" id="mst-placar" placeholder="2-1" value="${resultadoAtual||''}" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:2px">
+  document.getElementById('modal-corrigir')?.remove();
+  const m=document.createElement('div');
+  m.id='modal-corrigir';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999';
+  m.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:320px;max-width:400px;width:90%">
+    <div style="font-weight:700;font-size:14px;margin-bottom:16px;color:var(--text)">${titulo||'Corrigir resultado'}</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <label style="font-size:12px;color:var(--text3)">Placar final (ex: 2-1)
+        <input id="mc-placar" placeholder="2-1" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Placar 1º tempo (ex: 1-0) — opcional
+        <input id="mc-placar-ht" placeholder="1-0" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Escanteios totais — opcional
+        <input id="mc-esc" type="number" min="0" placeholder="ex: 9" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Cartões amarelos — opcional
+        <input id="mc-amarelos" type="number" min="0" placeholder="ex: 3" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
+      <label style="font-size:12px;color:var(--text3)">Cartões vermelhos — opcional
+        <input id="mc-vermelhos" type="number" min="0" placeholder="ex: 1" style="display:block;margin-top:4px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      </label>
     </div>
-    ${campoHT}
-    <div class="modal-actions" style="margin-top:8px">
-      <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
-      <button class="modal-btn primary" onclick="_mstCallback()">Salvar</button>
-    </div>`, async () => {
-    const placar = (_mstInput('mst-placar')?.value||'').trim();
-    const placarHT = (_mstInput('mst-placar-ht')?.value||'').trim() || null;
-    fecharModalStats();
-    try{
-      const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,placar:placar||null,placar_ht:placarHT})});
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+      <button onclick="document.getElementById('modal-corrigir').remove()" style="padding:7px 16px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text3);cursor:pointer;font-size:13px">Cancelar</button>
+      <button id="mc-salvar" style="padding:7px 16px;border-radius:7px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600">Salvar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+  document.getElementById('mc-salvar').onclick=()=>_salvarCorrecao(data,jogoId);
+}
+
+async function _salvarCorrecao(data,jogoId){
+  const placar=document.getElementById('mc-placar')?.value.trim();
+  const placarHT=document.getElementById('mc-placar-ht')?.value.trim();
+  const esc=document.getElementById('mc-esc')?.value.trim();
+  const amarelos=document.getElementById('mc-amarelos')?.value.trim();
+  const vermelhos=document.getElementById('mc-vermelhos')?.value.trim();
+  const temPlacar=placar&&/^\d+-\d+$/.test(placar);
+  const temStats=esc||amarelos||vermelhos;
+  if(!temPlacar&&!temStats){alert('Informe ao menos o placar final ou as estatísticas.');return;}
+  document.getElementById('mc-salvar').textContent='Salvando...';
+  try{
+    if(temPlacar){
+      const payload={data,jogo_id:jogoId,placar};
+      if(placarHT&&/^\d+-\d+$/.test(placarHT)) payload.placar_ht=placarHT;
+      const r=await fetch(`${BACKEND_URL}/corrigir-resultado`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const j=await r.json();
-      if(j.ok){ await _recarregarLista(data); }else{ alert('Erro: '+j.error); }
-    }catch(e){ alert('Erro: '+e.message); }
-  });
+      if(!j.ok){alert('Erro: '+j.error);return;}
+    }
+    if(temStats){
+      const cartoes=(amarelos?parseInt(amarelos):0)+(vermelhos?parseInt(vermelhos)*2:0)||null;
+      const payload={data,jogo_id:jogoId,escanteios:esc?parseInt(esc):null,cartoes,cartoes_amarelos:amarelos?parseInt(amarelos):null,cartoes_vermelhos:vermelhos?parseInt(vermelhos):null};
+      const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const j=await r.json();
+      if(!j.ok){alert('Erro stats: '+(j.error||'desconhecido'));return;}
+    }
+    document.getElementById('modal-corrigir')?.remove();
+    const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const d2=await r2.json();
+    if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function editarResultado(event,idx,data,jogoId,resultadoAtual){
+  abrirModalCorrigir(event,data,jogoId,'Corrigir resultado');
 }
 
 async function excluirJogo(event,data,jogoId){
@@ -1048,9 +901,16 @@ async function excluirJogo(event,data,jogoId){
   try{
     const r=await fetch(`${BACKEND_URL}/excluir-jogo`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId})});
     const j=await r.json();
-    if(j.ok){ await _recarregarLista(data); }
-    else{ alert('Erro ao excluir: '+(j.error||'desconhecido')); }
-  }catch(e){ alert('Erro: '+e.message); }
+    if(j.ok){
+      // Recarregar a lista do dia
+      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const d2=await r2.json();
+      const jogos=d2.apostas?.jogos||[];
+      const resultados=d2.resultados?.apostas||[];
+      const jogosComRes=jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
+      render(jogosComRes,data);
+    }else{alert('Erro ao excluir: '+(j.error||'desconhecido'));}
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 async function anularJogo(event,data,jogoId){
@@ -1059,88 +919,58 @@ async function anularJogo(event,data,jogoId){
   try{
     const r=await fetch(`${BACKEND_URL}/anular-jogo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId})});
     const j=await r.json();
-    if(j.ok){ await _recarregarLista(data); }
-    else{ alert('Erro: '+(j.error||'Endpoint não disponível.')); }
-  }catch(e){ alert('Erro: '+e.message); }
+    if(j.ok){
+      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const d2=await r2.json();
+      if(d2.apostas?.jogos?.length>0){
+        const resultados=d2.resultados?.apostas||[];
+        const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
+        render(jogosComRes,data);
+      }
+    }else{alert('Erro: '+(j.error||'Endpoint não disponível. Adicione POST /anular-jogo no backend.'));}
+  }catch(e){alert('Endpoint /anular-jogo não implementado ainda.');}
 }
 
 async function informarStats(event,data,jogoId,aposta,mercado){
   event.stopPropagation();
   const isEsc=mercado==='escanteios'||aposta.toLowerCase().includes('escanteio')||aposta.toLowerCase().includes('corner');
   const isCart=mercado==='cartoes'||aposta.toLowerCase().includes('cartao')||aposta.toLowerCase().includes('cartão');
-  const fields = [];
-  if(isEsc) fields.push(`<div class="modal-field"><label class="modal-label">Total de escanteios</label><input class="modal-input" id="mst-esc" type="number" min="0" placeholder="ex: 9"></div>`);
-  if(isCart) fields.push(`<div class="modal-field"><label class="modal-label">Total de cartões <small style="font-weight:400;color:var(--text3)">(vermelho = 2)</small></label><input class="modal-input" id="mst-cart" type="number" min="0" placeholder="ex: 4"></div>`);
-  _abrirModalStats('Informar stats', `
-    <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Aposta: <strong style="color:var(--text)">${aposta}</strong></p>
-    ${fields.join('')}
-    <div class="modal-actions" style="margin-top:8px">
-      <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
-      <button class="modal-btn primary" onclick="_mstCallback()">Confirmar</button>
-    </div>`, async () => {
-    const _parseVal = v => { const s=(v||'').trim(); if(s==='') return null; const n=parseInt(s); return isNaN(n)?null:n; };
-    const escanteios = _mstInput('mst-esc') ? _parseVal(_mstInput('mst-esc').value) : null;
-    const cartoes    = _mstInput('mst-cart') ? _parseVal(_mstInput('mst-cart').value) : null;
-    fecharModalStats();
-    try{
-      const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes})});
-      const j=await r.json();
-      if(j.ok){ await _recarregarLista(data); }
-      else{ alert('Erro: '+(j.error||'desconhecido')); }
-    }catch(e){ alert('Erro: '+e.message); }
-  });
+  let escanteios=null,cartoes=null;
+  if(isEsc){const v=prompt(`Total de escanteios no jogo:\n(aposta: ${aposta})`);if(v===null)return;escanteios=parseInt(v);if(isNaN(escanteios))return alert('Número inválido');}
+  if(isCart){const v=prompt(`Total de cartões no jogo:\n(lembre: vermelho = 2)\n(aposta: ${aposta})`);if(v===null)return;cartoes=parseInt(v);if(isNaN(cartoes))return alert('Número inválido');}
+  try{
+    const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes})});
+    const j=await r.json();
+    if(j.ok){
+      alert(`✅ ${j.resultado?.toUpperCase()} — resultado atualizado!`);
+      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const d2=await r2.json();
+      if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
+    }else{alert('Erro: '+(j.error||'desconhecido'));}
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 async function informarAnalise(event,data,jogoId){
   event.stopPropagation();
-  _abrirModalStats('Informar análise completa', `
-    <div class="modal-row">
-      <div class="modal-field" style="margin-bottom:0">
-        <label class="modal-label">Escanteios</label>
-        <input class="modal-input" id="mst-a-esc" type="number" min="0" placeholder="ex: 9">
-      </div>
-      <div class="modal-field" style="margin-bottom:0">
-        <label class="modal-label">Cartões amarelos</label>
-        <input class="modal-input" id="mst-a-amar" type="number" min="0" placeholder="ex: 3">
-      </div>
-    </div>
-    <div class="modal-field" style="margin-top:12px">
-      <label class="modal-label">Cartões vermelhos</label>
-      <input class="modal-input" id="mst-a-verm" type="number" min="0" placeholder="ex: 1">
-    </div>
-    <p style="font-size:11px;color:var(--text3);margin-top:8px">Deixe em branco os campos que não se aplicam.</p>
-    <div class="modal-actions" style="margin-top:12px">
-      <button class="modal-btn" onclick="fecharModalStats()">Cancelar</button>
-      <button class="modal-btn primary" onclick="_mstCallback()">Confirmar</button>
-    </div>`, async () => {
-    const _pv = v => { const s=(v||'').trim(); if(s==='') return null; const n=parseInt(s); return isNaN(n)?null:n; };
-    const vEsc  = _mstInput('mst-a-esc')?.value;
-    const vAmar = _mstInput('mst-a-amar')?.value;
-    const vVerm = _mstInput('mst-a-verm')?.value;
-    const escanteios = _pv(vEsc);
-    const amarelos   = _pv(vAmar);
-    const vermelhos  = _pv(vVerm);
-    if((vEsc?.trim()&&escanteios===null)||(vAmar?.trim()&&amarelos===null)||(vVerm?.trim()&&vermelhos===null)) return alert('Número inválido');
-    if(escanteios===null&&amarelos===null&&vermelhos===null){ fecharModalStats(); return; }
-    const cartoes=(amarelos!==null||vermelhos!==null)?(amarelos||0)+(vermelhos||0):null;
-    fecharModalStats();
-    try{
-      const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes,cartoes_amarelos:amarelos,cartoes_vermelhos:vermelhos})});
-      const j=await r.json();
-      if(j.ok){ await _recarregarLista(data); }
-      else{ alert('Erro: '+(j.error||'desconhecido')); }
-    }catch(e){ alert('Erro: '+e.message); }
-  });
-}
-
-async function _recarregarLista(data){
-  const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
-  const d2=await r2.json();
-  if(d2.apostas?.jogos?.length>0){
-    const resultados=d2.resultados?.apostas||[];
-    const jogosComRes=d2.apostas.jogos.filter(jg=>!jg.descartado).map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});
-    render(jogosComRes,data);
-  }
+  const vEsc=prompt(`Total de ESCANTEIOS no jogo (vazio = pular):`);if(vEsc===null)return;
+  const vAmarelos=prompt(`Total de CARTÕES AMARELOS (vazio = pular):`);if(vAmarelos===null)return;
+  const vVermelhos=prompt(`Total de CARTÕES VERMELHOS (vazio = pular):`);if(vVermelhos===null)return;
+  const escanteios=vEsc.trim()?parseInt(vEsc):null;
+  const amarelos=vAmarelos.trim()?parseInt(vAmarelos):null;
+  const vermelhos=vVermelhos.trim()?parseInt(vVermelhos):null;
+  if((vEsc.trim()&&isNaN(escanteios))||(vAmarelos.trim()&&isNaN(amarelos))||(vVermelhos.trim()&&isNaN(vermelhos)))return alert('Número inválido');
+  if(escanteios===null&&amarelos===null&&vermelhos===null)return;
+  const cartoes=(amarelos!==null||vermelhos!==null)?(amarelos||0)+(vermelhos||0):null;
+  try{
+    const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes,cartoes_amarelos:amarelos,cartoes_vermelhos:vermelhos})});
+    const j=await r.json();
+    if(j.ok){
+      alert(`✅ Análise atualizada!`);
+      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const d2=await r2.json();
+      if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
+    }else{alert('Erro: '+(j.error||'desconhecido'));}
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 function abrirInformarStats(){
@@ -1198,14 +1028,15 @@ function onBuscaInput(){
   buscaTimer = setTimeout(() => buscarJogosTime(q), 400);
 }
 
-async function buscarJogosTime(q, _retry){
+async function buscarJogosTime(q){
   const data = document.getElementById('m-data').value;
   if(!data){ fecharDropdown(); return; }
   const dd = document.getElementById('m-dropdown');
-  let countdown;
   try{
+    // Coletar times já na lista do dia para excluir do dropdown
     const timesExistentes = [];
     document.querySelectorAll('.match').forEach(el => {
+      // ".match" contém "Time Casa x Time Fora" — extrair cada time
       const txt = el.textContent || '';
       const partes = txt.split(' x ');
       if(partes[0]) timesExistentes.push(partes[0].trim());
@@ -1216,14 +1047,9 @@ async function buscarJogosTime(q, _retry){
     let j;
     try { j = await r.json(); }
     catch(parseErr) {
-      // Resposta não é JSON — mostrar o texto real para diagnóstico
-      let rawText = '';
-      try { rawText = await r.text(); } catch(_){}
-      const preview = rawText.replace(/<[^>]+>/g,'').trim().substring(0, 120);
-      dd.innerHTML = `<div class="jogo-drop-empty">Resposta inesperada do servidor (HTTP ${r.status}): ${preview || parseErr.message}</div>`;
+      dd.innerHTML = `<div class="jogo-drop-empty">Servidor ainda reiniciando — aguarde 1 min e tente novamente</div>`;
       return;
     }
-    if(countdown) clearTimeout(countdown);
     if(!r.ok){
       dd.innerHTML = `<div class="jogo-drop-empty">Erro do servidor: ${j.error || r.status}</div>`;
       return;
@@ -1245,7 +1071,6 @@ async function buscarJogosTime(q, _retry){
     ).join('');
     dd._jogos = jogos;
   }catch(e){
-    if(countdown) clearTimeout(countdown);
     dd.innerHTML = `<div class="jogo-drop-empty">Erro de rede: ${e.message}</div>`;
   }
 }
@@ -1278,7 +1103,7 @@ async function analisarJogoManual(){
   const data = document.getElementById('m-data').value;
   if(!data){ return; }
 
-  // Verificar duplicata via API
+  // Verificar se jogo já existe na lista do dia (checagem robusta via API)
   try{
     const checkR = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
     const checkD = await checkR.json();
@@ -1291,10 +1116,10 @@ async function analisarJogoManual(){
              (jf.includes(nFora.split(' ')[0]) || nFora.includes(jf.split(' ')[0]));
     });
     if(jaExiste){
-      alert(`⚠️ ${jogoSelecionado.time_casa} x ${jogoSelecionado.time_fora} já está na lista de ${data}.\nExclua o jogo antes de adicionar novamente.`);
+      alert(`⚠️ ${jogoSelecionado.time_casa} x ${jogoSelecionado.time_fora} já está na lista de ${data}.\nExclua o jogo existente antes de adicionar novamente.`);
       return;
     }
-  }catch(e){}
+  }catch(e){ /* se falhar a checagem, continua */ }
 
   const btn = document.getElementById('m-btn-analisar');
   btn.disabled = true;
@@ -1383,7 +1208,7 @@ async function confirmarJogoManual(data){
     const dv = await rv.json();
     if(dv.apostas?.jogos?.length > 0){
       const resultados = dv.resultados?.apostas || [];
-      const jogosComRes = dv.apostas.jogos.filter(jg=>!jg.descartado).map(jg => {
+      const jogosComRes = dv.apostas.jogos.map(jg => {
         const res = resultados.find(x => x.jogo_id === jg.id);
         return {...jg, resultado:res?.resultado_aposta||null, placar:res?.placar||null, mercados_resultado:res?.mercados_resultado||null};
       });
@@ -1391,34 +1216,6 @@ async function confirmarJogoManual(data){
     }
   }catch(e){ alert('Erro ao confirmar: ' + e.message); }
 }
-
-// Auto-load Hoje ao abrir
-carregarDia(hojeStr,'Hoje');
-document.querySelector('.day-btn[onclick*="hojeStr,\'Hoje\'"]')?.classList.add('active');
 </script>
-
-<!-- BOTTOM NAV MOBILE -->
-<nav class="bottom-nav">
-  <a href="index.html" class="active">
-    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    Apostas
-  </a>
-  <a href="dashboard.html">
-    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-    Dashboard
-  </a>
-  <a href="ligas.html">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-    Ligas
-  </a>
-  <a href="relatorios.html">
-    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-    Relatórios
-  </a>
-  <a href="experimental.html">
-    <svg viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
-    Extra
-  </a>
-</nav>
 </body>
 </html>
