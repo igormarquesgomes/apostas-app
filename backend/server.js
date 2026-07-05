@@ -1600,9 +1600,9 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         tipoComp = 'af';
         priComp = 80;
       } else if (paisLower === 'brazil' || paisLower === 'brasil') {
-        // Ligas brasileiras complementares (Série C, D, etc.) — prioridade alta por ter cobertura de odds
+        // Ligas brasileiras complementares — Série C pri=60, Série D após Africa/Oriente (pri=82)
         tipoComp = 'b';
-        priComp = 60;
+        priComp = (ligaId === 76) ? 82 : 60;
       } else {
         // Todo o resto — menor prioridade possível
         priComp = 200;
@@ -3779,7 +3779,7 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
         ? { casa: stats.golsCasa1T, fora: stats.golsFora1T, total: stats.golsCasa1T + stats.golsFora1T }
         : { casa: golsCasa - stats.golsCasa1T, fora: golsFora - stats.golsFora1T, total: (golsCasa - stats.golsCasa1T) + (golsFora - stats.golsFora1T) };
       const valorPT = isAway ? golsPT.fora : isHome ? golsPT.casa : golsPT.total;
-      for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5']) {
+      for (const linha of ['0.5','0.75','1.0','1','1.25','1.5','1.75','2.0','2','2.25','2.5','2.75','3.0','3','3.25','3.5','3.75','4.0','4','4.25','4.5']) {
         const r = checkOverUnder(valorPT, linha);
         if (r) return r;
       }
@@ -3788,20 +3788,20 @@ function verificarAposta(jogo, golsCasa, golsFora, stats = null) {
 
     // Apostas de time específico (full match)
     if (isAway || palavrasFora.some(p => apostaNorm.includes(p))) {
-      for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5']) {
+      for (const linha of ['0.5','0.75','1.0','1','1.25','1.5','1.75','2.0','2','2.25','2.5','2.75','3.0','3','3.25','3.5','3.75','4.0','4','4.25','4.5']) {
         const r = checkOverUnder(golsFora, linha);
         if (r) return r;
       }
     }
     if (isHome || palavrasCasa.some(p => apostaNorm.includes(p) && !isAway)) {
-      for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5']) {
+      for (const linha of ['0.5','0.75','1.0','1','1.25','1.5','1.75','2.0','2','2.25','2.5','2.75','3.0','3','3.25','3.5','3.75','4.0','4','4.25','4.5']) {
         const r = checkOverUnder(golsCasa, linha);
         if (r) return r;
       }
     }
 
     // Over/Under total — inclui linhas inteiras, .5 e linhas asiáticas (.25/.75)
-    for (const linha of ['0.5','0.75','1','1.25','1.5','1.75','2','2.25','2.5','2.75','3','3.25','3.5','3.75','4','4.25','4.5','4.75','5','5.5']) {
+    for (const linha of ['0.5','0.75','1.0','1','1.25','1.5','1.75','2.0','2','2.25','2.5','2.75','3.0','3','3.25','3.5','3.75','4.0','4','4.25','4.5','4.75','5','5.5']) {
       const r = checkOverUnder(total, linha);
       if (r) return r;
     }
