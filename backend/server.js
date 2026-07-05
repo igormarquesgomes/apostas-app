@@ -4740,9 +4740,6 @@ async function rotina04h() {
     const faltam = 15 - total;
     console.log(`🔄 ${diaAlvo}: tem ${total} jogos, faltam ${faltam}`);
 
-    // Para hoje precisa de margem mínima de 13h (aposta em aberto); para amanhã aceita desde 10h
-    const horaMinGerac = diaAlvo === hoje ? '13:00' : '10:00';
-
     // Times já selecionados — não repetir
     const timesJaSelecionados = new Set(
       jogosExistentes.flatMap(j => [
@@ -4755,10 +4752,10 @@ async function rotina04h() {
     // Gerar apostas passando os times já selecionados para evitar duplicatas
     let resultado = null;
     try {
-      resultado = await gerarApostasMultiAgente(diaAlvo, horaMinGerac, faltam, timesJaSelecionados);
+      resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
       if (!resultado?.jogos?.length) { console.log(`⚠️ Multi-agente sem jogos — fallback gerarApostas`); resultado = null; }
     } catch(e) { console.error('❌ Multi-agente falhou, usando fallback:', e.message); }
-    if (!resultado) resultado = await gerarApostas(diaAlvo, horaMinGerac, faltam, timesJaSelecionados);
+    if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
     if (!resultado?.jogos?.length) {
       console.log(`⚠️ ${diaAlvo}: não foi possível gerar novos jogos`);
       continue;
