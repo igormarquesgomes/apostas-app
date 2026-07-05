@@ -3075,7 +3075,16 @@ async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = 
     } else { jogosFinais.push(jogo); }
   }
 
-  jogosFinais.sort((a,b) => { const ord={alta:0,media:1,baixa:2,nao_recomendado:3}; const oa=ord[a.confianca]??2,ob=ord[b.confianca]??2; return oa!==ob ? oa-ob : (a.pri||99)-(b.pri||99); });
+  // Jogos prioritários (Série A/B, Copa do Mundo — pri < 10) nunca devem ser cortados pelo slice
+  // mesmo que a confiança pós-pivot seja "media". Garantir que entrem antes de qualquer pri >= 10.
+  jogosFinais.sort((a,b) => {
+    const priA = (a.pri||99) < 10 ? 0 : 1;
+    const priB = (b.pri||99) < 10 ? 0 : 1;
+    if (priA !== priB) return priA - priB; // prioritários primeiro
+    const ord={alta:0,media:1,baixa:2,nao_recomendado:3};
+    const oa=ord[a.confianca]??2, ob=ord[b.confianca]??2;
+    return oa!==ob ? oa-ob : (a.pri||99)-(b.pri||99);
+  });
   resultado.jogos = jogosFinais.slice(0, metaJogos);
   resultado.jogos.forEach((j, idx) => { j.id = idx + 1; });
 
