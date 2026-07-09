@@ -1973,12 +1973,15 @@ alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais 
 
   // Margem mínima de 10 candidatos extras para absorver falhas pós-IA
   // Para metaJogos pequenos (complemento), garante candidatos suficientes
-  const MARGEM_RESERVA = Math.max(10, metaJogos * 3);
+  // Buffer: jogos extras para absorver falhas de odds pós-IA.
+  // Era metaJogos*3 (até 45 candidatos para meta=15) → muito caro no multi-agente (5 calls/jogo).
+  // Reduzido para flat +8: cobre ~53% de descarte sem explodir custo.
+  const MARGEM_RESERVA = 8;
   const totalComMargem = Math.min(metaJogos + MARGEM_RESERVA, jogos.length);
   jogos = jogos.slice(0, totalComMargem);
 
-  // Lote 1: primeiros 8 (Sonnet + web_search) | Lote 2: resto (Haiku)
-  const LOTE = 8;
+  // Lote 1: primeiros 4 (Sonnet + web_search — só jogos top-priority) | Lote 2: resto (Haiku)
+  const LOTE = 4;
   const lote1 = jogos.slice(0, LOTE);
   const lote2 = jogos.slice(LOTE);
   console.log(`  Lotes: ${lote1.length} (Sonnet) + ${lote2.length} (Haiku) = ${jogos.length} jogos (meta: ${metaJogos} + ${MARGEM_RESERVA} reservas)`);
@@ -2575,7 +2578,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   }
   if (!jogos.length) return null;
 
-  const MARGEM = Math.max(15, metaJogos * 2);
+  const MARGEM = 8;
   jogos = jogos.slice(0, Math.min(metaJogos + MARGEM, jogos.length));
   console.log(`\nMulti-agente — jogos selecionados: ${jogos.length}`);
   jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
