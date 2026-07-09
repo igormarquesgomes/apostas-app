@@ -631,7 +631,9 @@ function renderMultiplas(multiplas,resultados){
 }
 
 // ─── Render apostas ────────────────────────────────────────────────────────────
-const gN={a:'🇧🇷 Série A',b:'🇧🇷 Série B',copa:'🏆 Copas',it:'🇮🇹 Serie A Italiana',es:'🇪🇸 La Liga',eu:'🌍 Europeias',sul:'🌎 Sul-Americanas',af:'🌍 África & Oriente Médio',other:'🌐 Outras'};
+const tipoEmoji={a:'🇧🇷',b:'🇧🇷',copa:'🏆',it:'🇮🇹',es:'🇪🇸',eu:'🌍',sul:'🌎',af:'🌍',other:'🌐'};
+const tipoOrd={copa:0,a:1,b:2,it:3,es:4,eu:5,sul:6,af:7,other:8};
+const ligaPri={'Copa do Mundo':0,'Copa Mundial':0,'FIFA World Cup':0,'Champions League':1,'UEFA Champions League':1,'Europa League':2,'UEFA Europa League':2,'Conference League':3,'UEFA Europa Conference League':3,'Liga Conferência UEFA':3};
 const mercNome={gols:'Gols',escanteios:'Escanteios',cartoes:'Cartões',resultado:'Resultado'};
 let expSet=new Set();
 
@@ -654,18 +656,28 @@ function render(jogos,data){
   document.getElementById('s-assert').textContent=assert;
   document.getElementById('stats-bar').style.display='grid';
 
-  const grupos={};
+  // Agrupar por liga individual
+  const gruposLiga={};
   jogos.forEach(j=>{
-    const g=['a','b','copa','it','es','eu','sul','af','other'].includes(j.tipo_liga)?j.tipo_liga:'eu';
-    if(!grupos[g]) grupos[g]=[];grupos[g].push(j);
+    const tipo=['a','b','copa','it','es','eu','sul','af','other'].includes(j.tipo_liga)?j.tipo_liga:'eu';
+    const liga=j.liga||'Outra';
+    if(!gruposLiga[liga]) gruposLiga[liga]={tipo,jogos:[]};
+    gruposLiga[liga].jogos.push(j);
   });
-  const ordem=['a','b','copa','it','es','eu','sul','af','other'];
+  const sortedLigas=Object.keys(gruposLiga).sort((a,b)=>{
+    const tA=tipoOrd[gruposLiga[a].tipo]??8, tB=tipoOrd[gruposLiga[b].tipo]??8;
+    if(tA!==tB) return tA-tB;
+    const pA=ligaPri[a]??99, pB=ligaPri[b]??99;
+    if(pA!==pB) return pA-pB;
+    return a.localeCompare(b,'pt');
+  });
 
   let rows='',i=0;
-  ordem.forEach(g=>{
-    if(!grupos[g]?.length) return;
-    rows+=`<div class="liga-hd" style="padding:10px 16px 6px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);background:var(--surface2)">${gN[g]||g}</div>`;
-    grupos[g].forEach(j=>{
+  sortedLigas.forEach(liga=>{
+    const {tipo,jogos:gjogos}=gruposLiga[liga];
+    const emoji=tipoEmoji[tipo]||'🌐';
+    rows+=`<div class="liga-hd" style="padding:10px 16px 6px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);background:var(--surface2)">${emoji} ${liga}</div>`;
+    gjogos.forEach(j=>{
       const confNorm=j.confianca==='nao_recomendado'?'baixa':(j.confianca||'baixa');
       const resCls=j.resultado==='green'?'green-res':j.resultado==='red'?'red-res':j.resultado==='cancelado'?'void-res':'';
       const dotCls=j.resultado==='green'?'green':j.resultado==='red'?'red':j.resultado==='cancelado'?'void':'';
