@@ -76,7 +76,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 /* ── Bet panel (table-grid) ───────────────────────── */
 .pn{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem;}
 .pnh{padding:10px 16px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);}
-.cols{display:grid;grid-template-columns:16px 20px 1fr 140px 70px 80px 100px 70px;gap:12px;align-items:center;}
+.cols{display:grid;grid-template-columns:16px 20px 1fr 80px 70px 80px 100px 70px;gap:12px;align-items:center;}
 .brow-hd{padding:7px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
 .brow{padding:11px 16px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background .1s;}
 .brow:hover{background:#FAFAFA;}
@@ -697,7 +697,7 @@ function render(jogos,data){
           <div class="match">${j.time_casa} x ${j.time_fora}</div>
           <div class="pick-txt">${j.aposta} · ${mercNome[j.mercado]||j.mercado}</div>
         </div>
-        <div class="meta-txt">${j.liga||''}${j.horario?` · ${j.horario}`:''}${j.placar?` · ${j.placar}`:''}</div>
+        <div class="meta-txt">${j.horario||''}${j.placar?` · ${j.placar}`:''}</div>
         <div class="odd-val">${odd}</div>
         <div><span class="conf ${confNorm}">${confNorm.charAt(0).toUpperCase()+confNorm.slice(1)}</span></div>
         <div class="result-col">${resBadge}</div>
@@ -756,7 +756,7 @@ function render(jogos,data){
     <div class="cols brow-hd">
       <span></span><span></span>
       <span>Jogo / Aposta</span>
-      <span>Liga · hora</span>
+      <span>Hora</span>
       <span>Odd</span>
       <span>Confiança</span>
       <span>Resultado</span>
