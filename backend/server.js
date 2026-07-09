@@ -754,6 +754,13 @@ const LIGAS_PRIORITY = {
   34:  { nome:'Eliminatórias UEFA',    tipo:'copa', pri:65, selecaoCampea:true },
   // Amistosos internacionais (só seleções campeãs)
   10:  { nome:'Amistoso Internacional',tipo:'copa', pri:66, selecaoCampea:true },
+  // Irlanda — ligas com bom histórico de odds, melhor que pri=90 genérico europeu
+  357: { nome:'Liga Premier Irlanda',      tipo:'eu', pri:68 },
+  358: { nome:'Primeira Divisão Irlanda',  tipo:'eu', pri:69 },
+  // Peru — Liga 1 com boas odds, melhor que pri=70 genérico sul-americano
+  284: { nome:'Liga 1 Peru',               tipo:'sul', pri:68 },
+  // Copa Peru (competição de copa, não liga principal)
+  485: { nome:'Copa Peru',                 tipo:'sul', pri:72 },
   // Amistosos femininos — aceitar todas as seleções adultas
   666: { nome:'Amistoso Feminino',tipo:'copa', pri:95 },
   // Qualificação Copa do Mundo feminina
