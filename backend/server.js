@@ -2587,6 +2587,22 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
 
   const MARGEM = 8;
   jogos = jogos.slice(0, Math.min(metaJogos + MARGEM, jogos.length));
+
+  // ── Pré-filtro de odds: só analisar jogos com cobertura na Odds API ───────
+  // Evita gastar AI em ligas sem mercado disponível (Islândia, Irã, etc.)
+  const jogosComOdds = [], jogosSemOdds = [];
+  await Promise.all(jogos.map(async j => {
+    if (!j.fixtureId) { jogosComOdds.push(j); return; } // sem fixtureId: tenta mesmo assim
+    const odds = await buscarOddsFixture(j.fixtureId, data).catch(() => null);
+    if (odds) jogosComOdds.push(j);
+    else jogosSemOdds.push(j);
+  }));
+  if (jogosSemOdds.length) {
+    console.log(`⚡ Pré-filtro odds: ${jogosSemOdds.length} jogo(s) sem cobertura ignorado(s): ${jogosSemOdds.map(j=>`${j.timeCasa} x ${j.timeFora}`).join(', ')}`);
+  }
+  // Se sobrar abaixo da meta, aceitar jogos sem fixtureId de volta
+  jogos = jogosComOdds.length >= metaJogos ? jogosComOdds : [...jogosComOdds, ...jogosSemOdds.slice(0, metaJogos - jogosComOdds.length)];
+
   console.log(`\nMulti-agente — jogos selecionados: ${jogos.length}`);
   jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
 
