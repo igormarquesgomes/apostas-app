@@ -3531,8 +3531,10 @@ async function validarMultipla(multipla, resultadosApostas) {
       console.log(`  ⚠️ Não encontrado: "${j.time_casa}" x "${j.time_fora}"`);
       return 'nao_encontrado';
     }
-    if (res.resultado_aposta === 'cancelado') return 'cancelado';
-    if (res.resultado_aposta === 'pendente' || !res.placar) return 'pendente';
+    // Não propagar 'cancelado' da aposta individual — a múltipla pode ter aposta diferente
+    // Ex: individual=Under 3.0 (push), múltipla=Over 2.5 (green com mesmo placar)
+    if (!res.placar) return res.resultado_aposta === 'cancelado' ? 'cancelado' : 'pendente';
+    if (res.resultado_aposta === 'pendente') return 'pendente';
     let [gC, gF] = res.placar.split('-').map(Number);
     // Se times estavam invertidos na múltipla, inverter gols para cálculo correto
     if (timesInvertidos) {
