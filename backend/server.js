@@ -2546,7 +2546,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   const ligaStatsMap = new Map();
   if (todasLigaIds.length > 0) {
     try {
-      const resL = await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=in.(${todasLigaIds.join(',')})&select=liga_id,nome,green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+      const resL = await fetch(`${SUPABASE_URL}/rest/v1/ligas_conhecidas?liga_id=in.(${todasLigaIds.join(',')})&select=liga_id,nome,green,red,total,mercados,media_escanteios,media_cartoes,amostras_escanteios,amostras_cartoes,cobertura_por_dia,tentativas_total,sucessos_total`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
       for (const row of (await resL.json() || [])) { if (row.total >= 3) ligaStatsMap.set(row.liga_id, { ...row, assertividade: Math.round((row.green / row.total) * 100) }); }
     } catch(e) {}
   }
@@ -2575,7 +2575,20 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
   if (timesIgnorar.size > 0) jogos = jogos.filter(j => !timesIgnorar.has(j.timeCasa?.toLowerCase()) && !timesIgnorar.has(j.timeFora?.toLowerCase()));
   if (jogos.length < metaJogos) {
-    const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
+    const dowHoje = new Date().getDay(); // 0=Dom ... 6=Sáb
+    const cobScore = j => {
+      const st = ligaStatsMap.get(j.ligaId);
+      const cob = st?.cobertura_por_dia?.[String(dowHoje)];
+      return typeof cob === 'number' ? cob : -1;
+    };
+    const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => {
+      if (a.pri !== b.pri) return a.pri - b.pri;
+      const ca = cobScore(a), cb = cobScore(b);
+      if (ca >= 0 && cb >= 0) return cb - ca;
+      if (ca >= 0) return ca > 0 ? -1 : 1;
+      if (cb >= 0) return cb > 0 ? 1 : -1;
+      return a.horario.localeCompare(b.horario);
+    });
     const compFiltrado = []; let cont13h = 0;
     for (const j of compOrdenado) {
       if (timesIgnorar.size > 0 && (timesIgnorar.has(j.timeCasa?.toLowerCase()) || timesIgnorar.has(j.timeFora?.toLowerCase()))) continue;
@@ -2591,11 +2604,20 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   // ── Pré-filtro de odds: só analisar jogos com cobertura na Odds API ───────
   // Evita gastar AI em ligas sem mercado disponível (Islândia, Irã, etc.)
   const jogosComOdds = [], jogosSemOdds = [];
+  const dowHojeFiltro = new Date().getDay();
   await Promise.all(jogos.map(async j => {
-    if (!j.fixtureId) { jogosComOdds.push(j); return; } // sem fixtureId: tenta mesmo assim
+    if (!j.fixtureId) { jogosComOdds.push(j); return; }
     const odds = await buscarOddsFixture(j.fixtureId, data).catch(() => null);
     if (odds) jogosComOdds.push(j);
     else jogosSemOdds.push(j);
+    // Atualizar cobertura por dia em background via RPC (fire-and-forget)
+    if (j.ligaId) {
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/atualizar_cobertura_liga`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_liga_id: j.ligaId, p_dow: dowHojeFiltro, p_tem_odds: !!odds })
+      }).catch(() => {});
+    }
   }));
   if (jogosSemOdds.length) {
     console.log(`⚡ Pré-filtro odds: ${jogosSemOdds.length} jogo(s) sem cobertura ignorado(s): ${jogosSemOdds.map(j=>`${j.timeCasa} x ${j.timeFora}`).join(', ')}`);
