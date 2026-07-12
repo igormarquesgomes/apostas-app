@@ -46,6 +46,7 @@ body{background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
     <button class="nav-link" data-page="aluno.html">Aluno</button>
     <button class="nav-link" data-page="experimental.html">Experimental</button>
   </div>
+  <button id="btn-add-jogo" onclick="abrirAddJogo()" style="display:none;margin-left:8px;padding:0 14px;height:32px;background:#0F766E;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">+ Adicionar jogo</button>
 </nav>
 <iframe id="frame" src="index.html" title="OddLab"></iframe>
 
@@ -54,10 +55,17 @@ const frame = document.getElementById('frame');
 const links = document.querySelectorAll('.nav-link[data-page]');
 const STORAGE_KEY = 'oddlab_app_page';
 
+const btnAdd = document.getElementById('btn-add-jogo');
+
 function navigate(page, save) {
   frame.src = page + '?embedded=true';
   links.forEach(l => l.classList.toggle('active', l.dataset.page === page));
+  btnAdd.style.display = page === 'index.html' ? '' : 'none';
   if (save !== false) localStorage.setItem(STORAGE_KEY, page);
+}
+
+function abrirAddJogo() {
+  frame.contentWindow.postMessage({ action: 'abrirModalAdicionarJogo' }, '*');
 }
 
 links.forEach(l => l.addEventListener('click', () => navigate(l.dataset.page)));

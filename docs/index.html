@@ -997,6 +997,8 @@ let jogoAnalisado = null;
 let jogoSelecionado = null;   // fixture escolhido no dropdown
 let buscaTimer = null;
 
+window.addEventListener('message', e => { if(e.data?.action === 'abrirModalAdicionarJogo') abrirModalAdicionarJogo(); });
+
 function abrirModalAdicionarJogo(){
   const dt = dataAtual || document.getElementById('d-input').value || offsetData(hojeStr, 1);
   document.getElementById('m-data').value = dt;
