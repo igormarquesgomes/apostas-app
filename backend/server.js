@@ -5230,6 +5230,23 @@ app.get('/testar-odds', async (req, res) => {
       }
     }
 
+    // Monta tabela: mercado → aposta → [{ casa, odd }] ordenado por odd desc
+    const oddsporCasa = {};
+    for (const bm of (entry.bookmakers || [])) {
+      for (const bet of (bm.bets || [])) {
+        const key = bet.name;
+        if (!oddsporCasa[key]) oddsporCasa[key] = {};
+        for (const v of (bet.values || [])) {
+          if (!oddsporCasa[key][v.value]) oddsporCasa[key][v.value] = [];
+          oddsporCasa[key][v.value].push({ casa: bm.name, odd: parseFloat(v.odd) });
+        }
+      }
+    }
+    // Ordena apostas por odd desc dentro de cada mercado
+    for (const mercado of Object.values(oddsporCasa))
+      for (const aposta of Object.keys(mercado))
+        mercado[aposta].sort((a, b) => b.odd - a.odd);
+
     res.json({
       fixtureId: parseInt(fixtureId),
       fixture: {
@@ -5241,6 +5258,7 @@ app.get('/testar-odds', async (req, res) => {
       total_bookmakers: detalhes.length,
       estrela_bet: estrelaBet,
       estrela_bet_encontrada: !!estrelaBet,
+      odds_por_casa: oddsporCasa,
       bookmakers: detalhes,
       disponibilidade_por_mercado: mercadosBkMap,
       odds_calculadas: oddsParsed,
