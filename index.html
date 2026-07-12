@@ -1126,6 +1126,7 @@ async function analisarJogoManual(){
     const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
     const nCasa = norm(jogoSelecionado.time_casa), nFora = norm(jogoSelecionado.time_fora);
     const jaExiste = jogosHoje.some(j => {
+      if (j.descartado || !j.odd_mercado) return false; // ignora reservas/sem odd
       const jc = norm(j.time_casa), jf = norm(j.time_fora);
       return (jc.includes(nCasa.split(' ')[0]) || nCasa.includes(jc.split(' ')[0])) &&
              (jf.includes(nFora.split(' ')[0]) || nFora.includes(jf.split(' ')[0]));
