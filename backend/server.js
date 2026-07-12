@@ -6083,6 +6083,7 @@ Forma casa: ${statsCasa?.forma||'?'} | Fora: ${statsFora?.forma||'?'} | Gols: ${
 Escolha a MELHOR aposta. Confiança alta, odd ≥ 1.25.
 Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
               const respFallback = await chamarIA(promptFallback, 800);
+              let oddConfirmada = false;
               if (respFallback) {
                 const mFb = respFallback.match(/\{[\s\S]*\}/);
                 if (mFb) {
@@ -6097,17 +6098,26 @@ Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","con
                       jogoFinal.confianca = 'alta';
                       jogoFinal.descartado = false;
                       jogoFinal.justificativa = novaFb.justificativa || novaFb.razao;
+                      oddConfirmada = true;
                       console.log(`  ✅ Re-análise manual: ${novaFb.aposta} @ ${oddNum}`);
                     }
                   }
                 }
               }
+              if (!oddConfirmada) {
+                console.log(`  ❌ Manual: nenhum mercado com odd validada encontrado para ${time_casa} x ${time_fora}`);
+                return res.json({ ok: false, sem_odd: true, error: `Nenhum mercado com odd validada disponível para ${time_casa} x ${time_fora}. O jogo existe mas não há odds apostáveis na API no momento.` });
+              }
+            } else {
+              console.log(`  ❌ Manual: sem mercados disponíveis na API para ${time_casa} x ${time_fora}`);
+              return res.json({ ok: false, sem_odd: true, error: `Sem mercados apostáveis na API para ${time_casa} x ${time_fora}. Tente novamente mais perto do horário do jogo.` });
             }
           } else {
             console.log(`  ✅ Odd validada: ${jogoFinal.aposta} @ ${jogoFinal.odd_mercado}`);
           }
         } else {
-          console.log('  ⚠️ Sem odds na API para este fixture — odd sugerida pela IA mantida');
+          console.log(`  ❌ Manual: sem odds na API para fixture ${jogoFinal.fixtureId}`);
+          return res.json({ ok: false, sem_odd: true, error: `Sem odds disponíveis na API para ${time_casa} x ${time_fora}. Tente novamente mais perto do horário do jogo.` });
         }
       } catch(oddsErr) {
         console.error('  Erro validando odds manual:', oddsErr.message);

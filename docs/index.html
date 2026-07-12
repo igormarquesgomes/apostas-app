@@ -1154,6 +1154,14 @@ async function analisarJogoManual(){
       })
     });
     const j = await r.json();
+    if(j.sem_odd){
+      resDiv.innerHTML = `<div style="margin-top:12px;padding:12px 14px;border-radius:8px;background:var(--bg2);border:1px solid var(--border)">
+        <div style="font-weight:600;margin-bottom:4px">⚠️ Sem mercado validado</div>
+        <div style="color:var(--text2);font-size:13px">${j.error}</div>
+      </div>`;
+      btn.disabled = false;
+      return;
+    }
     if(!j.ok || !j.jogo) throw new Error(j.error || 'Resposta inválida da IA');
     jogoAnalisado = j.jogo;
     renderResultadoModal(j.jogo, data);
