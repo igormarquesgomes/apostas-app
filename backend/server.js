@@ -6071,7 +6071,7 @@ app.post('/justificativa-multipla', async (req, res) => {
     const blocos = await Promise.all(apostas.map(async (a, i) => {
       const st = statsMap[i];
       const blocoStats = st ? `\nEstatísticas da API:\nCasa (${a.time_casa}): forma=${st.sc?.forma||'?'} gols/jogo=${st.sc?.mediaGols||'?'}\nVisitante (${a.time_fora}): forma=${st.sf?.forma||'?'} gols/jogo=${st.sf?.mediaGols||'?'}\nH2H: ${st.sc?.h2hTexto||'sem dados'}\n` : '';
-      const prompt = `Analista esportivo — escreva 2-3 parágrafos curtos em português explicando por que a aposta abaixo faz sentido.
+      const prompt = `Analista esportivo — escreva EXATAMENTE 1 parágrafo (3-4 frases) em português explicando por que a aposta abaixo faz sentido.
 
 JOGO: ${a.time_casa} x ${a.time_fora} (${a.liga||'Internacional'}) — ${dataFmt}${diaSemana?` (${diaSemana})`:''}
 APOSTA: ${a.aposta}
