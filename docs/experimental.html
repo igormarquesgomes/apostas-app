@@ -194,7 +194,10 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
               <input id="just-aposta" type="text" placeholder="Ex: Over 2.5 gols" style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;color:#1E293B;outline:none">
             </div>
           </div>
-          <button class="btn primary" id="just-btn" onclick="gerarJust()" disabled>✍️ Gerar justificativa</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn primary" id="just-btn" onclick="gerarJust()" disabled>✍️ Gerar justificativa</button>
+            <button class="btn" id="just-btn-cmp" onclick="gerarComparar()" disabled>⚖️ Comparar Haiku × Sonnet</button>
+          </div>
         </div>
         <div id="just-output" style="margin-top:16px"></div>
       </div>
@@ -465,7 +468,43 @@ function selecionarJogoJust(idx){
   document.getElementById('just-mercado').value = _justJogo.mercado || 'gols';
   document.getElementById('just-aposta').value = _justJogo.aposta || '';
   document.getElementById('just-btn').disabled = false;
+  document.getElementById('just-btn-cmp').disabled = false;
   document.getElementById('just-output').innerHTML = '';
+}
+
+async function gerarComparar(){
+  if(!_justJogo) return;
+  const aposta = document.getElementById('just-aposta').value.trim() || _justJogo.aposta;
+  const mercado = document.getElementById('just-mercado').value;
+  const btn = document.getElementById('just-btn-cmp');
+  btn.disabled = true; btn.textContent = '⏳ Gerando...';
+  document.getElementById('just-output').innerHTML = `<div class="loading-state">Gerando com Haiku e Sonnet em paralelo...</div>`;
+  try{
+    const r = await fetch(`${BACKEND_URL}/justificativa-comparar`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ time_casa:_justJogo.time_casa, time_fora:_justJogo.time_fora, liga:_justJogo.liga, aposta, mercado, data:_justData, fixture_id:_justJogo.fixtureId||null, liga_id:_justJogo.ligaId||null })
+    });
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error||'Erro desconhecido');
+    const fmtParas = txt => txt.split(/\n+/).filter(p=>p.trim()).map(p=>`<p style="margin-bottom:10px">${p}</p>`).join('');
+    document.getElementById('just-output').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="border:1px solid #E2E8F0;border-radius:12px;padding:16px 18px;background:#FAFAFA">
+          <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">🟡 Haiku</div>
+          <div style="font-size:13px;line-height:1.7;color:#1E293B;font-family:Georgia,serif">${fmtParas(d.haiku)}</div>
+          <button class="btn sm" onclick="navigator.clipboard.writeText(${JSON.stringify(d.haiku)}).then(()=>alert('Copiado!'))" style="margin-top:10px">📋 Copiar</button>
+        </div>
+        <div style="border:1px solid #6EE7B7;border-radius:12px;padding:16px 18px;background:#F0FDF9">
+          <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">🟢 Sonnet + web search</div>
+          <div style="font-size:13px;line-height:1.7;color:#1E293B;font-family:Georgia,serif">${fmtParas(d.sonnet)}</div>
+          <button class="btn sm" onclick="navigator.clipboard.writeText(${JSON.stringify(d.sonnet)}).then(()=>alert('Copiado!'))" style="margin-top:10px">📋 Copiar</button>
+        </div>
+      </div>`;
+  }catch(e){
+    document.getElementById('just-output').innerHTML = `<div class="loading-state" style="color:#EF4444">❌ ${e.message}</div>`;
+  }finally{
+    btn.disabled = false; btn.textContent = '⚖️ Comparar Haiku × Sonnet';
+  }
 }
 
 async function gerarJust(){
