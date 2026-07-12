@@ -4902,21 +4902,20 @@ async function rotina05h() {
         : `${semOdd.length} jogo(s) sem odd_mercado validada`;
       console.log(`⚠️ ${diaAlvo}: ${motivo} — acionando re-análise`);
 
-      // Re-analisar jogos sem odd antes de tentar complementar
-      if (semOdd.length > 0) {
-        console.log(`🔄 Re-analisando ${semOdd.length} jogo(s) sem odd: ${semOdd.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
+      // Re-analisar jogos descartados por "sem odd" — podem ter odd disponível agora
+      // Regra: sem odd = não vai para a lista. Re-análise só ATIVA se encontrar odd. Nunca remove ativos.
+      const semOddDescartados = jogos.filter(j => j.descartado && j.descartado_motivo?.includes('sem odd'));
+      const candidatosReanalise = [...semOdd, ...semOddDescartados].filter((j,i,arr) => arr.findIndex(x=>x.id===j.id)===i);
+      if (candidatosReanalise.length > 0) {
+        console.log(`🔄 Re-analisando ${candidatosReanalise.length} jogo(s) sem odd: ${candidatosReanalise.map(j=>j.time_casa+' x '+j.time_fora).join(', ')}`);
         const jogosAtualizados = [...jogos];
-        for (const jogo of semOdd) {
+        for (const jogo of candidatosReanalise) {
           if (!jogo.fixtureId) continue;
-          // Jogo já publicado (ativo, sem descartado) — re-análise só pode MELHORAR, nunca remover
-          const jaPublicado = !jogo.descartado;
           const oddsFixture = await buscarOddsFixture(jogo.fixtureId, diaAlvo);
           if (!oddsFixture) {
-            if (jaPublicado) {
-              console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} sem odds na API mas já publicado — mantido na lista`);
-            } else {
-              jogo.descartado = true; jogo.descartado_motivo = 'sem odds na API';
-            }
+            // Sem odds na API — descarta (ou mantém descartado)
+            jogo.descartado = true; jogo.descartado_motivo = 'sem odds na API';
+            console.log(`  ✂️ ${jogo.time_casa} x ${jogo.time_fora} — sem odds na API, não entra na lista`);
             continue;
           }
           const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
@@ -4936,29 +4935,19 @@ async function rotina05h() {
                   jogo.odd_mercado = oddNum; jogo.confianca = 'alta';
                   jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
                   jogo.descartado = false;
-                } else if (jaPublicado) {
-                  // Já estava na lista — não remove, só loga o aviso
-                  console.log(`  ⚠️ Re-análise sem odd confirmada para ${jogo.time_casa} — mantido na lista (já publicado)`);
                 } else {
-                  console.log(`  ❌ Re-análise falhou para ${jogo.time_casa}: odd não confirmada. Descartando.`);
+                  console.log(`  ❌ Re-análise falhou para ${jogo.time_casa}: odd não confirmada. Não entra na lista.`);
                   jogo.descartado = true; jogo.descartado_motivo = `re-análise: ${nova.aposta} sem odd confirmada`;
                 }
-              } else if (jaPublicado) {
-                console.log(`  ⚠️ Re-análise sem resposta válida para ${jogo.time_casa} — mantido na lista (já publicado)`);
               } else {
                 jogo.descartado = true; jogo.descartado_motivo = 're-análise: sem aposta válida';
               }
-            } else if (jaPublicado) {
-              console.log(`  ⚠️ Re-análise falhou (parse) para ${jogo.time_casa} — mantido na lista (já publicado)`);
             } else {
               jogo.descartado = true; jogo.descartado_motivo = 're-análise: resposta inválida';
             }
-          } catch(e) {
-            console.error(`  Erro re-análise ${jogo.time_casa}:`, e.message);
-            if (!jaPublicado) jogo.descartado = true;
-          }
+          } catch(e) { console.error(`  Erro re-análise ${jogo.time_casa}:`, e.message); jogo.descartado = true; }
         }
-        // Salva jogos atualizados antes de complementar (aplica teto para re-análise que reativou demais)
+        // Salva jogos atualizados antes de complementar
         await dbSave(diaAlvo, { jogos: aplicarTetoAtivos(jogosAtualizados) });
       }
 
