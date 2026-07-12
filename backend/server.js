@@ -4908,12 +4908,16 @@ async function rotina05h() {
         const jogosAtualizados = [...jogos];
         for (const jogo of semOdd) {
           if (!jogo.fixtureId) continue;
+          // Jogo já publicado (ativo, sem descartado) — re-análise só pode MELHORAR, nunca remover
+          const jaPublicado = !jogo.descartado;
           const oddsFixture = await buscarOddsFixture(jogo.fixtureId, diaAlvo);
-          // Ligas prioritárias (Série A/B, Copas) nunca são descartadas por falta de odds
-          const isPrioritariaReanalise = (jogo.pri != null && jogo.pri <= 10) || ['a','b','copa'].includes(jogo.tipo);
           if (!oddsFixture) {
-            if (isPrioritariaReanalise) { console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} sem odds mas mantido por prioridade (${jogo.liga})`); continue; }
-            jogo.descartado = true; jogo.descartado_motivo = 'sem odds na API'; continue;
+            if (jaPublicado) {
+              console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} sem odds na API mas já publicado — mantido na lista`);
+            } else {
+              jogo.descartado = true; jogo.descartado_motivo = 'sem odds na API';
+            }
+            continue;
           }
           const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
           const promptReanalise = `Jogo Copa/Liga: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga||''}, ${jogo.horario||''})\nMotivo sem odd: aposta original "${jogo.aposta}" não disponível ou odd < 1.25\n\nMercados DISPONÍVEIS com odd ≥ 1.25:\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'}\n\nEscolha a MELHOR aposta. Confiança ALTA, odd ≥ 1.25. Mercados de tempo parcial válidos (diga o período).\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
@@ -4932,13 +4936,27 @@ async function rotina05h() {
                   jogo.odd_mercado = oddNum; jogo.confianca = 'alta';
                   jogo.justificativa = nova.justificativa || nova.razao || jogo.justificativa;
                   jogo.descartado = false;
+                } else if (jaPublicado) {
+                  // Já estava na lista — não remove, só loga o aviso
+                  console.log(`  ⚠️ Re-análise sem odd confirmada para ${jogo.time_casa} — mantido na lista (já publicado)`);
                 } else {
                   console.log(`  ❌ Re-análise falhou para ${jogo.time_casa}: odd não confirmada. Descartando.`);
                   jogo.descartado = true; jogo.descartado_motivo = `re-análise: ${nova.aposta} sem odd confirmada`;
                 }
+              } else if (jaPublicado) {
+                console.log(`  ⚠️ Re-análise sem resposta válida para ${jogo.time_casa} — mantido na lista (já publicado)`);
+              } else {
+                jogo.descartado = true; jogo.descartado_motivo = 're-análise: sem aposta válida';
               }
+            } else if (jaPublicado) {
+              console.log(`  ⚠️ Re-análise falhou (parse) para ${jogo.time_casa} — mantido na lista (já publicado)`);
+            } else {
+              jogo.descartado = true; jogo.descartado_motivo = 're-análise: resposta inválida';
             }
-          } catch(e) { console.error(`  Erro re-análise ${jogo.time_casa}:`, e.message); jogo.descartado = true; }
+          } catch(e) {
+            console.error(`  Erro re-análise ${jogo.time_casa}:`, e.message);
+            if (!jaPublicado) jogo.descartado = true;
+          }
         }
         // Salva jogos atualizados antes de complementar (aplica teto para re-análise que reativou demais)
         await dbSave(diaAlvo, { jogos: aplicarTetoAtivos(jogosAtualizados) });
