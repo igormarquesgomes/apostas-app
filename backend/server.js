@@ -5943,6 +5943,42 @@ app.get('/buscar-jogos-time', async (req, res) => {
 });
 
 // ─── Item 7: Adicionar / Confirmar jogo manual ───────────────
+// Gera justificativa narrativa para uma aposta (para o usuário final)
+app.post('/justificativa-aposta', async (req, res) => {
+  const { time_casa, time_fora, liga, aposta, mercado, data } = req.body;
+  if (!time_casa || !time_fora || !aposta) return res.status(400).json({ error: 'time_casa, time_fora e aposta obrigatórios' });
+  try {
+    const dataFmt = data ? (() => { const p = data.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })() : 'hoje';
+    const prompt = `Você é um analista esportivo que escreve textos para apostadores. Escreva uma justificativa NARRATIVA e PERSUASIVA para a aposta abaixo.
+
+JOGO: ${time_casa} x ${time_fora}
+LIGA: ${liga || 'desconhecida'}
+DATA: ${dataFmt}
+APOSTA: ${aposta}
+MERCADO: ${mercado || 'gols'}
+
+ESTILO OBRIGATÓRIO:
+- Texto corrido em português, 4-6 parágrafos curtos (2-3 frases cada)
+- Comece contextualizando o confronto e a aposta
+- Cite forma recente, histórico H2H ou estatísticas relevantes
+- Mencione fatores que FAVORECEM a aposta
+- Termine com o principal RISCO e por que ainda assim a aposta faz sentido
+- Linguagem natural, sem jargões técnicos internos como "odd", "mercado" ou "confiança"
+- NÃO mencione casas de apostas, plataformas ou termos como "apostamos" — escreva como análise esportiva
+
+USE web_search para buscar: forma atual dos times, escalações, suspensões, histórico recente de confrontos diretos.
+
+Retorne APENAS o texto narrativo, sem títulos, sem JSON, sem marcadores.`;
+
+    const txt = await chamarIAComBusca(prompt, 1500);
+    if (!txt) return res.status(502).json({ error: 'IA não respondeu' });
+    res.json({ ok: true, justificativa: txt.trim() });
+  } catch(e) {
+    console.error('Erro justificativa:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Analisa um jogo avulso com IA e retorna o resultado SEM salvar
 app.post('/adicionar-jogo-manual', async (req, res) => {
   const { time_casa, time_fora, data, liga_id } = req.body;

@@ -138,11 +138,57 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
       <span class="card-action" id="tg-card-label">→ abrir ferramenta</span>
     </div>
 
-    <div class="card disabled">
-      <div class="card-icon gray" style="font-size:26px;color:#CBD5E1">+</div>
-      <div class="card-title" style="color:#94A3B8">Nova ferramenta</div>
-      <div class="card-desc">Adicione aqui para novos experimentos.</div>
-      <span class="badge soon">Em breve</span>
+    <div class="card" id="card-just" onclick="toggleJustificativa()">
+      <div class="card-icon blue">✍️</div>
+      <div class="card-title">Justificativa de aposta</div>
+      <div class="card-desc">Gera uma narrativa detalhada para qualquer aposta do dia, ou para uma aposta personalizada.</div>
+      <span class="card-action" id="just-card-label">→ abrir ferramenta</span>
+      <span class="badge beta">Beta</span>
+    </div>
+  </div>
+
+  <!-- Justificativa tool panel -->
+  <div class="tool-panel" id="tool-just">
+    <div class="tool-hd">
+      <div class="tool-hd-left">
+        <div class="tool-hd-icon">✍️</div>
+        <div>
+          <div class="tool-hd-title">Justificativa de aposta</div>
+          <div class="tool-hd-sub">A IA busca dados atuais e escreve uma análise narrativa</div>
+        </div>
+      </div>
+      <button class="tool-close" onclick="fecharJustificativa()">×</button>
+    </div>
+    <div class="tool-body">
+      <div class="day-tabs" id="just-day-tabs">
+        <button class="day-tab active" onclick="selDiaJust('hoje',this)">Hoje</button>
+        <button class="day-tab" onclick="selDiaJust('amanha',this)">Amanhã</button>
+        <input class="day-inp" type="date" id="just-data" onchange="carregarApostasJust(this.value)">
+      </div>
+
+      <div id="just-bet-list" style="margin-bottom:16px"><div class="loading-state">Carregando apostas...</div></div>
+
+      <div style="border-top:1px solid #E2E8F0;padding-top:16px;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Personalizar aposta (opcional)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;display:block;margin-bottom:3px">Mercado</label>
+            <select id="just-mercado" style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;color:#1E293B;background:#fff;outline:none">
+              <option value="gols">Gols</option>
+              <option value="resultado">Resultado</option>
+              <option value="escanteios">Escanteios</option>
+              <option value="cartoes">Cartões</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;display:block;margin-bottom:3px">Aposta</label>
+            <input id="just-aposta" type="text" placeholder="Ex: Over 2.5 gols" style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;color:#1E293B;outline:none">
+          </div>
+        </div>
+        <button class="btn primary" id="just-btn" onclick="gerarJust()" disabled>✍️ Gerar justificativa</button>
+      </div>
+
+      <div id="just-output" style="margin-top:16px"></div>
     </div>
   </div>
 
@@ -191,9 +237,113 @@ function offset(base,n){ const d=new Date(base+'T12:00:00'); d.setDate(d.getDate
 
 // ── abertura/fechamento ────────────────────────────────────────────────────
 
+// ── JUSTIFICATIVA ─────────────────────────────────────────────────────────────
+
+let _justJogo = null;
+let _justData = '';
+
+function toggleJustificativa(){
+  const panel = document.getElementById('tool-just');
+  if(panel.classList.contains('open')){ fecharJustificativa(); return; }
+  fecharTelegram();
+  panel.classList.add('open');
+  document.getElementById('card-just').classList.add('selected');
+  document.getElementById('just-card-label').textContent = '→ fechar ferramenta';
+  const d = hoje();
+  document.getElementById('just-data').value = d;
+  carregarApostasJust(d);
+}
+
+function fecharJustificativa(){
+  document.getElementById('tool-just').classList.remove('open');
+  document.getElementById('card-just').classList.remove('selected');
+  document.getElementById('just-card-label').textContent = '→ abrir ferramenta';
+}
+
+function selDiaJust(periodo, btn){
+  document.querySelectorAll('#just-day-tabs .day-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const d = periodo==='hoje' ? hoje() : offset(hoje(),1);
+  document.getElementById('just-data').value = d;
+  carregarApostasJust(d);
+}
+
+async function carregarApostasJust(data){
+  if(!data) return;
+  _justData = data;
+  _justJogo = null;
+  document.getElementById('just-btn').disabled = true;
+  document.getElementById('just-output').innerHTML = '';
+  document.getElementById('just-bet-list').innerHTML = '<div class="loading-state">Carregando...</div>';
+  try{
+    const r = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const d = await r.json();
+    const jogos = (d.apostas?.jogos || []).filter(j => !j.descartado && j.odd_mercado);
+    if(!jogos.length){ document.getElementById('just-bet-list').innerHTML = '<div class="loading-state">Nenhuma aposta ativa para esta data.</div>'; return; }
+    document.getElementById('just-bet-list').innerHTML = jogos.map((j,i) => `
+      <div class="tg-item" id="just-item-${i}" onclick="selecionarJogoJust(${i})" style="cursor:pointer">
+        <div class="tg-teams">${j.time_casa} × ${j.time_fora}</div>
+        <div class="tg-bet">${j.aposta}</div>
+        <div class="tg-meta">${j.liga||''} · ${j.horario||''} · odd ${j.odd_mercado}</div>
+      </div>`).join('');
+    document.getElementById('just-bet-list')._jogos = jogos;
+  }catch(e){
+    document.getElementById('just-bet-list').innerHTML = `<div class="loading-state">Erro: ${e.message}</div>`;
+  }
+}
+
+function selecionarJogoJust(idx){
+  const jogos = document.getElementById('just-bet-list')._jogos || [];
+  _justJogo = jogos[idx];
+  if(!_justJogo) return;
+  document.querySelectorAll('[id^=just-item-]').forEach(el => el.style.borderColor='');
+  document.getElementById(`just-item-${idx}`).style.borderColor = '#0F766E';
+  document.getElementById('just-mercado').value = _justJogo.mercado || 'gols';
+  document.getElementById('just-aposta').value = _justJogo.aposta || '';
+  document.getElementById('just-btn').disabled = false;
+  document.getElementById('just-output').innerHTML = '';
+}
+
+async function gerarJust(){
+  if(!_justJogo) return;
+  const aposta = document.getElementById('just-aposta').value.trim() || _justJogo.aposta;
+  const mercado = document.getElementById('just-mercado').value;
+  const btn = document.getElementById('just-btn');
+  btn.disabled = true; btn.textContent = '⏳ Gerando...';
+  document.getElementById('just-output').innerHTML = `<div class="loading-state">A IA está pesquisando ${_justJogo.time_casa} x ${_justJogo.time_fora} com web search...</div>`;
+  try{
+    const r = await fetch(`${BACKEND_URL}/justificativa-aposta`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ time_casa:_justJogo.time_casa, time_fora:_justJogo.time_fora, liga:_justJogo.liga, aposta, mercado, data:_justData })
+    });
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error||'Erro desconhecido');
+    const paragrafos = d.justificativa.split(/\n+/).filter(p=>p.trim()).map(p=>`<p style="margin-bottom:12px">${p}</p>`).join('');
+    document.getElementById('just-output').innerHTML = `
+      <div style="border:1px solid #6EE7B7;border-radius:12px;padding:20px 24px;background:#F0FDF9">
+        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">✅ ${_justJogo.time_casa} × ${_justJogo.time_fora} · ${aposta}</div>
+        <div style="font-size:14px;line-height:1.75;color:#1E293B;font-family:Georgia,serif">${paragrafos}</div>
+        <button class="btn sm" onclick="copiarJust()" style="margin-top:12px">📋 Copiar texto</button>
+      </div>`;
+    document.getElementById('just-output')._txt = d.justificativa;
+  }catch(e){
+    document.getElementById('just-output').innerHTML = `<div class="loading-state" style="color:#EF4444">❌ ${e.message}</div>`;
+  }finally{
+    btn.disabled = false; btn.textContent = '✍️ Gerar justificativa';
+  }
+}
+
+function copiarJust(){
+  const txt = document.getElementById('just-output')._txt || '';
+  navigator.clipboard.writeText(txt).then(()=>alert('✅ Texto copiado!')).catch(()=>alert('Erro ao copiar'));
+}
+
+// ── TELEGRAM ──────────────────────────────────────────────────────────────────
+
 function toggleTelegram(){
   const panel = document.getElementById('tool-tg');
   if(panel.classList.contains('open')){ fecharTelegram(); return; }
+  fecharJustificativa();
   panel.classList.add('open');
   document.getElementById('card-tg').classList.add('selected');
   document.getElementById('tg-card-label').textContent = '→ fechar ferramenta';
