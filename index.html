@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<script>if(new URLSearchParams(location.search).get('embedded')==='true'){document.write('<style>.nav,.bottom-nav{display:none!important}</style>');}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Apostas · OddLab</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -997,6 +998,7 @@ let jogoAnalisado = null;
 let jogoSelecionado = null;   // fixture escolhido no dropdown
 let buscaTimer = null;
 
+window.addEventListener('message', e => { if(e.data?.action === 'abrirModalAdicionarJogo') abrirModalAdicionarJogo(); });
 function abrirModalAdicionarJogo(){
   const dt = dataAtual || document.getElementById('d-input').value || offsetData(hojeStr, 1);
   document.getElementById('m-data').value = dt;
