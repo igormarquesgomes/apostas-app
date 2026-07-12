@@ -5945,28 +5945,76 @@ app.get('/buscar-jogos-time', async (req, res) => {
 // ─── Item 7: Adicionar / Confirmar jogo manual ───────────────
 // Gera justificativa narrativa para uma aposta (para o usuário final)
 app.post('/justificativa-aposta', async (req, res) => {
-  const { time_casa, time_fora, liga, aposta, mercado, data } = req.body;
+  const { time_casa, time_fora, liga, aposta, mercado, data, fixture_id, liga_id } = req.body;
   if (!time_casa || !time_fora || !aposta) return res.status(400).json({ error: 'time_casa, time_fora e aposta obrigatórios' });
   try {
-    const dataFmt = data ? (() => { const p = data.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })() : 'hoje';
+    // Dia da semana correto a partir da data
+    const DIAS_PT = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+    let diaSemana = '';
+    let dataFmt = 'hoje';
+    if (data) {
+      const p = data.split('-');
+      dataFmt = `${p[2]}/${p[1]}/${p[0]}`;
+      const dtObj = new Date(`${data}T12:00:00`);
+      diaSemana = DIAS_PT[dtObj.getDay()];
+    }
+
+    // Buscar stats da API (forma, H2H, médias) — mesmo fluxo da geração automática
+    let blocoStats = '';
+    try {
+      const normM = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+      let tCasaId = null, tForaId = null, ligaIdResolvido = liga_id ? Number(liga_id) : null;
+
+      if (fixture_id) {
+        // Se o frontend passou o fixture_id, busca times direto
+        const fixtures = await buscarFixturesPorData(data || hojeStr());
+        const fx = fixtures.find(f => String(f.fixture?.id) === String(fixture_id));
+        if (fx) { tCasaId = fx.teams?.home?.id; tForaId = fx.teams?.away?.id; ligaIdResolvido = fx.league?.id || ligaIdResolvido; }
+      }
+      if (!tCasaId && data) {
+        const fixtures = await buscarFixturesPorData(data);
+        const nC = normM(time_casa), nF = normM(time_fora);
+        const fx = fixtures.find(f => {
+          const h = normM(f.teams?.home?.name||''), a = normM(f.teams?.away?.name||'');
+          return (h.includes(nC.split(' ')[0])||nC.includes(h.split(' ')[0]||'\x00')) &&
+                 (a.includes(nF.split(' ')[0])||nF.includes(a.split(' ')[0]||'\x00'));
+        });
+        if (fx) { tCasaId = fx.teams?.home?.id; tForaId = fx.teams?.away?.id; ligaIdResolvido = fx.league?.id || ligaIdResolvido; }
+      }
+
+      if (tCasaId && tForaId) {
+        const [sc, sf] = await Promise.all([
+          coletarEstatisticas(tCasaId, time_casa, ligaIdResolvido, tForaId),
+          coletarEstatisticas(tForaId, time_fora, ligaIdResolvido, tCasaId),
+        ]);
+        if (sc || sf) {
+          blocoStats = `\nESTATÍSTICAS DA API (use como base — não invente dados divergentes):
+Casa (${time_casa}): forma=${sc?.forma||'?'} gols/jogo=${sc?.mediaGols||'?'} escanteios=${sc?.mediaEscanteios||'?'} cartões=${sc?.mediaCartoes||'?'}
+Visitante (${time_fora}): forma=${sf?.forma||'?'} gols/jogo=${sf?.mediaGols||'?'} escanteios=${sf?.mediaEscanteios||'?'} cartões=${sf?.mediaCartoes||'?'}
+H2H: ${sc?.h2hTexto||'sem dados'}\n`;
+        }
+      }
+    } catch(statsErr) { console.log('Stats justificativa (não crítico):', statsErr.message); }
+
     const prompt = `Você é um analista esportivo que escreve textos para apostadores. Escreva uma justificativa NARRATIVA e PERSUASIVA para a aposta abaixo.
 
 JOGO: ${time_casa} x ${time_fora}
 LIGA: ${liga || 'desconhecida'}
-DATA: ${dataFmt}
+DATA: ${dataFmt}${diaSemana ? ` (${diaSemana})` : ''}
 APOSTA: ${aposta}
 MERCADO: ${mercado || 'gols'}
-
+${blocoStats}
 ESTILO OBRIGATÓRIO:
 - Texto corrido em português, 4-6 parágrafos curtos (2-3 frases cada)
 - Comece contextualizando o confronto e a aposta
-- Cite forma recente, histórico H2H ou estatísticas relevantes
-- Mencione fatores que FAVORECEM a aposta
+- Use as estatísticas reais da API acima para embasar os argumentos
+- Mencione forma recente, histórico H2H e fatores que FAVORECEM a aposta
 - Termine com o principal RISCO e por que ainda assim a aposta faz sentido
-- Linguagem natural, sem jargões técnicos internos como "odd", "mercado" ou "confiança"
-- NÃO mencione casas de apostas, plataformas ou termos como "apostamos" — escreva como análise esportiva
+- Linguagem natural para o público — sem termos internos como "odd", "mercado" ou "confiança"
+- NÃO mencione casas de apostas, plataformas ou "apostamos" — escreva como análise esportiva
+- Use a data correta para mencionar o dia da semana (${diaSemana || 'não use dia da semana se não souber'})
 
-USE web_search para buscar: forma atual dos times, escalações, suspensões, histórico recente de confrontos diretos.
+USE web_search para complementar: escalações atuais, suspensões, contexto recente não coberto pelas stats.
 
 Retorne APENAS o texto narrativo, sem títulos, sem JSON, sem marcadores.`;
 

@@ -314,7 +314,7 @@ async function gerarJust(){
   try{
     const r = await fetch(`${BACKEND_URL}/justificativa-aposta`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ time_casa:_justJogo.time_casa, time_fora:_justJogo.time_fora, liga:_justJogo.liga, aposta, mercado, data:_justData })
+      body: JSON.stringify({ time_casa:_justJogo.time_casa, time_fora:_justJogo.time_fora, liga:_justJogo.liga, aposta, mercado, data:_justData, fixture_id:_justJogo.fixtureId||_justJogo.fixture_id||null, liga_id:_justJogo.ligaId||_justJogo.liga_id||null })
     });
     const d = await r.json();
     if(!d.ok) throw new Error(d.error||'Erro desconhecido');
