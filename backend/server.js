@@ -4909,7 +4909,12 @@ async function rotina05h() {
         for (const jogo of semOdd) {
           if (!jogo.fixtureId) continue;
           const oddsFixture = await buscarOddsFixture(jogo.fixtureId, diaAlvo);
-          if (!oddsFixture) { jogo.descartado = true; jogo.descartado_motivo = 'sem odds na API'; continue; }
+          // Ligas prioritárias (Série A/B, Copas) nunca são descartadas por falta de odds
+          const isPrioritariaReanalise = (jogo.pri != null && jogo.pri <= 10) || ['a','b','copa'].includes(jogo.tipo);
+          if (!oddsFixture) {
+            if (isPrioritariaReanalise) { console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} sem odds mas mantido por prioridade (${jogo.liga})`); continue; }
+            jogo.descartado = true; jogo.descartado_motivo = 'sem odds na API'; continue;
+          }
           const mercadosDisp = formatarMercadosDisponiveisParaIA(oddsFixture);
           const promptReanalise = `Jogo Copa/Liga: ${jogo.time_casa} x ${jogo.time_fora} (${jogo.liga||''}, ${jogo.horario||''})\nMotivo sem odd: aposta original "${jogo.aposta}" não disponível ou odd < 1.25\n\nMercados DISPONÍVEIS com odd ≥ 1.25:\n${mercadosDisp}\n\nForma casa: ${jogo.forma_casa||'?'} | Fora: ${jogo.forma_fora||'?'} | Gols: ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'}\n\nEscolha a MELHOR aposta. Confiança ALTA, odd ≥ 1.25. Mercados de tempo parcial válidos (diga o período).\nRetorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
           try {
