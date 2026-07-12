@@ -160,35 +160,65 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
       <button class="tool-close" onclick="fecharJustificativa()">×</button>
     </div>
     <div class="tool-body">
+
+      <!-- Abas Simples / Múltipla -->
+      <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #E2E8F0">
+        <button class="just-tab active" id="tab-simples" onclick="trocarAba('simples')" style="background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#0F766E;border-bottom:2px solid #0F766E;margin-bottom:-2px;cursor:pointer;font-family:inherit">Simples</button>
+        <button class="just-tab" id="tab-multipla" onclick="trocarAba('multipla')" style="background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit">Múltipla</button>
+      </div>
+
+      <!-- Seletor de data (compartilhado) -->
       <div class="day-tabs" id="just-day-tabs">
         <button class="day-tab active" onclick="selDiaJust('hoje',this)">Hoje</button>
         <button class="day-tab" onclick="selDiaJust('amanha',this)">Amanhã</button>
         <input class="day-inp" type="date" id="just-data" onchange="carregarApostasJust(this.value)">
       </div>
 
-      <div id="just-bet-list" style="margin-bottom:16px"><div class="loading-state">Carregando apostas...</div></div>
-
-      <div style="border-top:1px solid #E2E8F0;padding-top:16px;margin-top:4px">
-        <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Personalizar aposta (opcional)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-          <div>
-            <label style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;display:block;margin-bottom:3px">Mercado</label>
-            <select id="just-mercado" style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;color:#1E293B;background:#fff;outline:none">
-              <option value="gols">Gols</option>
-              <option value="resultado">Resultado</option>
-              <option value="escanteios">Escanteios</option>
-              <option value="cartoes">Cartões</option>
-            </select>
+      <!-- ── ABA SIMPLES ── -->
+      <div id="aba-simples">
+        <div id="just-bet-list" style="margin-bottom:16px"><div class="loading-state">Carregando apostas...</div></div>
+        <div style="border-top:1px solid #E2E8F0;padding-top:16px;margin-top:4px">
+          <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Personalizar aposta (opcional)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+            <div>
+              <label style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;display:block;margin-bottom:3px">Mercado</label>
+              <select id="just-mercado" style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;color:#1E293B;background:#fff;outline:none">
+                <option value="gols">Gols</option>
+                <option value="resultado">Resultado</option>
+                <option value="escanteios">Escanteios</option>
+                <option value="cartoes">Cartões</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;display:block;margin-bottom:3px">Aposta</label>
+              <input id="just-aposta" type="text" placeholder="Ex: Over 2.5 gols" style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;color:#1E293B;outline:none">
+            </div>
           </div>
-          <div>
-            <label style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;display:block;margin-bottom:3px">Aposta</label>
-            <input id="just-aposta" type="text" placeholder="Ex: Over 2.5 gols" style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:6px;font-family:inherit;font-size:12px;color:#1E293B;outline:none">
-          </div>
+          <button class="btn primary" id="just-btn" onclick="gerarJust()" disabled>✍️ Gerar justificativa</button>
         </div>
-        <button class="btn primary" id="just-btn" onclick="gerarJust()" disabled>✍️ Gerar justificativa</button>
+        <div id="just-output" style="margin-top:16px"></div>
       </div>
 
-      <div id="just-output" style="margin-top:16px"></div>
+      <!-- ── ABA MÚLTIPLA ── -->
+      <div id="aba-multipla" style="display:none">
+        <!-- Seleção da lista do dia -->
+        <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Apostas do dia — clique para adicionar à múltipla</div>
+        <div id="mult-bet-list" style="margin-bottom:16px"><div class="loading-state">Carregando apostas...</div></div>
+
+        <!-- Jogos selecionados para a múltipla -->
+        <div style="border-top:1px solid #E2E8F0;padding-top:16px;margin-top:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em">Múltipla montada <span id="mult-count" style="color:#0F766E">0 jogos</span></div>
+            <button class="btn sm" onclick="addJogoManualMult()">+ Adicionar jogo manual</button>
+          </div>
+          <div id="mult-selecionados" style="margin-bottom:12px">
+            <div style="font-size:12px;color:#94A3B8;text-align:center;padding:12px 0">Nenhum jogo selecionado</div>
+          </div>
+          <button class="btn primary" id="mult-btn" onclick="gerarJustMultipla()" disabled>✍️ Gerar justificativa da múltipla</button>
+        </div>
+        <div id="mult-output" style="margin-top:16px"></div>
+      </div>
+
     </div>
   </div>
 
@@ -241,6 +271,19 @@ function offset(base,n){ const d=new Date(base+'T12:00:00'); d.setDate(d.getDate
 
 let _justJogo = null;
 let _justData = '';
+let _multJogos = []; // jogos da múltipla
+
+function trocarAba(aba){
+  document.getElementById('aba-simples').style.display = aba==='simples' ? '' : 'none';
+  document.getElementById('aba-multipla').style.display = aba==='multipla' ? '' : 'none';
+  document.getElementById('tab-simples').style.cssText = aba==='simples'
+    ? 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#0F766E;border-bottom:2px solid #0F766E;margin-bottom:-2px;cursor:pointer;font-family:inherit'
+    : 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit';
+  document.getElementById('tab-multipla').style.cssText = aba==='multipla'
+    ? 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#0F766E;border-bottom:2px solid #0F766E;margin-bottom:-2px;cursor:pointer;font-family:inherit'
+    : 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit';
+  if(aba==='multipla') renderMultSelecionados();
+}
 
 function toggleJustificativa(){
   const panel = document.getElementById('tool-just');
@@ -275,11 +318,17 @@ async function carregarApostasJust(data){
   document.getElementById('just-btn').disabled = true;
   document.getElementById('just-output').innerHTML = '';
   document.getElementById('just-bet-list').innerHTML = '<div class="loading-state">Carregando...</div>';
+  document.getElementById('mult-bet-list').innerHTML = '<div class="loading-state">Carregando...</div>';
   try{
     const r = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
     const d = await r.json();
     const jogos = (d.apostas?.jogos || []).filter(j => !j.descartado && j.odd_mercado);
-    if(!jogos.length){ document.getElementById('just-bet-list').innerHTML = '<div class="loading-state">Nenhuma aposta ativa para esta data.</div>'; return; }
+    if(!jogos.length){
+      document.getElementById('just-bet-list').innerHTML = '<div class="loading-state">Nenhuma aposta ativa para esta data.</div>';
+      document.getElementById('mult-bet-list').innerHTML = '<div class="loading-state">Nenhuma aposta ativa para esta data.</div>';
+      return;
+    }
+    // Simples
     document.getElementById('just-bet-list').innerHTML = jogos.map((j,i) => `
       <div class="tg-item" id="just-item-${i}" onclick="selecionarJogoJust(${i})" style="cursor:pointer">
         <div class="tg-teams">${j.time_casa} × ${j.time_fora}</div>
@@ -287,9 +336,124 @@ async function carregarApostasJust(data){
         <div class="tg-meta">${j.liga||''} · ${j.horario||''} · odd ${j.odd_mercado}</div>
       </div>`).join('');
     document.getElementById('just-bet-list')._jogos = jogos;
+    // Múltipla
+    document.getElementById('mult-bet-list').innerHTML = jogos.map((j,i) => `
+      <div class="tg-item" id="mult-item-${i}" onclick="toggleMultJogo(${i})" style="cursor:pointer;display:flex;align-items:center;gap:10px">
+        <div style="width:18px;height:18px;border:2px solid #CBD5E1;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px" id="mult-chk-${i}"></div>
+        <div style="flex:1;min-width:0">
+          <div class="tg-teams">${j.time_casa} × ${j.time_fora}</div>
+          <div class="tg-bet">${j.aposta}</div>
+          <div class="tg-meta">${j.liga||''} · ${j.horario||''} · odd ${j.odd_mercado}</div>
+        </div>
+      </div>`).join('');
+    document.getElementById('mult-bet-list')._jogos = jogos;
   }catch(e){
     document.getElementById('just-bet-list').innerHTML = `<div class="loading-state">Erro: ${e.message}</div>`;
+    document.getElementById('mult-bet-list').innerHTML = `<div class="loading-state">Erro: ${e.message}</div>`;
   }
+}
+
+function toggleMultJogo(idx){
+  const jogos = document.getElementById('mult-bet-list')._jogos || [];
+  const j = jogos[idx];
+  if(!j) return;
+  const jaIdx = _multJogos.findIndex(x => x._listIdx === idx);
+  const chk = document.getElementById(`mult-chk-${idx}`);
+  const item = document.getElementById(`mult-item-${idx}`);
+  if(jaIdx >= 0){
+    _multJogos.splice(jaIdx,1);
+    chk.textContent = ''; chk.style.background=''; chk.style.borderColor='#CBD5E1';
+    item.style.borderColor='';
+  } else {
+    _multJogos.push({...j, _listIdx:idx});
+    chk.textContent = '✓'; chk.style.background='#0F766E'; chk.style.borderColor='#0F766E'; chk.style.color='#fff';
+    item.style.borderColor='#0F766E';
+  }
+  renderMultSelecionados();
+}
+
+function addJogoManualMult(){
+  const id = `manual-${Date.now()}`;
+  _multJogos.push({ time_casa:'', time_fora:'', liga:'', aposta:'', mercado:'gols', odd_mercado:'', _manual:true, _id:id });
+  renderMultSelecionados();
+}
+
+function renderMultSelecionados(){
+  const el = document.getElementById('mult-selecionados');
+  const count = document.getElementById('mult-count');
+  count.textContent = `${_multJogos.length} jogo${_multJogos.length!==1?'s':''}`;
+  if(!_multJogos.length){
+    el.innerHTML = '<div style="font-size:12px;color:#94A3B8;text-align:center;padding:12px 0">Nenhum jogo selecionado</div>';
+    document.getElementById('mult-btn').disabled = true;
+    return;
+  }
+  el.innerHTML = _multJogos.map((j,i) => j._manual ? `
+    <div style="border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;margin-bottom:6px;display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center">
+      <input placeholder="Time casa × fora" value="${j._label||''}" oninput="_multJogos[${i}]._label=this.value" style="padding:5px 7px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;font-family:inherit;outline:none;color:#1E293B">
+      <input placeholder="Aposta (ex: Over 2.5)" value="${j.aposta}" oninput="_multJogos[${i}].aposta=this.value" style="padding:5px 7px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;font-family:inherit;outline:none;color:#1E293B">
+      <button onclick="removerMultJogo(${i})" style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;line-height:1;padding:2px 4px">×</button>
+    </div>` : `
+    <div style="border:1px solid #6EE7B7;border-radius:8px;padding:10px 12px;margin-bottom:6px;background:#F0FDF9;display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#1E293B">${j.time_casa} × ${j.time_fora}</div>
+        <div style="font-size:11px;color:#059669;margin-top:1px">${j.aposta} · odd ${j.odd_mercado}</div>
+      </div>
+      <button onclick="removerMultJogo(${i})" style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;line-height:1;padding:2px 4px">×</button>
+    </div>`).join('');
+  document.getElementById('mult-btn').disabled = _multJogos.length < 2;
+}
+
+function removerMultJogo(i){
+  const j = _multJogos[i];
+  if(!j._manual && j._listIdx != null){
+    const chk = document.getElementById(`mult-chk-${j._listIdx}`);
+    const item = document.getElementById(`mult-item-${j._listIdx}`);
+    if(chk){ chk.textContent=''; chk.style.background=''; chk.style.borderColor='#CBD5E1'; }
+    if(item) item.style.borderColor='';
+  }
+  _multJogos.splice(i,1);
+  renderMultSelecionados();
+}
+
+async function gerarJustMultipla(){
+  if(_multJogos.length < 2) return;
+  const apostas = _multJogos.map(j => {
+    if(j._manual) return { time_casa: (j._label||'').split('×')[0]?.trim()||'Time A', time_fora: (j._label||'').split('×')[1]?.trim()||'Time B', aposta: j.aposta||'Resultado', mercado: j.mercado||'gols', liga:'', fixture_id:null, liga_id:null };
+    return { time_casa:j.time_casa, time_fora:j.time_fora, aposta:j.aposta, mercado:j.mercado||'gols', liga:j.liga||'', fixture_id:j.fixtureId||null, liga_id:j.ligaId||null };
+  });
+  const btn = document.getElementById('mult-btn');
+  btn.disabled=true; btn.textContent='⏳ Gerando...';
+  document.getElementById('mult-output').innerHTML = `<div class="loading-state">A IA está analisando ${apostas.length} jogos com web search...</div>`;
+  try{
+    const r = await fetch(`${BACKEND_URL}/justificativa-multipla`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ apostas, data:_justData })
+    });
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error||'Erro desconhecido');
+    const blocos = d.blocos || [];
+    const html = blocos.map(b => `
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${b.jogo}</div>
+        <div style="font-size:14px;line-height:1.7;color:#1E293B;font-family:Georgia,serif">${b.texto}</div>
+      </div>`).join('<hr style="border:none;border-top:1px solid #E2E8F0;margin:12px 0">');
+    document.getElementById('mult-output').innerHTML = `
+      <div style="border:1px solid #6EE7B7;border-radius:12px;padding:20px 24px;background:#F0FDF9">
+        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">✅ Múltipla com ${blocos.length} jogos</div>
+        ${html}
+        <button class="btn sm" onclick="copiarMult()" style="margin-top:12px">📋 Copiar texto</button>
+      </div>`;
+    document.getElementById('mult-output')._txt = blocos.map(b=>`${b.jogo}\n${b.texto}`).join('\n\n---\n\n');
+  }catch(e){
+    document.getElementById('mult-output').innerHTML = `<div class="loading-state" style="color:#EF4444">❌ ${e.message}</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='✍️ Gerar justificativa da múltipla';
+  }
+}
+
+function copiarMult(){
+  const txt = document.getElementById('mult-output')._txt || '';
+  navigator.clipboard.writeText(txt).then(()=>alert('✅ Texto copiado!')).catch(()=>alert('Erro ao copiar'));
 }
 
 function selecionarJogoJust(idx){

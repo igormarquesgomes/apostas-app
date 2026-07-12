@@ -6027,6 +6027,71 @@ Retorne APENAS o texto narrativo, sem títulos, sem JSON, sem marcadores.`;
   }
 });
 
+// Gera justificativa narrativa para uma múltipla (N apostas)
+app.post('/justificativa-multipla', async (req, res) => {
+  const { apostas, data } = req.body;
+  if (!Array.isArray(apostas) || apostas.length < 2) return res.status(400).json({ error: 'Informe ao menos 2 apostas' });
+  try {
+    const DIAS_PT = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+    let diaSemana = '', dataFmt = 'hoje';
+    if (data) {
+      const p = data.split('-');
+      dataFmt = `${p[2]}/${p[1]}/${p[0]}`;
+      diaSemana = DIAS_PT[new Date(`${data}T12:00:00`).getDay()];
+    }
+
+    // Busca stats de todos os jogos em paralelo
+    const statsMap = await Promise.all(apostas.map(async (a) => {
+      try {
+        const normM = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
+        let tCasaId = null, tForaId = null, ligaId = a.liga_id ? Number(a.liga_id) : null;
+        if (data) {
+          const fixtures = await buscarFixturesPorData(data);
+          const nC = normM(a.time_casa), nF = normM(a.time_fora);
+          const fx = a.fixture_id
+            ? fixtures.find(f => String(f.fixture?.id) === String(a.fixture_id))
+            : fixtures.find(f => {
+                const h = normM(f.teams?.home?.name||''), av = normM(f.teams?.away?.name||'');
+                return (h.includes(nC.split(' ')[0])||nC.includes(h.split(' ')[0]||'\x00')) &&
+                       (av.includes(nF.split(' ')[0])||nF.includes(av.split(' ')[0]||'\x00'));
+              });
+          if (fx) { tCasaId = fx.teams?.home?.id; tForaId = fx.teams?.away?.id; ligaId = fx.league?.id || ligaId; }
+        }
+        if (!tCasaId || !tForaId) return null;
+        const [sc, sf] = await Promise.all([
+          coletarEstatisticas(tCasaId, a.time_casa, ligaId, tForaId),
+          coletarEstatisticas(tForaId, a.time_fora, ligaId, tCasaId),
+        ]);
+        return { sc, sf };
+      } catch { return null; }
+    }));
+
+    // Gera justificativa para cada jogo em paralelo (Haiku — sem web_search — para economizar)
+    // Usa web_search apenas no primeiro jogo (Sonnet) para pegar contexto geral do dia
+    const blocos = await Promise.all(apostas.map(async (a, i) => {
+      const st = statsMap[i];
+      const blocoStats = st ? `\nEstatísticas da API:\nCasa (${a.time_casa}): forma=${st.sc?.forma||'?'} gols/jogo=${st.sc?.mediaGols||'?'}\nVisitante (${a.time_fora}): forma=${st.sf?.forma||'?'} gols/jogo=${st.sf?.mediaGols||'?'}\nH2H: ${st.sc?.h2hTexto||'sem dados'}\n` : '';
+      const prompt = `Analista esportivo — escreva 2-3 parágrafos curtos em português explicando por que a aposta abaixo faz sentido.
+
+JOGO: ${a.time_casa} x ${a.time_fora} (${a.liga||'Internacional'}) — ${dataFmt}${diaSemana?` (${diaSemana})`:''}
+APOSTA: ${a.aposta}
+${blocoStats}
+REGRAS: linguagem natural para leitor leigo; cite forma recente e H2H das stats acima; mencione o risco no último parágrafo; sem termos como "odd" ou "mercado"; sem mencionar casas de apostas.
+Retorne APENAS o texto, sem títulos.`;
+
+      const txt = i === 0
+        ? await chamarIAComBusca(prompt, 800)
+        : await chamarIA(prompt, 600);
+      return { jogo: `${a.time_casa} × ${a.time_fora} · ${a.aposta}`, texto: (txt||'').trim() };
+    }));
+
+    res.json({ ok: true, blocos });
+  } catch(e) {
+    console.error('Erro justificativa múltipla:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Analisa um jogo avulso com IA e retorna o resultado SEM salvar
 app.post('/adicionar-jogo-manual', async (req, res) => {
   const { time_casa, time_fora, data, liga_id } = req.body;
