@@ -303,8 +303,8 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
       const dir = (a.includes('over') || a.includes('mais')) ? 'over' : 'under';
 
       // Tempo parcial mencionado explicitamente na aposta
-      const isPrimTempo = a.includes('primeiro tempo') || a.includes('1o tempo') || a.includes('1st half') || a.includes('first half') || a.includes('ht');
-      const isSegTempo  = a.includes('segundo tempo')  || a.includes('2o tempo') || a.includes('2nd half') || a.includes('second half');
+      const isPrimTempo = a.includes('primeiro tempo') || a.includes('1o tempo') || a.includes('1º tempo') || a.includes('1st half') || a.includes('first half') || a.includes('ht');
+      const isSegTempo  = a.includes('segundo tempo')  || a.includes('2o tempo') || a.includes('2º tempo') || a.includes('2nd half') || a.includes('second half');
 
       if (isPrimTempo) {
         const r1 = Object.entries(odds).find(([k]) => (k.includes('first half') || k.includes('1st half')) && k.includes(dir) && k.includes(linha));
