@@ -317,9 +317,21 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
             || (r2 ? r2[1] : null);
       }
 
-      // Jogo completo — fallback exclui parciais (comportamento original)
+      // Jogo completo — fallback só aceita mercados de gols totais puros
+      const EXOTICOS = ['asian','handicap','player','team','corner','booking','card','minute','period','exact','correct','range','spread','live','anytime','first','second','half'];
+      const buscarGoalsTotais = (valor) => {
+        for (const chave of Object.keys(odds)) {
+          const [betNome, betValor] = chave.split('|');
+          if (betValor !== valor) continue;
+          if (PARCIAIS.some(p => betNome.includes(p))) continue;
+          if (EXOTICOS.some(p => betNome.includes(p))) continue;
+          if (!betNome.includes('over') && !betNome.includes('under') && !betNome.includes('total') && !betNome.includes('goal')) continue;
+          return odds[chave];
+        }
+        return null;
+      };
       return buscar(['goals over/under','total goals','over/under','total - goals','over/under goals'], `${dir} ${linha}`)
-          || buscarPorPalavras(['goal','over/under','total'], `${dir} ${linha}`);
+          || buscarGoalsTotais(`${dir} ${linha}`);
     }
   }
 
