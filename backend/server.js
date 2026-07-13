@@ -317,9 +317,8 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
             || (r2 ? r2[1] : null);
       }
 
-      // Jogo completo — fallback exclui parciais (comportamento original)
-      return buscar(['goals over/under','total goals','over/under','total - goals','over/under goals'], `${dir} ${linha}`)
-          || buscarPorPalavras(['goal','over/under','total'], `${dir} ${linha}`);
+      // Jogo completo — só nomes exatos conhecidos; sem fallback genérico (evita mercados de jogador/asiático)
+      return buscar(['goals over/under','total goals','over/under','total - goals','over/under goals'], `${dir} ${linha}`);
     }
   }
 
