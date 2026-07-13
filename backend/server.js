@@ -4880,11 +4880,39 @@ async function rotina05h() {
       if (!oddsFixture) continue;
       const oddConfirmada = selecionarOddFixture(oddsFixture, jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
       if (oddConfirmada === null) {
-        console.log(`⚠️ ${jogo.time_casa}: odd não encontrada para "${jogo.aposta}" — mercado errado, removendo`);
-        jogo.odd_mercado = null;
+        console.log(`⚠️ ${jogo.time_casa}: odd não encontrada para "${jogo.aposta}" — mercado errado, tentando pivot`);
+        let pivotado = false;
+        for (const alt of (jogo.alternativas || []).filter(a => a.aposta && a.mercado && a.confianca === 'alta')) {
+          const oddAlt = selecionarOddFixture(oddsFixture, alt.aposta, alt.mercado, jogo.time_casa, jogo.time_fora);
+          const oddAltNum = oddAlt ? parseFloat(oddAlt) : null;
+          if (oddAltNum && oddAltNum >= ODD_MINIMA) {
+            console.log(`  ⚡ Integridade pivot: ${jogo.time_casa} → ${alt.aposta} (${alt.mercado}) @ ${oddAltNum}`);
+            jogo.aposta_original = jogo.aposta_original || jogo.aposta;
+            jogo.mercado_original = jogo.mercado_original || jogo.mercado;
+            jogo.aposta = alt.aposta; jogo.mercado = alt.mercado;
+            jogo.odd_mercado = oddAltNum; jogo.confianca = 'alta';
+            pivotado = true; break;
+          }
+        }
+        if (!pivotado) jogo.odd_mercado = null;
       } else if (parseFloat(oddConfirmada) < ODD_MINIMA) {
-        console.log(`⚠️ ${jogo.time_casa}: odd confirmada ${oddConfirmada} < mínima ${ODD_MINIMA} — forçando re-análise`);
-        jogo.odd_mercado = null;
+        let pivotado = false;
+        for (const alt of (jogo.alternativas || []).filter(a => a.aposta && a.mercado && a.confianca === 'alta')) {
+          const oddAlt = selecionarOddFixture(oddsFixture, alt.aposta, alt.mercado, jogo.time_casa, jogo.time_fora);
+          const oddAltNum = oddAlt ? parseFloat(oddAlt) : null;
+          if (oddAltNum && oddAltNum >= ODD_MINIMA) {
+            console.log(`  ⚡ Integridade pivot: ${jogo.time_casa} ${jogo.aposta} (${oddConfirmada}) → ${alt.aposta} (${alt.mercado}) @ ${oddAltNum}`);
+            jogo.aposta_original = jogo.aposta_original || jogo.aposta;
+            jogo.mercado_original = jogo.mercado_original || jogo.mercado;
+            jogo.aposta = alt.aposta; jogo.mercado = alt.mercado;
+            jogo.odd_mercado = oddAltNum; jogo.confianca = 'alta';
+            pivotado = true; break;
+          }
+        }
+        if (!pivotado) {
+          console.log(`⚠️ ${jogo.time_casa}: odd confirmada ${oddConfirmada} < mínima ${ODD_MINIMA} — sem alternativa, forçando re-análise`);
+          jogo.odd_mercado = null;
+        }
       } else if (Math.abs(parseFloat(oddConfirmada) - parseFloat(jogo.odd_mercado)) > 0.15) {
         console.log(`⚠️ ${jogo.time_casa}: odd salva ${jogo.odd_mercado} diverge da API ${oddConfirmada} — corrigindo`);
         jogo.odd_mercado = parseFloat(oddConfirmada); // corrige para o valor real
@@ -4953,11 +4981,12 @@ async function rotina05h() {
 
       // Complementar se ainda faltam jogos (descontando descartados)
       const rowAtualizado = await dbGet(diaAlvo);
-      const jogosValidos = (rowAtualizado?.apostas?.jogos || []).filter(j => !j.descartado);
+      const todosJogosAtualizados = rowAtualizado?.apostas?.jogos || [];
+      const jogosValidos = todosJogosAtualizados.filter(j => !j.descartado);
       if (jogosValidos.length < 15) {
         const faltam = 15 - jogosValidos.length;
         const timesJaSelecionados = new Set(
-          jogosValidos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+          todosJogosAtualizados.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
         );
         console.log(`🔄 ${diaAlvo}: complementando ${faltam} jogo(s)`);
         let resultado = null;
