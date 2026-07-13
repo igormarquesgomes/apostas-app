@@ -6945,6 +6945,16 @@ function agendarRotina() {
     agentValidar(hoje, { forcarWebSearch: true }).catch(console.error);
     setTimeout(tick18h, 24 * 60 * 60 * 1000);
   }, ms18h);
+
+  // ── 21:00 BRT (00:00 UTC) — terceira validação parcial ──────────────────
+  const ms21h = msAteHoraUTC(0, 0);
+  console.log(`⏰ Próxima validação parcial (21h) em ${Math.round(ms21h/60000)} min`);
+  setTimeout(function tick21h() {
+    const hoje = hojeStr();
+    console.log(`⏰ [21h] Validação parcial — ${hoje}`);
+    agentValidar(hoje, { forcarWebSearch: true }).catch(console.error);
+    setTimeout(tick21h, 24 * 60 * 60 * 1000);
+  }, ms21h);
 }
 
 app.listen(PORT, () => {
