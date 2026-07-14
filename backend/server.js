@@ -2607,9 +2607,10 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   const dowHojeFiltro = new Date().getDay();
   await Promise.all(jogos.map(async j => {
     const isPrioritaria = (j.pri != null && j.pri <= 10) || LIGAS_PRIORITARIAS_TIPOS.has(j.tipo);
-    if (!j.fixtureId || isPrioritaria) { jogosComOdds.push(j); return; }
+    if (!j.fixtureId) { jogosComOdds.push(j); return; }
     const odds = await buscarOddsFixture(j.fixtureId, data).catch(() => null);
     if (odds) { j._oddsData = odds; jogosComOdds.push(j); }
+    else if (isPrioritaria) jogosComOdds.push(j); // prioritária sem odds: inclui mesmo assim
     else jogosSemOdds.push(j);
     // Atualizar cobertura por dia em background via RPC (fire-and-forget)
     if (j.ligaId) {
