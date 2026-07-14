@@ -2609,7 +2609,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     const isPrioritaria = (j.pri != null && j.pri <= 10) || LIGAS_PRIORITARIAS_TIPOS.has(j.tipo);
     if (!j.fixtureId || isPrioritaria) { jogosComOdds.push(j); return; }
     const odds = await buscarOddsFixture(j.fixtureId, data).catch(() => null);
-    if (odds) jogosComOdds.push(j);
+    if (odds) { j._oddsData = odds; jogosComOdds.push(j); }
     else jogosSemOdds.push(j);
     // Atualizar cobertura por dia em background via RPC (fire-and-forget)
     if (j.ligaId) {
@@ -2751,6 +2751,7 @@ RESPONDA APENAS COM ESTE JSON (sem markdown, sem texto extra):
 }
 
 function _promptCoordenador(jogo, ligaStatsMap, blocoMem, agentes, df) {
+  const mercadosDisponiveis = jogo._oddsData ? `\nMERCADOS DISPONÍVEIS NA API (escolha APENAS entre estes):\n${formatarMercadosDisponiveisParaIA(jogo._oddsData)}\n` : '';
   const sc = jogo._stats?.statsCasa, sf = jogo._stats?.statsFora;
   const escC = parseFloat(sc?.mediaEscanteios)||0, escF = parseFloat(sf?.mediaEscanteios)||0;
   const cartC = parseFloat(sc?.mediaCartoes)||0, cartF = parseFloat(sf?.mediaCartoes)||0;
@@ -2779,8 +2780,10 @@ ${blocoAg}
 
 ${blocoMem ? `MEMÓRIA DE CALIBRAÇÃO (contexto histórico):\n${blocoMem.substring(0,1200)}` : ''}
 
+${mercadosDisponiveis}
 CRITÉRIOS DE DECISÃO (siga rigorosamente):
 1. PROIBIDO usar mercados marcados como "SEM DADOS" — só escolha de mercados com dados reais acima
+1b. Se houver MERCADOS DISPONÍVEIS NA API listados acima, escolha SOMENTE apostas que existam nessa lista — nunca sugira linha/mercado ausente da API
 2. Prioridade: probabilidade mais alta (segurança > odd)
 3. Se probabilidades similares (<5% diferença), use value = odd_real / (1/probabilidade)
 4. NUNCA invente probabilidades — use APENAS os números fornecidos pelos agentes acima
