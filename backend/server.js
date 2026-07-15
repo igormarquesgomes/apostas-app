@@ -777,6 +777,7 @@ const LIGAS_IGNORAR = new Set([
   936, 614, 619, 620, 613, // Estaduais div 2
   1073, 1076, 1086, 1100, 1107, 1128, 1069, 1071, // Sub-20 e U17
   1148, 1158, 1096, 1097,  // Copas regionais
+  1035,        // Copa Rio — só tem odds 1X2, sem gols; sempre descartado
   1146, 1143,  // Alagoano-2, Estadual Junior
   // Competições internacionais sub-categorias
   921, 928, 914, 973, // UEFA U17, ASEAN U19, Tournoi Revello, CAF U17
@@ -1500,6 +1501,26 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   const jogosMap = new Map();
   const jogosComp = new Map();
 
+  // Times do Série A (71) e Série B (72) presentes nos fixtures do dia
+  const teamsSerieAB = new Set();
+  for (const f of fixtures) {
+    if (f.league?.id === 71 || f.league?.id === 72) {
+      if (f.teams?.home?.id) teamsSerieAB.add(f.teams.home.id);
+      if (f.teams?.away?.id) teamsSerieAB.add(f.teams.away.id);
+    }
+  }
+  // Grandes clubes BR por nome (cobre off-season quando Série A/B não está nos fixtures do dia)
+  const BIG_CLUBS_BR = ['flamengo','palmeiras','corinthians','santos','são paulo','sao paulo',
+    'botafogo','vasco','fluminense','atlético','atletico','grêmio','gremio','internacional',
+    'cruzeiro','bahia','fortaleza','athletico','bragantino','goiás','goias','sport recife',
+    'ceará','ceara','america mineiro','cuiabá','cuiaba','juventude','avaí','avai',
+    'coritiba','chapecoense','criciúma','criciuma','guarani','ponte preta','londrina',
+    'sampaio corrêa','tombense','novorizontino','ituano','abc','csa','guaratinguetá'];
+  const isTimeBigBR = (casa, fora) => {
+    const c = (casa||'').toLowerCase(), f2 = (fora||'').toLowerCase();
+    return BIG_CLUBS_BR.some(t => c.includes(t) || f2.includes(t));
+  };
+
   for (const f of fixtures) {
     const ts = f.fixture?.timestamp;
     const status = f.fixture?.status?.short;
@@ -1607,9 +1628,14 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         tipoComp = 'af';
         priComp = 80;
       } else if (paisLower === 'brazil' || paisLower === 'brasil') {
-        // Ligas brasileiras complementares — Série C pri=60, Série D após Africa/Oriente (pri=82)
         tipoComp = 'b';
-        priComp = (ligaId === 76) ? 82 : 60;
+        if (ligaId === 75) priComp = 60;       // Série C
+        else if (ligaId === 76) priComp = 82;  // Série D
+        else if (teamsSerieAB.has(f.teams?.home?.id) || teamsSerieAB.has(f.teams?.away?.id) || isTimeBigBR(timeCasa, timeFora)) {
+          priComp = 55; // Estadual/copa com time de Série A ou B — alta prioridade
+        } else {
+          priComp = 200; // Copa regional sem times relevantes — ignora
+        }
       } else {
         // Todo o resto — menor prioridade possível
         priComp = 200;
@@ -4955,20 +4981,41 @@ async function rotina05h() {
           if (!resultado?.jogos?.length) resultado = null;
         } catch(e) { console.error('❌ Multi-agente falhou:', e.message); }
         if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
-        if (resultado?.jogos?.length) {
-          resultado.jogos = resultado.jogos.filter(j => {
-            const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
-            const ok = hh * 60 + mm >= 13 * 60;
-            if (!ok) console.log(`  ⏰ Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
-            return ok;
-          });
-          if (resultado.jogos.length) {
-            const jogosCompletos = {
-              jogos: aplicarTetoAtivos([...jogosValidos, ...resultado.jogos.map((j, i) => ({...j, id: Math.max(...(rowAtualizado?.apostas?.jogos||[]).map(x=>x.id||0), 0) + i + 1}))])
-            };
-            await dbSave(diaAlvo, jogosCompletos);
-            console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.filter(j=>!j.descartado).length} ativos após complemento`);
-          }
+        const filtrarHorario = jogosRes => (jogosRes||[]).filter(j => {
+          const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
+          const ok = hh * 60 + mm >= 13 * 60;
+          if (!ok) console.log(`  ⏰ Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
+          return ok;
+        });
+
+        let novosJogos = filtrarHorario(resultado?.jogos);
+
+        // Segunda tentativa se ainda insuficiente
+        const aposComp1 = [...jogosValidos, ...novosJogos];
+        if (aposComp1.filter(j => !j.descartado).length < 15) {
+          const faltam2 = 15 - aposComp1.filter(j => !j.descartado).length;
+          const timesJaTentados2 = new Set([
+            ...timesJaSelecionados,
+            ...novosJogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+          ]);
+          console.log(`🔄 2ª tentativa de complemento — ainda faltam ${faltam2} jogo(s)`);
+          let resultado2 = null;
+          try {
+            resultado2 = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam2, timesJaTentados2);
+            if (!resultado2?.jogos?.length) resultado2 = null;
+          } catch(e) { console.error('❌ 2ª tentativa falhou:', e.message); }
+          if (!resultado2) resultado2 = await gerarApostas(diaAlvo, '13:00', faltam2, timesJaTentados2);
+          novosJogos = [...novosJogos, ...filtrarHorario(resultado2?.jogos)];
+        }
+
+        if (novosJogos.length) {
+          const rowAtual2 = await dbGet(diaAlvo);
+          const maxId = Math.max(...(rowAtual2?.apostas?.jogos||[]).map(x=>x.id||0), 0);
+          const jogosCompletos = {
+            jogos: aplicarTetoAtivos([...jogosValidos, ...novosJogos.map((j, i) => ({...j, id: maxId + i + 1}))])
+          };
+          await dbSave(diaAlvo, jogosCompletos);
+          console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.filter(j=>!j.descartado).length} ativos após complemento`);
         }
       }
     } else {
