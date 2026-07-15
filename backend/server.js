@@ -1396,8 +1396,8 @@ async function coletarEstatisticas(teamId, teamNome, ligaId, oponenteId) {
       const ehCasa = ultimos5[i].teams?.home?.id === teamId;
       const esc = ehCasa ? s.escanteiosCasa : s.escanteiosFora;
       const cart = ehCasa ? s.cartoesCasa : s.cartoesFora;
-      if (s.escanteiosTotal >= 0) { totalEscanteios += esc; countStats++; }
-      if (s.cartoesTotal >= 0) { totalCartoes += cart; countCartoes++; }
+      if (s.hasCornerData) { totalEscanteios += esc; countStats++; }
+      if (s.hasCardData) { totalCartoes += cart; countCartoes++; }
     }
   }
 
@@ -3765,16 +3765,19 @@ async function buscarStatsFixture(fixtureId) {
     let cartoesCasa = 0, cartoesFora = 0;
     let ambosM = false;
 
+    let hasCornerData = false, hasCardData = false;
     for (const team of teams) {
       const stats = team.statistics || [];
       const corners = stats.find(s => s.type === 'Corner Kicks')?.value;
       const yellowCards = stats.find(s => s.type === 'Yellow Cards')?.value;
       const redCards = stats.find(s => s.type === 'Red Cards')?.value;
       const goals = stats.find(s => s.type === 'Goals')?.value;
-      // "null" string da API deve virar 0
-      const parseVal = v => (v === null || v === 'null' || v === undefined) ? 0 : parseInt(v) || 0;
+      const isNull = v => v === null || v === 'null' || v === undefined;
+      const parseVal = v => isNull(v) ? 0 : parseInt(v) || 0;
 
-      // Cartão vermelho = 2 cartões (amarelo já computado antes do vermelho na maioria dos casos)
+      if (!isNull(corners)) hasCornerData = true;
+      if (!isNull(yellowCards) || !isNull(redCards)) hasCardData = true;
+
       const yellow = parseVal(yellowCards);
       const red = parseVal(redCards);
       const cartoesTime = yellow + (red * 2);
@@ -3794,6 +3797,7 @@ async function buscarStatsFixture(fixtureId) {
       escanteiosCasa, escanteiosFora,
       cartoesTotal: cartoesCasa + cartoesFora,
       cartoesCasa, cartoesFora,
+      hasCornerData, hasCardData,
       ambosMarcaram: teams.length === 2 ? ambosM : null
     };
   } catch(e) { return null; }
