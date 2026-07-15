@@ -1385,17 +1385,19 @@ async function coletarEstatisticas(teamId, teamNome, ligaId, oponenteId) {
   const forma = formatarForma(ultimosJogos, teamId);
   const mediaGols = calcularMediaGols(ultimosJogos, teamId);
 
-  // Calcular média de escanteios e cartões dos últimos jogos
+  // Buscar estatísticas (escanteios, cartões) dos últimos 5 fixtures via endpoint dedicado
   let totalEscanteios = 0, totalCartoes = 0, countStats = 0, countCartoes = 0;
-  for (const f of ultimosJogos) {
-    if (f.statistics) {
-      const statsTime = f.statistics.find(s => s.team?.id === teamId);
-      if (statsTime) {
-        const esc = statsTime.statistics?.find(s => s.type === 'Corner Kicks')?.value;
-        const cart = statsTime.statistics?.find(s => s.type === 'Yellow Cards')?.value;
-        if (esc) { totalEscanteios += parseInt(esc) || 0; countStats++; }
-        if (cart) { totalCartoes += parseInt(cart) || 0; countCartoes++; }
-      }
+  const ultimos5 = ultimosJogos.slice(0, 5).filter(f => f.fixture?.id);
+  if (ultimos5.length > 0) {
+    const statsResults = await Promise.all(ultimos5.map(f => buscarStatsFixture(f.fixture.id)));
+    for (let i = 0; i < ultimos5.length; i++) {
+      const s = statsResults[i];
+      if (!s) continue;
+      const ehCasa = ultimos5[i].teams?.home?.id === teamId;
+      const esc = ehCasa ? s.escanteiosCasa : s.escanteiosFora;
+      const cart = ehCasa ? s.cartoesCasa : s.cartoesFora;
+      if (s.escanteiosTotal >= 0) { totalEscanteios += esc; countStats++; }
+      if (s.cartoesTotal >= 0) { totalCartoes += cart; countCartoes++; }
     }
   }
 
