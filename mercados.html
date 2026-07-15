@@ -114,6 +114,35 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
     <div class="loading">carregando...</div>
   </div>
 
+  <!-- correlação odd × mercado × resultado -->
+  <div class="panel" id="corr-panel" style="margin-bottom:22px">
+    <div class="panel-head" style="justify-content:space-between">
+      <div>
+        <span class="panel-title">Correlação Odd × Mercado × Resultado</span>
+        <span class="panel-sub" id="corr-sub" style="margin-left:10px">carregando...</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center" id="corr-pills"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="corr-table" style="width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums">
+        <thead>
+          <tr id="corr-thead" style="border-bottom:2px solid #E2E8F0">
+            <th class="th" style="padding:7px 14px;text-align:left">Mercado</th>
+            <th class="th" style="padding:7px 14px;text-align:left">Linha</th>
+            <th class="th" style="padding:7px 14px;text-align:left">Faixa Odd</th>
+            <th class="th" style="padding:7px 14px;text-align:right">Odd Média</th>
+            <th class="th" style="padding:7px 14px;text-align:right">Total</th>
+            <th class="th" style="padding:7px 14px;text-align:right">✅/❌</th>
+            <th class="th" style="padding:7px 14px;min-width:150px">Assertividade</th>
+          </tr>
+        </thead>
+        <tbody id="corr-body">
+          <tr><td colspan="7" style="padding:32px;text-align:center;color:#CBD5E1;font-size:13px">carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- tabela de ligas -->
   <div class="panel" id="ligas-panel" style="display:none">
     <div class="panel-head">
@@ -291,6 +320,91 @@ function toggleLiga(id) {
 }
 
 carregar();
+
+// ── Correlação Odd × Mercado ─────────────────────────────────────────────
+const LINHA_LABEL = {
+  'over_0.5':'Over 0.5','over_1.0':'Over 1.0','over_1.5':'Over 1.5','over_2.0':'Over 2.0',
+  'over_2.25':'Over 2.25','over_2.5':'Over 2.5','over_2.75':'Over 2.75','over_3.0':'Over 3.0',
+  'over_3.5':'Over 3.5','over_4.5':'Over 4.5',
+  'under_1.5':'Under 1.5','under_2.25':'Under 2.25','under_2.5':'Under 2.5',
+  'under_3.0':'Under 3.0','under_3.5':'Under 3.5','under_3.75':'Under 3.75',
+  'btts':'BTTS','1X':'Dupla Chance 1X','X2':'Dupla Chance X2','12':'Dupla 12',
+  'casa':'Casa vence','fora':'Fora vence','empate':'Empate',
+};
+function linhaLabel(l){ return LINHA_LABEL[l] || (l || '—'); }
+function barColor(p){ return p>=75?'#0F766E':p>=60?'#F59E0B':'#E11D48'; }
+function corrPctColor(p){ return p>=75?'color:#0F766E':p>=60?'color:#F59E0B':'color:#E11D48'; }
+
+const MKT_COLORS = { gols:'#2563eb', resultado:'#7c3aed', escanteios:'#0d9488', cartoes:'#ea580c', handicap:'#b45309' };
+const MKT_BG     = { gols:'#eff6ff', resultado:'#f5f3ff', escanteios:'#f0fdfa', cartoes:'#fff7ed', handicap:'#fefce8' };
+
+let corrData = [];
+const corrActive = new Set(['gols','resultado','escanteios','cartoes','handicap']);
+
+function renderCorr() {
+  const tbody = document.getElementById('corr-body');
+  const rows = corrData.filter(r => r.total >= 5 && r.faixa_odd !== 'sem_odd' && corrActive.has(r.mercado))
+    .sort((a,b) => b.assertividade - a.assertividade);
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:#CBD5E1">Sem dados com odd validada</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => {
+    const p = r.assertividade;
+    const fill = barColor(p);
+    const small = r.total < 10 ? 'opacity:.7;font-style:italic' : '';
+    return `<tr style="border-bottom:1px solid #F1F5F9;${small}" onmouseover="this.style.background='#FAFAF8'" onmouseout="this.style.background=''">
+      <td style="padding:7px 14px">
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;
+          background:${MKT_BG[r.mercado]||'#F1F5F9'};color:${MKT_COLORS[r.mercado]||'#64748B'}">${r.mercado}</span>
+      </td>
+      <td style="padding:7px 14px;font-size:12px;font-weight:500;color:#1E293B">${linhaLabel(r.linha)}</td>
+      <td style="padding:7px 14px">
+        <span style="display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:500;
+          background:#FEF3C7;border:1px solid #F59E0B;color:#B45309">${r.faixa_odd}</span>
+      </td>
+      <td style="padding:7px 14px;text-align:right;font-size:12px;color:${r.odd_media?'#1E293B':'#CBD5E1'}">${r.odd_media?r.odd_media.toFixed(2):'—'}</td>
+      <td style="padding:7px 14px;text-align:right;font-size:11px;color:#94A3B8">${r.total}</td>
+      <td style="padding:7px 14px;text-align:right;font-size:11px;color:#94A3B8">${r.green}/${r.total}</td>
+      <td style="padding:7px 14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:5px;background:#E2E8F0;border-radius:3px;overflow:hidden;min-width:60px">
+            <div style="height:5px;width:${p}%;background:${fill};border-radius:3px"></div>
+          </div>
+          <span style="font-size:12px;font-weight:700;width:42px;text-align:right;${corrPctColor(p)}">${p.toFixed(1)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function carregarCorrelacao() {
+  try {
+    const data = await fetch(`${B}/calibracao/correlacao-odds`).then(r => r.json());
+    corrData = data.tabela_correlacao || [];
+    const total = data.total_apostas || 0;
+    document.getElementById('corr-sub').textContent =
+      `${total} apostas · gerado ${data.gerado_em || ''} · só odd validada · ≥5 amostras`;
+
+    // Montar pills de filtro
+    const pills = document.getElementById('corr-pills');
+    ['gols','resultado','escanteios','cartoes','handicap'].forEach(m => {
+      const p = document.createElement('span');
+      p.textContent = m;
+      p.style.cssText = `display:inline-block;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;
+        border:1px solid ${MKT_COLORS[m]};color:${MKT_COLORS[m]};background:${MKT_BG[m]};user-select:none`;
+      p.onclick = () => {
+        if (corrActive.has(m)) { if(corrActive.size===1) return; corrActive.delete(m); p.style.background='#F1F5F9'; p.style.color='#94A3B8'; p.style.borderColor='#E2E8F0'; }
+        else { corrActive.add(m); p.style.background=MKT_BG[m]; p.style.color=MKT_COLORS[m]; p.style.borderColor=MKT_COLORS[m]; }
+        renderCorr();
+      };
+      pills.appendChild(p);
+    });
+
+    renderCorr();
+  } catch(e) {
+    document.getElementById('corr-body').innerHTML =
+      `<tr><td colspan="7" style="padding:24px;text-align:center;color:#E11D48">Erro: ${e.message}</td></tr>`;
+  }
+}
+carregarCorrelacao();
 </script>
 </body>
 </html>

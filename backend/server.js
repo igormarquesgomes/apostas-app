@@ -425,6 +425,31 @@ function selecionarOddFixture(odds, aposta, mercado, timeCasa, timeFora) {
         || (r2t ? r2t[1] : null);
   }
 
+  // ── HANDICAP ASIÁTICO ────────────────────────────────────────────────────
+  if (mercado === 'handicap') {
+    const ncasa = norm(timeCasa), nfora = norm(timeFora);
+    const pcasa = ncasa.split(' ')[0], pfora2 = nfora.split(' ')[0];
+    const mencCasa = (pcasa.length > 2 && a.includes(pcasa)) || a.includes('home') || a.includes('casa') || a.includes('home +') || a.includes('home -');
+    const mencFora = (pfora2.length > 2 && a.includes(pfora2)) || a.includes('away') || a.includes('fora') || a.includes('away +') || a.includes('away -');
+    // Extrai linha de handicap: ex "casa -0.5", "fora +1", "away -0.25"
+    const hMatch = a.match(/([+-]\s*\d+\.?\d*)/);
+    const hLinha = hMatch ? hMatch[1].replace(/\s/g, '') : null;
+    const lado = mencFora && !mencCasa ? 'away' : 'home';
+    if (hLinha) {
+      const val = lado === 'home' ? `home ${hLinha}` : `away ${hLinha}`;
+      const r = buscar(['asian handicap','asian handicap (regular time)','asian handicap full time'], val)
+             || buscarPorPalavras(['asian handicap','asian hcp','ah'], val);
+      if (r) return r;
+      // Tenta inverso (casa +X = fora -X na API)
+      const inv = hLinha.startsWith('+') ? hLinha.replace('+','-') : hLinha.replace('-','+');
+      const ladoInv = lado === 'home' ? 'away' : 'home';
+      return buscarPorPalavras(['asian handicap','asian hcp','ah'], `${ladoInv} ${inv}`);
+    }
+    // Sem linha explícita: tenta handicap 0 (draw no bet)
+    return buscar(['asian handicap','asian handicap (regular time)'], `${lado} 0`)
+        || buscarPorPalavras(['asian handicap','draw no bet'], lado === 'home' ? 'home' : 'away');
+  }
+
   return null;
 }
 
@@ -491,7 +516,10 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
       if (alt.aposta === jogo.aposta && alt.mercado === jogo.mercado) continue;
       const oddV = selecionarOddFixture(oddsFixture, alt.aposta, alt.mercado, jogo.time_casa, jogo.time_fora);
       const oddN = oddV ? parseFloat(oddV) : null;
-      if (oddN && oddN >= ODD_MINIMA) jogo.odds_confirmadas.push({ aposta: alt.aposta, mercado: alt.mercado, odd: oddN });
+      if (oddN && oddN >= ODD_MINIMA) {
+        alt.odd_mercado = oddN;
+        jogo.odds_confirmadas.push({ aposta: alt.aposta, mercado: alt.mercado, odd: oddN });
+      }
     }
   };
 
@@ -1862,7 +1890,7 @@ Escanteios alta: média combinada ≥ 10.0. Cartões alta: média combinada ≥ 
 Retorne SOMENTE JSON:
 {"jogos":[{"id":1,"liga":"Liga","tipo_liga":"eu","time_casa":"A","time_fora":"B","horario":"15:00","aposta":"Over 2.5 gols","mercado":"gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","razao_escolha":"média 3.1 gols","odd_sugerida":"1.80","confianca":"alta","media_gols_casa":"1.6","media_gols_fora":"1.5","media_escanteios":"9.2","media_cartoes":"3.8","forma_casa":"VVDEV","forma_fora":"DEVVD","justificativa":"Análise.","alternativas":[{"mercado":"gols","aposta":"Over 2.5","confianca":"alta","razao":"média alta"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"boa forma"},{"mercado":"escanteios","aposta":"Over 8.5","confianca":"media","razao":"média 9.2"},{"mercado":"cartoes","aposta":"Over 3.5","confianca":"baixa","razao":"média baixa"}]}]}
 
-tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca: alta/media/baixa.`;
+tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado/handicap. confianca: alta/media/baixa.`;
   }
 
   function montarPrompt(listaJogos, blocoMem, df) {
@@ -1938,7 +1966,7 @@ REGRAS:
 Retorne SOMENTE JSON válido:
 {"jogos":[{"id":1,"liga":"Série A","tipo_liga":"a","time_casa":"A","time_fora":"B","horario":"16:00","aposta":"Over 2.5 gols","mercado":"gols","razao_escolha":"Média combinada 3.1 gols, H2H 4/5 com Over 2.5, histórico da liga 70% green em gols","aposta_backup":"Over 1.5 gols","mercado_backup":"gols","odd_sugerida":"1.85","confianca":"alta","media_gols_casa":"1.8","media_gols_fora":"1.2","media_escanteios":"9.4","media_cartoes":"3.1","forma_casa":"VVEDV","forma_fora":"DEVVD","justificativa":"Análise completa do jogo.","alternativas":[{"mercado":"gols","aposta":"Over 2.5 gols","confianca":"alta","razao":"média 3.1 gols, H2H favorável"},{"mercado":"resultado","aposta":"Casa vence","confianca":"media","razao":"forma recente melhor em casa"},{"mercado":"escanteios","aposta":"Over 8.5 escanteios","confianca":"media","razao":"média 9.2 escanteios combinados"},{"mercado":"cartoes","aposta":"Over 3.5 cartões","confianca":"baixa","razao":"média 3.1, jogo sem rivalidade"}]}]}
 
-tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado. confianca da aposta principal: alta/media/baixa (NUNCA nao_recomendado — se nenhum mercado presta, escolha o menos ruim com baixa). confianca nas alternativas: alta/media/baixa/nao_recomendado.
+tipo_liga: a/b/it/es/eu/copa. mercado: gols/escanteios/cartoes/resultado/handicap. confianca da aposta principal: alta/media/baixa (NUNCA nao_recomendado — se nenhum mercado presta, escolha o menos ruim com baixa). confianca nas alternativas: alta/media/baixa/nao_recomendado.
 razao_escolha: frase curta explicando por que esse mercado e não outro.
 alternativas: OBRIGATÓRIO — todos os 4 mercados avaliados, ordenados do mais ao menos confiável.`;
   }
@@ -2233,13 +2261,13 @@ ${mercadosDisp}
 Dados: forma casa ${jogo.forma_casa||'?'} | fora ${jogo.forma_fora||'?'} | gols ${jogo.media_gols_casa||'?'}+${jogo.media_gols_fora||'?'} | esc ${jogo.media_escanteios||'?'} | cart ${jogo.media_cartoes||'?'}
 
 MISSÃO: Escolha a MELHOR aposta da lista acima. ${isPrioritarioReanalise ? 'Aceite confiança "media" se necessário.' : 'Confiança ALTA, odd ≥ 1.25.'}
-Use mercado "gols" para gols, "resultado" para resultado/dupla chance, "escanteios" para cantos, "cartoes" para cartões.
+Use mercado "gols" para gols, "resultado" para resultado/dupla chance, "escanteios" para cantos, "cartoes" para cartões, "handicap" para handicap asiático (ex: "Casa -0.5", "Fora +1").
 Para 1º tempo use "gols" com "Primeiro Tempo" no texto da aposta (ex: "Over 0.5 gols - Primeiro Tempo").
 Para 2º tempo use "gols" com "Segundo Tempo" no texto da aposta (ex: "Over 1.5 gols - Segundo Tempo").
 
 IMPORTANTE: A aposta deve usar termos presentes na lista de mercados acima para que a odd seja confirmada.
 
-Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
+Retorne JSON: {"aposta":"...","mercado":"gols|resultado|escanteios|cartoes|handicap","confianca":"alta|media","odd_sugerida":"X.XX","razao":"...","justificativa":"..."}`;
 
         const aplicarNovaAposta = async (nova) => {
           const confOk = nova.confianca === 'alta' || (isPrioritarioReanalise && nova.confianca === 'media');
@@ -4351,6 +4379,14 @@ async function agentValidar(data, opcoes = {}) {
               'Dupla casa (1X)': golsCasa >= golsFora ? 'green' : 'red',
               'Dupla fora (X2)': golsFora >= golsCasa ? 'green' : 'red'
             };
+            // Handicap asiático (linhas comuns)
+            const diffCasa = golsCasa - golsFora;
+            mercadosResult.handicap = {};
+            for (const linha of [-2, -1.5, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.5, 2]) {
+              const l = linha > 0 ? `+${linha}` : `${linha}`;
+              mercadosResult.handicap[`Casa ${l}`] = diffCasa + linha > 0 ? 'green' : diffCasa + linha < 0 ? 'red' : 'push';
+              mercadosResult.handicap[`Fora ${linha < 0 ? '+' + Math.abs(linha) : '-' + linha}`] = diffCasa + linha < 0 ? 'green' : diffCasa + linha > 0 ? 'red' : 'push';
+            }
           }
           // Escanteios e cartões — só se a API trouxe stats reais (não zeradas)
           // Zero em casa E fora simultaneamente = liga sem cobertura de stats na API, não um 0 real
@@ -4614,7 +4650,7 @@ async function agentDiario(data) {
   }).join(' | ');
 
   // Calcular mercados subapostados (nunca ou pouco apostado mas teriam performado bem)
-  const mercadosAlternativos = { gols: {green:0,total:0}, resultado: {green:0,total:0}, escanteios: {green:0,total:0}, cartoes: {green:0,total:0} };
+  const mercadosAlternativos = { gols: {green:0,total:0}, resultado: {green:0,total:0}, escanteios: {green:0,total:0}, cartoes: {green:0,total:0}, handicap: {green:0,total:0} };
   for (const res of resultadosValidados) {
     if (!res.mercados_resultado) continue;
     for (const [merc, apostasDict] of Object.entries(res.mercados_resultado)) {
@@ -6585,6 +6621,13 @@ function normalizarLinhaAposta(aposta, mercado) {
     return isUnder ? `under_${num}` : `over_${num}`;
   }
 
+  if (mercado === 'handicap') {
+    const hMatch = a.match(/([+-]\d+\.?\d*)/);
+    const linha = hMatch ? hMatch[1] : '0';
+    const isCasa = a.includes('home') || a.includes('casa') || (!a.includes('away') && !a.includes('fora'));
+    return (isCasa ? 'casa' : 'fora') + '_' + linha;
+  }
+
   const numMatch = a.match(/(\d+\.?\d*)/);
   return numMatch ? numMatch[1] : null;
 }
@@ -6606,16 +6649,38 @@ async function atualizarCorrelacaoOdds() {
     for (const j of jogos) {
       const res = resArr.find(r => r.jogo_id === j.id);
       if (!res || !['green','red'].includes(res.resultado_aposta)) continue;
+
+      // Registrar aposta principal
+      const registrar = (aposta, mercado, oddM, resultadoAposta) => {
+        const linha = normalizarLinhaAposta(aposta, mercado);
+        const faixaOdd = oddM ? (oddM < 1.40 ? '1.25-1.39' : oddM < 1.60 ? '1.40-1.59' : oddM < 1.80 ? '1.60-1.79' : oddM < 2.00 ? '1.80-1.99' : '2.00+') : 'sem_odd';
+        pontos.push({ data: row.data, liga: j.liga, tipo_liga: j.tipo_liga, mercado, aposta, linha, odd_mercado: oddM, confianca: j.confianca, resultado: resultadoAposta, faixa_odd: faixaOdd });
+        const chave = `${mercado}|${linha||'?'}|${faixaOdd}`;
+        if (!agr[chave]) agr[chave] = { mercado, linha, faixa_odd: faixaOdd, green: 0, red: 0, total: 0, odds: [] };
+        agr[chave].total++;
+        agr[chave][resultadoAposta]++;
+        if (oddM) agr[chave].odds.push(oddM);
+      };
+
       const oddM = j.odd_mercado ? parseFloat(j.odd_mercado) : null;
-      const oddS = j.odd_sugerida ? parseFloat(j.odd_sugerida) : null;
-      const linha = normalizarLinhaAposta(j.aposta, j.mercado);
-      const faixaOdd = oddM ? (oddM < 1.40 ? '1.25-1.39' : oddM < 1.60 ? '1.40-1.59' : oddM < 1.80 ? '1.60-1.79' : oddM < 2.00 ? '1.80-1.99' : '2.00+') : 'sem_odd';
-      pontos.push({ data: row.data, liga: j.liga, tipo_liga: j.tipo_liga, mercado: j.mercado, aposta: j.aposta, linha, odd_mercado: oddM, odd_sugerida: oddS, confianca: j.confianca, resultado: res.resultado_aposta, faixa_odd: faixaOdd });
-      const chave = `${j.mercado}|${linha||'?'}|${faixaOdd}`;
-      if (!agr[chave]) agr[chave] = { mercado: j.mercado, linha, faixa_odd: faixaOdd, green: 0, red: 0, total: 0, odds: [] };
-      agr[chave].total++;
-      agr[chave][res.resultado_aposta]++;
-      if (oddM) agr[chave].odds.push(oddM);
+      registrar(j.aposta, j.mercado, oddM, res.resultado_aposta);
+
+      // Registrar alternativas com odd_mercado confirmada e resultado calculável
+      for (const alt of (j.alternativas || [])) {
+        if (!alt.aposta || !alt.mercado || !alt.odd_mercado) continue;
+        // Resultado da alternativa via mercados_resultado se disponível
+        const mRes = res.mercados_resultado;
+        const mMap = { gols: 'gols', resultado: 'resultado', escanteios: 'escanteios', cartoes: 'cartoes' };
+        const catRes = mRes?.[mMap[alt.mercado]];
+        // Tenta match pelo texto da aposta normalizado
+        const resAlt = catRes ? Object.entries(catRes).find(([k]) =>
+          k.toLowerCase().includes((alt.aposta||'').toLowerCase().substring(0,8)) ||
+          (alt.aposta||'').toLowerCase().includes(k.toLowerCase().substring(0,8))
+        )?.[1] : null;
+        if (resAlt && ['green','red'].includes(resAlt)) {
+          registrar(alt.aposta, alt.mercado, parseFloat(alt.odd_mercado), resAlt);
+        }
+      }
     }
   }
 
