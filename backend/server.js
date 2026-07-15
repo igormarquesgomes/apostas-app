@@ -6554,6 +6554,41 @@ app.post('/informar-stats', async (req, res) => {
 });
 
 // ── Correlação odd / aposta / mercado ────────────────────────────────────────
+
+function normalizarLinhaAposta(aposta, mercado) {
+  const a = (aposta || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+  if (mercado === 'resultado') {
+    if (a.includes('1x') || a.includes('dupla chance casa') || a.includes('casa ou empate') || a.includes('home or draw')) return '1X';
+    if (a.includes('x2') || a.includes('dupla chance fora') || a.includes('fora ou empate') || a.includes('away or draw') || a.includes('dupla chance x2') || a.includes('fora vence ou empate')) return 'X2';
+    if (a.includes('dupla chance') && (a.includes('12') || a.includes('casa') && a.includes('fora'))) return '12';
+    if (a.includes('casa vence') || a.includes('mandante vence') || a.includes('home wins') || a.includes('home vence') || /\b1\b/.test(a) && !a.includes('1x')) return 'casa';
+    if (a.includes('fora vence') || a.includes('visitante vence') || a.includes('away wins') || a.includes('away vence')) return 'fora';
+    if (a.includes('empate') || a.includes('draw') || a.includes(' x ') || /\bx\b/.test(a)) return 'empate';
+    return null;
+  }
+
+  if (mercado === 'gols') {
+    if (a.includes('ambos') || a.includes('ambas') || a.includes('btts') || a.includes('both teams') || a.includes('ambos marcam')) return 'btts';
+    const numMatch = a.match(/(\d+\.?\d*)/);
+    const num = numMatch ? numMatch[1] : null;
+    if (!num) return null;
+    const isUnder = a.includes('under') || a.includes('menos');
+    return isUnder ? `under_${num}` : `over_${num}`;
+  }
+
+  if (mercado === 'escanteios' || mercado === 'cartoes') {
+    const numMatch = a.match(/(\d+\.?\d*)/);
+    const num = numMatch ? numMatch[1] : null;
+    if (!num) return null;
+    const isUnder = a.includes('under') || a.includes('menos');
+    return isUnder ? `under_${num}` : `over_${num}`;
+  }
+
+  const numMatch = a.match(/(\d+\.?\d*)/);
+  return numMatch ? numMatch[1] : null;
+}
+
 // Analisa todos os resultados validados e cruza: odd_mercado × mercado × linha × resultado
 // Agrega correlação odd × mercado × resultado dos últimos 60 dias e salva em calibracao
 async function atualizarCorrelacaoOdds() {
@@ -6573,7 +6608,7 @@ async function atualizarCorrelacaoOdds() {
       if (!res || !['green','red'].includes(res.resultado_aposta)) continue;
       const oddM = j.odd_mercado ? parseFloat(j.odd_mercado) : null;
       const oddS = j.odd_sugerida ? parseFloat(j.odd_sugerida) : null;
-      const linha = (j.aposta || '').match(/(\d+\.?\d*)/)?.[1] || null;
+      const linha = normalizarLinhaAposta(j.aposta, j.mercado);
       const faixaOdd = oddM ? (oddM < 1.40 ? '1.25-1.39' : oddM < 1.60 ? '1.40-1.59' : oddM < 1.80 ? '1.60-1.79' : oddM < 2.00 ? '1.80-1.99' : '2.00+') : 'sem_odd';
       pontos.push({ data: row.data, liga: j.liga, tipo_liga: j.tipo_liga, mercado: j.mercado, aposta: j.aposta, linha, odd_mercado: oddM, odd_sugerida: oddS, confianca: j.confianca, resultado: res.resultado_aposta, faixa_odd: faixaOdd });
       const chave = `${j.mercado}|${linha||'?'}|${faixaOdd}`;
