@@ -2965,6 +2965,47 @@ async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df, _gerar
   return resultado;
 }
 
+// ─── Complemento com 2 tentativas ────────────────────────────
+// Tenta gerarApostasMultiAgente; se insuficiente, tenta mais uma vez com pool atualizado.
+// Retorna array de jogos novos (já filtrados por horário mínimo), nunca null.
+async function executarComplemento(data, horaMin, faltam, timesJaSelecionados) {
+  const filtrarHorario = lista => (lista || []).filter(j => {
+    const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
+    const ok = hh * 60 + mm >= parseInt(horaMin) * 60 + parseInt((horaMin.split(':')[1] || 0));
+    if (!ok) console.log(`  ⏰ [Complemento] Rejeitando antes de ${horaMin}: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
+    return ok;
+  });
+
+  // 1ª tentativa
+  let resultado = null;
+  try {
+    resultado = await gerarApostasMultiAgente(data, horaMin, faltam, timesJaSelecionados);
+    if (!resultado?.jogos?.length) resultado = null;
+  } catch(e) { console.error('❌ [Complemento] Multi-agente falhou:', e.message); }
+  if (!resultado) resultado = await gerarApostas(data, horaMin, faltam, timesJaSelecionados);
+
+  let novos = filtrarHorario(resultado?.jogos);
+
+  // 2ª tentativa se ainda insuficiente
+  if (novos.length < faltam) {
+    const faltam2 = faltam - novos.length;
+    const tentados2 = new Set([
+      ...timesJaSelecionados,
+      ...novos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+    ]);
+    console.log(`🔄 [Complemento] 2ª tentativa — ainda faltam ${faltam2} jogo(s)`);
+    let resultado2 = null;
+    try {
+      resultado2 = await gerarApostasMultiAgente(data, horaMin, faltam2, tentados2);
+      if (!resultado2?.jogos?.length) resultado2 = null;
+    } catch(e) { console.error('❌ [Complemento] 2ª tentativa falhou:', e.message); }
+    if (!resultado2) resultado2 = await gerarApostas(data, horaMin, faltam2, tentados2);
+    novos = [...novos, ...filtrarHorario(resultado2?.jogos)];
+  }
+
+  return novos;
+}
+
 // ─── gerarApostasMultiAgente ─────────────────────────────────
 
 async function gerarApostasMultiAgente(data, horaMin, metaJogos, timesIgnorar = new Set()) {
@@ -4841,36 +4882,19 @@ async function rotina04h() {
     console.log(`🚫 Times já selecionados: ${[...timesJaSelecionados].join(', ')}`);
 
     // Gerar apostas passando os times já selecionados para evitar duplicatas
-    let resultado = null;
-    try {
-      resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
-      if (!resultado?.jogos?.length) { console.log(`⚠️ Multi-agente sem jogos — fallback gerarApostas`); resultado = null; }
-    } catch(e) { console.error('❌ Multi-agente falhou, usando fallback:', e.message); }
-    if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
-    if (!resultado?.jogos?.length) {
+    const novosJogos04h = await executarComplemento(diaAlvo, '13:00', faltam, timesJaSelecionados);
+    if (!novosJogos04h.length) {
       console.log(`⚠️ ${diaAlvo}: não foi possível gerar novos jogos`);
       continue;
     }
 
-    // Garantir horário mínimo 13:00 nos jogos novos (belt-and-suspenders)
-    resultado.jogos = resultado.jogos.filter(j => {
-      const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
-      const ok = hh * 60 + mm >= 13 * 60;
-      if (!ok) console.log(`  ⏰ Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
-      return ok;
-    });
-    if (!resultado.jogos.length) { console.log(`⚠️ ${diaAlvo}: todos os novos jogos rejeitados por horário`); continue; }
-
     if (total === 0) {
-      // Primeiro preenchimento — salvar normalmente
-      resultado.jogos = aplicarTetoAtivos(resultado.jogos);
-      await dbSave(diaAlvo, resultado);
-      console.log(`✅ ${diaAlvo}: ${resultado.jogos.length} jogos salvos`);
+      await dbSave(diaAlvo, { jogos: aplicarTetoAtivos(novosJogos04h) });
+      console.log(`✅ ${diaAlvo}: ${novosJogos04h.length} jogos salvos`);
     } else {
-      // Complemento — mesclar com jogos existentes usando maior ID existente para evitar colisão
       const maxIdExistente = todosjogos.reduce((max, j) => Math.max(max, j.id || 0), 0);
       const jogosCompletos = {
-        jogos: aplicarTetoAtivos([...jogosExistentes, ...resultado.jogos.map((j, i) => ({
+        jogos: aplicarTetoAtivos([...jogosExistentes, ...novosJogos04h.map((j, i) => ({
           ...j,
           id: maxIdExistente + i + 1
         }))])
@@ -4975,44 +4999,12 @@ async function rotina05h() {
           todosJogosAtualizados.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
         );
         console.log(`🔄 ${diaAlvo}: complementando ${faltam} jogo(s)`);
-        let resultado = null;
-        try {
-          resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
-          if (!resultado?.jogos?.length) resultado = null;
-        } catch(e) { console.error('❌ Multi-agente falhou:', e.message); }
-        if (!resultado) resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
-        const filtrarHorario = jogosRes => (jogosRes||[]).filter(j => {
-          const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
-          const ok = hh * 60 + mm >= 13 * 60;
-          if (!ok) console.log(`  ⏰ Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
-          return ok;
-        });
-
-        let novosJogos = filtrarHorario(resultado?.jogos);
-
-        // Segunda tentativa se ainda insuficiente
-        const aposComp1 = [...jogosValidos, ...novosJogos];
-        if (aposComp1.filter(j => !j.descartado).length < 15) {
-          const faltam2 = 15 - aposComp1.filter(j => !j.descartado).length;
-          const timesJaTentados2 = new Set([
-            ...timesJaSelecionados,
-            ...novosJogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
-          ]);
-          console.log(`🔄 2ª tentativa de complemento — ainda faltam ${faltam2} jogo(s)`);
-          let resultado2 = null;
-          try {
-            resultado2 = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam2, timesJaTentados2);
-            if (!resultado2?.jogos?.length) resultado2 = null;
-          } catch(e) { console.error('❌ 2ª tentativa falhou:', e.message); }
-          if (!resultado2) resultado2 = await gerarApostas(diaAlvo, '13:00', faltam2, timesJaTentados2);
-          novosJogos = [...novosJogos, ...filtrarHorario(resultado2?.jogos)];
-        }
-
-        if (novosJogos.length) {
+        const novosJogos05h = await executarComplemento(diaAlvo, '13:00', faltam, timesJaSelecionados);
+        if (novosJogos05h.length) {
           const rowAtual2 = await dbGet(diaAlvo);
           const maxId = Math.max(...(rowAtual2?.apostas?.jogos||[]).map(x=>x.id||0), 0);
           const jogosCompletos = {
-            jogos: aplicarTetoAtivos([...jogosValidos, ...novosJogos.map((j, i) => ({...j, id: maxId + i + 1}))])
+            jogos: aplicarTetoAtivos([...jogosValidos, ...novosJogos05h.map((j, i) => ({...j, id: maxId + i + 1}))])
           };
           await dbSave(diaAlvo, jogosCompletos);
           console.log(`✅ ${diaAlvo}: ${jogosCompletos.jogos.filter(j=>!j.descartado).length} ativos após complemento`);
@@ -6865,31 +6857,14 @@ async function rotinaComplementoDiurno() {
         jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
       );
 
-      // Tenta multi-agente; fallback para gerarApostas
-      let resultado = null;
-      try {
-        resultado = await gerarApostasMultiAgente(diaAlvo, '13:00', faltam, timesJaSelecionados);
-        if (!resultado?.jogos?.length) resultado = null;
-      } catch(e) { console.error('❌ [Complemento] Multi-agente falhou:', e.message); }
+      const novosComp = await executarComplemento(diaAlvo, '13:00', faltam, timesJaSelecionados);
 
-      if (!resultado) {
-        resultado = await gerarApostas(diaAlvo, '13:00', faltam, timesJaSelecionados);
-      }
-
-      if (resultado?.jogos?.length) {
-        // Filtro final: garantir horário mínimo 13:00
-        resultado.jogos = resultado.jogos.filter(j => {
-          const [hh, mm] = (j.horario || '00:00').split(':').map(Number);
-          const ok = hh * 60 + mm >= 13 * 60;
-          if (!ok) console.log(`  ⏰ [Complemento] Rejeitando jogo antes das 13h: ${j.time_casa} x ${j.time_fora} (${j.horario})`);
-          return ok;
-        });
-        if (!resultado.jogos.length) { console.log(`⚠️ [${diaAlvo}] Todos os novos jogos rejeitados por horário`); continue; }
+      if (novosComp.length) {
         const maxId = Math.max(...jogos.map(x => x.id || 0), 0);
-        const novosJogos = resultado.jogos.map((j, i) => ({ ...j, id: maxId + i + 1 }));
-        await dbSave(diaAlvo, { jogos: aplicarTetoAtivos([...jogos, ...novosJogos]) });
-        const totalAtivos = ativos.length + novosJogos.filter(j => !j.descartado).length;
-        console.log(`✅ [${diaAlvo}] Complemento: +${novosJogos.length} jogos → ${totalAtivos} ativos`);
+        const novosComId = novosComp.map((j, i) => ({ ...j, id: maxId + i + 1 }));
+        await dbSave(diaAlvo, { jogos: aplicarTetoAtivos([...jogos, ...novosComId]) });
+        const totalAtivos = ativos.length + novosComId.filter(j => !j.descartado).length;
+        console.log(`✅ [${diaAlvo}] Complemento: +${novosComId.length} jogos → ${totalAtivos} ativos`);
 
         // Regenerar múltiplas se ainda não existem ou faltavam jogos antes
         const rowMult = await dbGetComMultiplas(diaAlvo);
