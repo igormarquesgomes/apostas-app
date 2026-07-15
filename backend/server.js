@@ -752,7 +752,8 @@ const LIGAS_PRIORITY = {
   29:  { nome:'Eliminatórias CONMEBOL',tipo:'copa', pri:65, selecaoCampea:true },
   34:  { nome:'Eliminatórias UEFA',    tipo:'copa', pri:65, selecaoCampea:true },
   // Amistosos internacionais (só seleções campeãs)
-  10:  { nome:'Amistoso Internacional',tipo:'copa', pri:66, selecaoCampea:true },
+  848: { nome:'Conference League',      tipo:'copa', pri:66 },
+  10:  { nome:'Amistoso Internacional',tipo:'copa', pri:67, selecaoCampea:true },
   // Irlanda — ligas com bom histórico de odds, melhor que pri=90 genérico europeu
   357: { nome:'Liga Premier Irlanda',      tipo:'eu', pri:68 },
   358: { nome:'Primeira Divisão Irlanda',  tipo:'eu', pri:69 },
