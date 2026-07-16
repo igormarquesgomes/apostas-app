@@ -2809,21 +2809,31 @@ RESPONDA APENAS COM ESTE JSON (sem markdown, sem texto extra):
 }
 
 function _promptCoordenador(jogo, ligaStatsMap, blocoMem, agentes, df) {
-  const mercadosDisponiveis = jogo._oddsData ? `\nMERCADOS DISPONÍVEIS NA API (escolha APENAS entre estes):\n${formatarMercadosDisponiveisParaIA(jogo._oddsData)}\n` : '';
   const sc = jogo._stats?.statsCasa, sf = jogo._stats?.statsFora;
   const escC = parseFloat(sc?.mediaEscanteios)||0, escF = parseFloat(sf?.mediaEscanteios)||0;
   const cartC = parseFloat(sc?.mediaCartoes)||0, cartF = parseFloat(sf?.mediaCartoes)||0;
   const mediaCombEsc = (escC > 0 && escF > 0) ? (escC + escF).toFixed(1) : '?';
   const mediaCombCart = (cartC > 0 && cartF > 0) ? (cartC + cartF).toFixed(1) : '?';
 
-  // P4: lista todos os 4 mercados — com dados reais ou marcados como SEM DADOS
+  // Verifica disponibilidade de uma aposta na Odds API e retorna tag com odd ou indisponível
+  const tagDisp = (aposta, mercado) => {
+    if (!jogo._oddsData) return '';
+    const odd = selecionarOddFixture(jogo._oddsData, aposta, mercado, jogo.timeCasa, jogo.timeFora);
+    const n = odd ? parseFloat(odd) : null;
+    if (n && n >= ODD_MINIMA) return ` ✅ ${n.toFixed(2)}`;
+    return ' ❌ indisponível';
+  };
+
+  // Bloco de análises com disponibilidade embutida — o coordenador vê diretamente o que pode escolher
   const TODOS_MERCADOS = ['gols', 'resultado', 'escanteios', 'cartoes'];
   const agMap = new Map(agentes.map(a => [a.mercado, a]));
   const blocoAg = TODOS_MERCADOS.map(m => {
     const a = agMap.get(m);
     if (!a) return `[${m.toUpperCase()}] — SEM DADOS (agente falhou — NÃO USE este mercado)`;
-    const op1 = `${a.opcao_1.aposta} (${Math.round((a.opcao_1.probabilidade||0)*100)}%) — ${a.opcao_1.razao}`;
-    const op2 = a.opcao_2 ? `${a.opcao_2.aposta} (${Math.round((a.opcao_2.probabilidade||0)*100)}%) — ${a.opcao_2.razao}` : 'sem opção 2';
+    const op1Tag = tagDisp(a.opcao_1.aposta, m);
+    const op1 = `${a.opcao_1.aposta} (${Math.round((a.opcao_1.probabilidade||0)*100)}%)${op1Tag} — ${a.opcao_1.razao}`;
+    const op2Tag = a.opcao_2 ? tagDisp(a.opcao_2.aposta, m) : '';
+    const op2 = a.opcao_2 ? `${a.opcao_2.aposta} (${Math.round((a.opcao_2.probabilidade||0)*100)}%)${op2Tag} — ${a.opcao_2.razao}` : 'sem opção 2';
     return `[${m.toUpperCase()}] Opção 1: ${op1} | Opção 2: ${op2}`;
   }).join('\n');
 
@@ -2833,27 +2843,26 @@ JOGO: ${jogo.timeCasa} x ${jogo.timeFora} | ${jogo.liga} | tipo: ${jogo.tipo||'e
 Casa: forma ${sc?.forma||'?'} | gols ${sc?.mediaGols||'?'} | esc ${sc?.mediaEscanteios||'?'} | cart ${sc?.mediaCartoes||'?'}
 Fora: forma ${sf?.forma||'?'} | gols ${sf?.mediaGols||'?'} | esc ${sf?.mediaEscanteios||'?'} | cart ${sf?.mediaCartoes||'?'}
 
-ANÁLISES ESPECIALIZADAS:
+ANÁLISES ESPECIALIZADAS (✅ = odd confirmada na API | ❌ = indisponível, NÃO escolha):
 ${blocoAg}
 
 ${blocoMem ? `MEMÓRIA DE CALIBRAÇÃO (contexto histórico):\n${blocoMem.substring(0,1200)}` : ''}
 
-${mercadosDisponiveis}
 CRITÉRIOS DE DECISÃO (siga rigorosamente):
 1. PROIBIDO usar mercados marcados como "SEM DADOS" — só escolha de mercados com dados reais acima
-1b. Se houver MERCADOS DISPONÍVEIS NA API listados acima, escolha SOMENTE apostas que existam nessa lista — nunca sugira linha/mercado ausente da API
-2. Prioridade: probabilidade mais alta (segurança > odd)
-3. Se probabilidades similares (<5% diferença), use value = odd_real / (1/probabilidade)
-4. NUNCA invente probabilidades — use APENAS os números fornecidos pelos agentes acima
-5. Se melhor opção de um agente < 55%, use opcao_2 desse agente
-6. confianca: alta ≥ 75% | media 55–74% | baixa < 55%
-7. CAMPO alternativas: inclua APENAS mercados com dados reais acima. PROIBIDO criar uma entrada para mercado marcado "SEM DADOS" — omita-o completamente do array (nunca escreva "indisponível", "sem dados" ou similar como aposta)
-8. IMPORTANTE: se forma e gols forem todos "?" (dados ausentes) mas há odds disponíveis nos agentes, defina confiança MÍNIMA "media" — há mercado válido para apostar mesmo sem histórico
+2. PROIBIDO escolher apostas marcadas com ❌ — escolha SOMENTE opções com ✅
+3. Prioridade: probabilidade mais alta entre as opções ✅ (segurança > odd)
+4. Se probabilidades similares (<5% diferença), use value = odd_real / (1/probabilidade)
+5. NUNCA invente probabilidades — use APENAS os números fornecidos pelos agentes acima
+6. Se melhor opção de um agente < 55%, use opcao_2 desse agente
+7. confianca: alta ≥ 75% | media 55–74% | baixa < 55%
+8. CAMPO alternativas: inclua APENAS opções com ✅ e mercados com dados reais. PROIBIDO incluir ❌ no array de alternativas.
+9. IMPORTANTE: se forma e gols forem todos "?" mas há opções ✅, defina confiança MÍNIMA "media"
 
 CAMPO justificativa (PÚBLICO): escreva como especialista em apostas. PROIBIDO usar: "calibração", "assertividade %", "LigaMedia", "especialista", "agente", "sistema". Use apenas: forma recente, H2H, médias, contexto esportivo. 2–3 frases.
 
 Retorne SOMENTE JSON válido:
-{"time_casa":"${jogo.timeCasa}","time_fora":"${jogo.timeFora}","liga":"${jogo.liga}","tipo_liga":"${jogo.tipo||'eu'}","horario":"${jogo.horario}","aposta":"Over 1.5 gols","mercado":"gols","confianca":"alta","probabilidade_estimada":0.85,"odd_sugerida":"1.65","value":1.40,"razao_escolha":"...","aposta_backup":"BTTS","mercado_backup":"gols","media_gols_casa":"${sc?.mediaGols||'?'}","media_gols_fora":"${sf?.mediaGols||'?'}","media_escanteios":"${mediaCombEsc}","media_cartoes":"${mediaCombCart}","forma_casa":"${sc?.forma||'?'}","forma_fora":"${sf?.forma||'?'}","justificativa":"Análise pública aqui.","alternativas":[{"mercado":"gols","aposta":"Over 2.5 gols","confianca":"alta","razao":"..."},{"mercado":"resultado","aposta":"Dupla Chance 1X","confianca":"media","razao":"..."},{"mercado":"escanteios","aposta":"Over 8.5 escanteios","confianca":"media","razao":"..."},{"mercado":"cartoes","aposta":"Over 2.5 cartões","confianca":"baixa","razao":"..."}]}`;
+{"time_casa":"${jogo.timeCasa}","time_fora":"${jogo.timeFora}","liga":"${jogo.liga}","tipo_liga":"${jogo.tipo||'eu'}","horario":"${jogo.horario}","aposta":"<opção marcada ✅ com maior probabilidade do bloco acima>","mercado":"<mercado correspondente>","confianca":"<alta|media|baixa>","probabilidade_estimada":"<probabilidade da opção escolhida>","odd_sugerida":"<odd do ✅ escolhido>","value":"<odd/probabilidade>","razao_escolha":"...","aposta_backup":"<segunda melhor opção ✅>","mercado_backup":"<mercado do backup>","media_gols_casa":"${sc?.mediaGols||'?'}","media_gols_fora":"${sf?.mediaGols||'?'}","media_escanteios":"${mediaCombEsc}","media_cartoes":"${mediaCombCart}","forma_casa":"${sc?.forma||'?'}","forma_fora":"${sf?.forma||'?'}","justificativa":"Análise pública aqui.","alternativas":[{"mercado":"<mercado>","aposta":"<aposta ✅>","confianca":"<alta|media|baixa>","razao":"..."}]}`;
 }
 
 // ─── Multi-agente: parse e análise por jogo ──────────────────
