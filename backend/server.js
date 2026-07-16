@@ -543,26 +543,6 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
 
   console.log(`  ⚠️ ${jogo.time_casa} x ${jogo.time_fora} | ${jogo.aposta} → ${motivoPrincipal} — buscando alternativa`);
 
-  // Caso 1.5: fallback de gols — se Over 1.5 não existe, tentar outras linhas do mesmo mercado
-  if (jogo.mercado === 'gols' && !oddBrutaNum) {
-    const fallbackGols = ['Over 2.5 gols', 'Over 1.5 gols', 'Over 0.5 gols', 'Both Teams to Score (BTTS)', 'Under 2.5 gols', 'Over 3.5 gols'];
-    for (const fg of fallbackGols) {
-      if (fg === jogo.aposta) continue;
-      const oddFg = selecionarOddFixture(oddsFixture, fg, 'gols', jogo.time_casa, jogo.time_fora);
-      const oddFgNum = oddFg ? parseFloat(oddFg) : null;
-      if (oddFgNum && oddFgNum >= ODD_MINIMA) {
-        console.log(`  ⚡ [GOLS-FALLBACK] ${jogo.time_casa} x ${jogo.time_fora} → ${fg} @ ${oddFgNum}`);
-        jogo.aposta_original = jogo.aposta_original || jogo.aposta;
-        jogo.mercado_original = jogo.mercado_original || jogo.mercado;
-        jogo.aposta = fg; jogo.odd_mercado = oddFgNum; jogo.confianca = 'alta';
-        jogo.descartado = false;
-        jogo.justificativa = gerarJustificativaPosPivot(fg, 'gols', '', jogo);
-        coletarOddsConfirmadas();
-        return null;
-      }
-    }
-  }
-
   // Caso 2: alternativas com confiança alta e odd ≥ mínima
   const todasAlts = (jogo.alternativas || []).filter(a => a.aposta && a.mercado);
   for (const alt of todasAlts.filter(a => a.confianca === 'alta')) {
