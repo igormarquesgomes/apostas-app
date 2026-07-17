@@ -255,11 +255,18 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
   <div class="mult-section">
     <div class="mult-section-hd">
       <div class="mult-section-title">Múltiplas</div>
-      <div class="mult-filters">
-        <button class="mult-filter active" onclick="filtrarMult('todos',this)">Todos</button>
-        <button class="mult-filter" onclick="filtrarMult('green',this)">Green</button>
-        <button class="mult-filter" onclick="filtrarMult('red',this)">Red</button>
-        <button class="mult-filter" onclick="filtrarMult('pendente',this)">Pendente</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <div class="mult-filters">
+          <button class="mult-filter mult-mes active" onclick="filtrarMultMes('atual',this)">Este mês</button>
+          <button class="mult-filter mult-mes" onclick="filtrarMultMes('passado',this)">Mês passado</button>
+        </div>
+        <div class="mult-filters">
+          <button class="mult-filter active" onclick="filtrarMult('todos',this)">Todos</button>
+          <button class="mult-filter" onclick="filtrarMult('green',this)">Green</button>
+          <button class="mult-filter" onclick="filtrarMult('red',this)">Red</button>
+          <button class="mult-filter" onclick="filtrarMult('pendente',this)">Pendente</button>
+        </div>
+        <button class="mult-filter" onclick="validarPendentesMultB(this)" title="Dispara validação para todos os dias com Múltipla B pendente">⚡ Validar B pendentes</button>
       </div>
     </div>
     <div class="mult-cols" id="mult-cols"><div class="spin"></div></div>
@@ -558,9 +565,44 @@ function renderConfianca(conf){
 }
 
 let _multFiltro = 'todos';
+let _multMesFiltro = 'atual';
+
+function mesPrefixo(offset=0){
+  const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function filtrarMultMes(f, btn){
+  _multMesFiltro = f;
+  document.querySelectorAll('.mult-mes').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMultiplas();
+}
+
+async function validarPendentesMultB(btn){
+  const pendentes = _multiplasDias.filter(d => {
+    const r = d.res?.multipla_b?.resultado;
+    return !r || r === 'pendente';
+  });
+  if(!pendentes.length){ alert('Nenhuma Múltipla B pendente encontrada.'); return; }
+  const datas = pendentes.map(d=>d.data);
+  if(!confirm(`Validar ${datas.length} dia(s) com Múltipla B pendente?\n${datas.join(', ')}`)) return;
+  btn.disabled=true; btn.textContent='⏳ Validando...';
+  let ok=0, err=0;
+  for(const data of datas){
+    try{
+      const r = await fetch(`${B}/validar/${data}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+      if(r.ok) ok++; else err++;
+    }catch(e){ err++; }
+    await new Promise(r=>setTimeout(r,1500)); // espaçar chamadas
+  }
+  btn.textContent='⚡ Validar B pendentes'; btn.disabled=false;
+  alert(`Validação concluída: ${ok} OK · ${err} erros.\nAtualize a página em alguns minutos.`);
+}
 
 function construirLinhasMult(key){
-  const recentes = _multiplasDias.slice().sort((a,b)=>b.data.localeCompare(a.data));
+  const prefixo = _multMesFiltro==='passado' ? mesPrefixo(-1) : mesPrefixo(0);
+  const recentes = _multiplasDias.filter(d=>d.data.startsWith(prefixo)).sort((a,b)=>b.data.localeCompare(a.data));
   const linhas = [];
   for(const d of recentes){
     const m = d.multiplas?.[key];
