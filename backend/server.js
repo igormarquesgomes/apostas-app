@@ -4917,6 +4917,10 @@ async function rotina04h() {
 
   for (const diaAlvo of [hoje, amanha]) {
     const row = await dbGet(diaAlvo);
+    if (row?.resultados) {
+      console.log(`🔒 ${diaAlvo}: dia já validado — não modificar`);
+      continue;
+    }
     const todosjogos = row?.apostas?.jogos || [];
     // Considera apenas jogos válidos (não descartados e com odd confirmada)
     const jogosExistentes = todosjogos.filter(j => !j.descartado);
@@ -4982,6 +4986,10 @@ async function rotina05h() {
 
   for (const diaAlvo of [hoje, amanha]) {
     const row = await dbGetComMultiplas(diaAlvo);
+    if (row?.resultados) {
+      console.log(`🔒 ${diaAlvo}: dia já validado — não modificar`);
+      continue;
+    }
     const jogos = row?.apostas?.jogos || [];
     const multiplas = row?.multiplas;
 
@@ -6962,6 +6970,10 @@ async function rotinaComplementoDiurno() {
   for (const diaAlvo of [hoje, amanha]) {
     try {
       const row = await dbGet(diaAlvo);
+      if (row?.resultados) {
+        console.log(`🔒 ${diaAlvo}: dia já validado — não modificar`);
+        continue;
+      }
       const jogos = row?.apostas?.jogos || [];
       const ativos = jogos.filter(j => !j.descartado && !j.analisando);
       const ocupados = jogos.filter(j => !j.descartado).length; // ativos + analisando = slots tomados
