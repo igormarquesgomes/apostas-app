@@ -119,7 +119,7 @@ router.get('/lista/:data', async (req, res) => {
       supaFetch(`apostas_dia?data=eq.${data}&select=apostas`),
     ]);
     const agendo = agendoRows?.[0] || null;
-    const apostas = diasRows?.[0]?.apostas?.jogos || [];
+    const apostas = (diasRows?.[0]?.apostas?.jogos || []).filter(j => !j.descartado && j.odd_mercado);
     res.json({ data, apostas, agendo_id: agendo?.id || null, status: agendo?.status || null, jogos: agendo?.jogos || [], enviado_em: agendo?.enviado_em || null });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -211,7 +211,7 @@ router.get('/analises/:data', async (req, res) => {
       supaFetch(`agendos_telegram_analises?data_envio=eq.${data}&select=*&order=horario_envio.asc`),
       supaFetch(`apostas_dia?data=eq.${data}&select=apostas`),
     ]);
-    const apostas = diasRows?.[0]?.apostas?.jogos || [];
+    const apostas = (diasRows?.[0]?.apostas?.jogos || []).filter(j => !j.descartado && j.odd_mercado);
     res.json({ data, apostas, analises: analisesRows || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });

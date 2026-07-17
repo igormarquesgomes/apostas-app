@@ -357,7 +357,7 @@ function agregaResultados(dias){
   const mercados = {gols:{g:0,r:0}, escanteios:{g:0,r:0}, resultado:{g:0,r:0}, cartoes:{g:0,r:0}};
   const conf = {alta:{g:0,r:0}, media:{g:0,r:0}, baixa:{g:0,r:0}};
   for(const dia of dias){
-    const ap = dia.apostas?.jogos||[], res = dia.resultados?.apostas||[];
+    const ap = (dia.apostas?.jogos||[]).filter(j=>!j.descartado && j.odd_mercado), res = dia.resultados?.apostas||[];
     for(const a of ap){
       const rv = res.find(x=>x.jogo_id===a.id)?.resultado_aposta||'pendente';
       total++;
