@@ -2851,7 +2851,7 @@ ${blocoMem ? `MEMÓRIA DE CALIBRAÇÃO (contexto histórico):\n${blocoMem.substr
 CRITÉRIOS DE DECISÃO (siga rigorosamente):
 1. PROIBIDO usar mercados marcados como "SEM DADOS" — só escolha de mercados com dados reais acima
 2. PROIBIDO escolher apostas marcadas com ❌ — escolha SOMENTE opções com ✅
-3. Prioridade: probabilidade mais alta entre as opções ✅ (segurança > odd) — MAS probabilidade > 85% indica odd < 1.25, que é INVÁLIDA. PROIBIDO escolher apostas com probabilidade > 85% (ex: Over 0.5 gols, Casa ou Empate em time muito favorito)
+3. Prioridade: probabilidade mais alta entre as opções ✅ (segurança > odd)
 4. Se probabilidades similares (<5% diferença), use value = odd_real / (1/probabilidade)
 5. NUNCA invente probabilidades — use APENAS os números fornecidos pelos agentes acima
 6. Se melhor opção de um agente < 55%, use opcao_2 desse agente
