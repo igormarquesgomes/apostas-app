@@ -2861,8 +2861,11 @@ CRITÉRIOS DE DECISÃO (siga rigorosamente):
 
 CAMPO justificativa (PÚBLICO): escreva como especialista em apostas. PROIBIDO usar: "calibração", "assertividade %", "LigaMedia", "especialista", "agente", "sistema". Use apenas: forma recente, H2H, médias, contexto esportivo. 2–3 frases.
 
+CAMPO mercado: use EXATAMENTE um destes valores em minúsculas: gols | resultado | escanteios | cartoes | handicap
+CAMPO mercado_backup: mesmo conjunto de valores acima, em minúsculas
+
 Retorne SOMENTE JSON válido:
-{"time_casa":"${jogo.timeCasa}","time_fora":"${jogo.timeFora}","liga":"${jogo.liga}","tipo_liga":"${jogo.tipo||'eu'}","horario":"${jogo.horario}","aposta":"<opção marcada ✅ com maior probabilidade do bloco acima>","mercado":"<mercado correspondente>","confianca":"<alta|media|baixa>","probabilidade_estimada":"<probabilidade da opção escolhida>","odd_sugerida":"<odd do ✅ escolhido>","value":"<odd/probabilidade>","razao_escolha":"...","aposta_backup":"<segunda melhor opção ✅>","mercado_backup":"<mercado do backup>","media_gols_casa":"${sc?.mediaGols||'?'}","media_gols_fora":"${sf?.mediaGols||'?'}","media_escanteios":"${mediaCombEsc}","media_cartoes":"${mediaCombCart}","forma_casa":"${sc?.forma||'?'}","forma_fora":"${sf?.forma||'?'}","justificativa":"Análise pública aqui.","alternativas":[{"mercado":"<mercado>","aposta":"<aposta ✅>","confianca":"<alta|media|baixa>","razao":"..."}]}`;
+{"time_casa":"${jogo.timeCasa}","time_fora":"${jogo.timeFora}","liga":"${jogo.liga}","tipo_liga":"${jogo.tipo||'eu'}","horario":"${jogo.horario}","aposta":"<opção marcada ✅ com maior probabilidade do bloco acima>","mercado":"gols","confianca":"<alta|media|baixa>","probabilidade_estimada":"<probabilidade da opção escolhida>","odd_sugerida":"<odd do ✅ escolhido>","value":"<odd/probabilidade>","razao_escolha":"...","aposta_backup":"<segunda melhor opção ✅>","mercado_backup":"resultado","media_gols_casa":"${sc?.mediaGols||'?'}","media_gols_fora":"${sf?.mediaGols||'?'}","media_escanteios":"${mediaCombEsc}","media_cartoes":"${mediaCombCart}","forma_casa":"${sc?.forma||'?'}","forma_fora":"${sf?.forma||'?'}","justificativa":"Análise pública aqui.","alternativas":[{"mercado":"escanteios","aposta":"<aposta ✅>","confianca":"<alta|media|baixa>","razao":"..."}]}`;
 }
 
 // ─── Multi-agente: parse e análise por jogo ──────────────────
@@ -2973,6 +2976,8 @@ async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df, _gerar
     return null; // gerarApostasMultiAgente vai chamar fallback no loop
   }
 
+  // Garantir que _oddsData está disponível para o coordenador (tags ✅/❌)
+  if (!jogo._oddsData && jogo._odds) jogo._oddsData = jogo._odds;
   const txtCoord = await chamarIASonnet(_promptCoordenador(jogo, ligaStatsMap, blocoMem, agentesValidos, df), 1500);
   const resultado = _parseAgenteJson(txtCoord);
 
@@ -2981,6 +2986,8 @@ async function _analisarJogoMultiAgente(jogo, ligaStatsMap, blocoMem, df, _gerar
   }
 
   // P4: validar que o mercado escolhido realmente veio de um agente válido
+  resultado.mercado = (resultado.mercado || '').toLowerCase();
+  if (resultado.mercado_backup) resultado.mercado_backup = resultado.mercado_backup.toLowerCase();
   const mercadosDisponiveis = new Set(agentesValidos.map(a => a.mercado));
   if (!mercadosDisponiveis.has(resultado.mercado)) {
     console.log(`  ⚠️ Coordenador escolheu mercado "${resultado.mercado}" que não tem dados — descartando`);
