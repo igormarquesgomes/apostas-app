@@ -1142,11 +1142,13 @@ async function dbSave(data, apostas) {
 
 async function dbSaveResultados(data, resultados) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
       method: 'PATCH',
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ resultados })
     });
+    if (!res.ok) { const err = await res.text(); console.error(`❌ dbSaveResultados erro ${res.status}: ${err}`); }
+    else console.log(`💾 dbSaveResultados OK — ${data}`);
   } catch(e) { console.error('Erro dbSaveResultados:', e.message); }
 }
 
@@ -2682,7 +2684,9 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     console.log(`⚡ Pré-filtro odds: ${jogosSemOdds.length} jogo(s) sem cobertura ignorado(s): ${jogosSemOdds.map(j=>`${j.timeCasa} x ${j.timeFora}`).join(', ')}`);
   }
   // Se sobrar abaixo da meta, aceitar jogos sem odds de volta
-  jogos = jogosComOdds.length >= metaJogos ? jogosComOdds : [...jogosComOdds, ...jogosSemOdds.slice(0, metaJogos - jogosComOdds.length)];
+  // Em chamadas de complemento (timesIgnorar populado), NÃO re-admitir sem-odds — já foram tentados e confirmadamente falham
+  const ehComplemento = timesIgnorar && timesIgnorar.size > 0;
+  jogos = (jogosComOdds.length >= metaJogos || ehComplemento) ? jogosComOdds : [...jogosComOdds, ...jogosSemOdds.slice(0, metaJogos - jogosComOdds.length)];
 
   console.log(`\nMulti-agente — jogos selecionados: ${jogos.length}`);
   jogos.forEach(j => console.log(`  ${j.liga} | ${j.timeCasa} x ${j.timeFora} | ${j.horario}`));
@@ -3049,6 +3053,9 @@ async function executarComplemento(data, horaMin, faltam, timesJaSelecionados) {
     novos = [...novos, ...filtrarHorario(resultado2?.jogos)];
   }
 
+  // Renumerar IDs para garantir unicidade — cada lote é numerado internamente a partir de 1,
+  // então a concatenação cria duplicatas (ex: lote1 ids 1-8 + lote2 ids 1-5 = duplicatas 1-5)
+  novos.forEach((j, idx) => { j.id = idx + 1; });
   return novos;
 }
 
@@ -3713,10 +3720,19 @@ async function validarMultipla(multipla, resultadosApostas) {
           if (/cancelado|adiado|suspens/i.test(txt.split('\n').find(l => l.toLowerCase().includes(nc)) || '')) {
             resultadosJogos[idx] = 'cancelado';
           } else {
-            const m = txt.match(new RegExp(nc + '[^\\n]*?(\\d+)[-x](\\d+)', 'i'))
-                    || txt.match(new RegExp('(\\d+)[-x](\\d+)[^\\n]*' + nf, 'i'));
-            if (m) {
-              const gC = parseInt(m[1]), gF = parseInt(m[2]);
+            let _gC, _gF;
+            const _m1 = txt.match(new RegExp(nc + '[^\\n]*?(\\d+)[-x](\\d+)', 'i'));
+            if (_m1) { _gC = parseInt(_m1[1]); _gF = parseInt(_m1[2]); }
+            else {
+              const _m2 = txt.match(new RegExp(nf + '[^\\n]*?(\\d+)[-x](\\d+)', 'i'));
+              if (_m2) { _gC = parseInt(_m2[2]); _gF = parseInt(_m2[1]); }
+              else {
+                const _m3 = txt.match(new RegExp('(\\d+)[-x](\\d+)[^\\n]*' + nf, 'i'));
+                if (_m3) { _gC = parseInt(_m3[1]); _gF = parseInt(_m3[2]); }
+              }
+            }
+            if (_gC !== undefined && _gF !== undefined) {
+              const gC = _gC, gF = _gF;
               resultadosJogos[idx] = verificarAposta({...j}, gC, gF, null);
               console.log(`  ✅ Web search lote: ${j.time_casa} x ${j.time_fora} → ${gC}-${gF} → ${resultadosJogos[idx].toUpperCase()}`);
             }
@@ -4374,7 +4390,7 @@ async function agentValidar(data, opcoes = {}) {
         if (resultado === 'sem_stats') {
           // Stats zeradas — marcar pendente_ws com placar para web search buscar escanteios/cartões
           console.log(`    ⚠️ Stats zeradas — pendente_ws para web search buscar escanteios/cartões`);
-          resultados.push({ encontrado: true, placar, placar_conhecido: placar, resultado_aposta: 'pendente_ws', motivo: 'stats zeradas — web search buscará escanteios/cartões', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
+          resultados.push({ encontrado: true, placar, placar_conhecido: placar, placar_api: placar, resultado_aposta: 'pendente_ws', motivo: 'stats zeradas — web search buscará escanteios/cartões', jogo_id: jogo.id, time_casa: jogo.time_casa, time_fora: jogo.time_fora, aposta: jogo.aposta, mercado: jogo.mercado });
         } else {
           // Calcular resultado real de cada mercado alternativo
           const mercadosResult = {};
@@ -4481,13 +4497,34 @@ async function agentValidar(data, opcoes = {}) {
             console.log(`    📋 Placar já conhecido: ${pend.placar_conhecido} — buscando stats no web search`);
             console.log(`    📄 Texto web search: ${txt.substring(0, 300)}`);
           } else {
-            const m = txt.match(new RegExp(nc + '[^\n]*?([0-9]{1,2})[-x]([0-9]{1,2})', 'i'))
-                    || txt.match(new RegExp('([0-9]{1,2})[-x]([0-9]{1,2})[^\n]*' + nf, 'i'));
-            if (m) { gC = parseInt(m[1]); gF = parseInt(m[2]); }
+            // Parsing ciente da orientação dos times:
+            // 1) nc antes do score → nc=casa, gC=m[1], gF=m[2] (mais comum: "Flora II 1-3 Maardu")
+            const m1 = txt.match(new RegExp(nc + '[^\\n]*?([0-9]{1,2})[-x]([0-9]{1,2})', 'i'));
+            if (m1) {
+              gC = parseInt(m1[1]); gF = parseInt(m1[2]);
+            } else {
+              // 2) nf antes do score → nf listado primeiro → score1=gols do nf, score2=gols do nc
+              //    ("Maardu 3-1 Flora II" = Maardu marcou 3, Flora II marcou 1 → gC=1, gF=3)
+              const m2 = txt.match(new RegExp(nf + '[^\\n]*?([0-9]{1,2})[-x]([0-9]{1,2})', 'i'));
+              if (m2) {
+                gC = parseInt(m2[2]); gF = parseInt(m2[1]);
+                console.log(`    ⚠️ Score com time_fora primeiro — invertendo: gC=${gC} gF=${gF}`);
+              } else {
+                // 3) score antes do nf (menos comum e ambíguo — só usa se nenhum dos anteriores bateu)
+                const m3 = txt.match(new RegExp('([0-9]{1,2})[-x]([0-9]{1,2})[^\\n]*' + nf, 'i'));
+                if (m3) { gC = parseInt(m3[1]); gF = parseInt(m3[2]); }
+              }
+            }
           }
           if (gC !== undefined && gF !== undefined) {
             const jogoOriginal = jogos.find(j => j.time_casa === pend.time_casa && j.time_fora === pend.time_fora);
             if (jogoOriginal) {
+              // Se o placar do web search contradiz o placar confirmado pela API (pend.placar_api), descartar web search
+              if (pend.placar_api && pend.placar_api !== `${gC}-${gF}`) {
+                console.log(`    ⚠️ Web search retornou placar ${gC}-${gF} divergente da API (${pend.placar_api}) — usando placar da API`);
+                const [apiC, apiF] = pend.placar_api.split('-').map(Number);
+                gC = apiC; gF = apiF;
+              }
               let statsWS = null;
               const escMatch = txt.match(/escanteios?[: ]+(\d+)/i);
               const cartMatch = txt.match(/cart[oe][es]?[: ]+(\d+)/i);
@@ -4935,10 +4972,12 @@ async function rotina04h() {
     console.log(`🔄 ${diaAlvo}: tem ${total} jogos, faltam ${faltam}`);
 
     // Times já selecionados — não repetir
+    // Jogos descartados por "sem odds" podem ser retentados (cobertura aparece com o tempo)
     const timesJaSelecionados = new Set(
-      jogosExistentes.flatMap(j => [
-        j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()
-      ]).filter(Boolean)
+      jogosExistentes
+        .filter(j => !j.descartado || !j.descartado_motivo?.includes('sem odds'))
+        .flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()])
+        .filter(Boolean)
     );
 
     console.log(`🚫 Times já selecionados: ${[...timesJaSelecionados].join(', ')}`);
@@ -5062,7 +5101,10 @@ async function rotina05h() {
       if (jogosValidos.length < 15) {
         const faltam = 15 - jogosValidos.length;
         const timesJaSelecionados = new Set(
-          todosJogosAtualizados.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+          todosJogosAtualizados
+            .filter(j => !j.descartado || !j.descartado_motivo?.includes('sem odds'))
+            .flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()])
+            .filter(Boolean)
         );
         console.log(`🔄 ${diaAlvo}: complementando ${faltam} jogo(s)`);
         const novosJogos05h = await executarComplemento(diaAlvo, '13:00', faltam, timesJaSelecionados);
@@ -6986,9 +7028,12 @@ async function rotinaComplementoDiurno() {
       const faltam = 15 - ocupados;
       console.log(`⚠️ [${diaAlvo}] Apenas ${ativos.length}/15 ativos — complementando ${faltam} jogo(s)`);
 
-      // Times já selecionados (ativos + descartados) para evitar duplicatas
+      // Times já selecionados — ativos + descartados por motivo diferente de sem-odds (esses podem ter cobertura depois)
       const timesJaSelecionados = new Set(
-        jogos.flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()]).filter(Boolean)
+        jogos
+          .filter(j => !j.descartado || !j.descartado_motivo?.includes('sem odds'))
+          .flatMap(j => [j.time_casa?.toLowerCase(), j.time_fora?.toLowerCase()])
+          .filter(Boolean)
       );
 
       const novosComp = await executarComplemento(diaAlvo, '13:00', faltam, timesJaSelecionados);
