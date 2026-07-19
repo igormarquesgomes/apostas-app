@@ -4568,20 +4568,22 @@ async function agentValidar(data, opcoes = {}) {
   const p = resultados.filter(r=>r.resultado_aposta==='pendente').length;
   console.log(`✅ Validação: ${g} green, ${r} red, ${p} pendente`);
 
-  // Validar múltiplas automaticamente
+  await recalcularMultiplas(data, resultados);
+}
+
+async function recalcularMultiplas(data, resultadosApostas) {
   const rowMultiplas = await dbGetComMultiplas(data);
-  if (rowMultiplas?.multiplas) {
-    console.log('🎯 Validando múltiplas...');
-    const resA = await validarMultipla(rowMultiplas.multiplas.multipla_a, resultados);
-    const resB = await validarMultipla(rowMultiplas.multiplas.multipla_b, resultados);
-    if (resA || resB) {
-      await dbSaveResultadosMultiplas(data, {
-        validado_em: new Date().toISOString(),
-        multipla_a: resA,
-        multipla_b: resB
-      });
-      console.log(`✅ Múltiplas: A=${resA?.resultado||'?'} B=${resB?.resultado||'?'}`);
-    }
+  if (!rowMultiplas?.multiplas) return;
+  console.log('🎯 Validando múltiplas...');
+  const resA = await validarMultipla(rowMultiplas.multiplas.multipla_a, resultadosApostas);
+  const resB = await validarMultipla(rowMultiplas.multiplas.multipla_b, resultadosApostas);
+  if (resA || resB) {
+    await dbSaveResultadosMultiplas(data, {
+      validado_em: new Date().toISOString(),
+      multipla_a: resA,
+      multipla_b: resB
+    });
+    console.log(`✅ Múltiplas: A=${resA?.resultado||'?'} B=${resB?.resultado||'?'}`);
   }
 }
 
@@ -5951,7 +5953,9 @@ app.post('/corrigir-resultado', async (req, res) => {
       : a
   );
 
-  await dbSaveResultados(data, { ...row.resultados, apostas });
+  const novoResultadosSalvos = { ...row.resultados, apostas };
+  await dbSaveResultados(data, novoResultadosSalvos);
+  recalcularMultiplas(data, apostas).catch(e => console.error('Erro recalcularMultiplas:', e.message));
   res.json({ ok: true, mensagem: `Corrigido: ${novoPlacar} → ${novoResultado}`, resultado: novoResultado, placar: novoPlacar });
 });
 
@@ -6007,6 +6011,7 @@ app.post('/anular-jogo', async (req, res) => {
     }
 
     await dbSaveResultados(data, { ...(row.resultados || {}), apostas: novosResultados });
+    recalcularMultiplas(data, novosResultados).catch(e => console.error('Erro recalcularMultiplas:', e.message));
     console.log(`↩️ Jogo anulado: ${jogo.time_casa} x ${jogo.time_fora} (${data})`);
     res.json({ ok: true, mensagem: `Jogo anulado: ${jogo.time_casa} x ${jogo.time_fora}` });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -6620,6 +6625,7 @@ app.post('/informar-stats', async (req, res) => {
     );
 
     await dbSaveResultados(data, { validado_em: new Date().toISOString(), apostas: novosResultados });
+    recalcularMultiplas(data, novosResultados).catch(e => console.error('Erro recalcularMultiplas:', e.message));
     console.log(`📊 Stats informadas: ${jogo.time_casa} x ${jogo.time_fora} | esc=${escanteios} cart=${cartoes} → ${resultado}`);
 
     // Propagar para ligas_conhecidas — alimentar o histórico de assertividade por mercado
