@@ -6651,21 +6651,37 @@ app.get('/historico', async (req, res) => {
 });
 
 // ─── ENGINE DE REGRAS ───────────────────────────────────────────────────────
-// Combina dois sinais independentes para pontuar cada aposta disponível:
-//   1. correlacao_odds (calibracao table): assertividade por mercado+linha+faixa_odd
-//   2. jogos_historico: assertividade por liga+mercado (performance da liga naquele mercado)
-// Sanity filters (médias/forma) como veto secundário.
-// Threshold: score combinado ≥ 65 para incluir.
+// 4 sinais combinados + API teams/statistics por temporada:
+//   1. correlacao_odds: mercado+linha+faixa_odd → assertividade global
+//   2. jogos_historico liga+mercado: performance da liga naquele mercado
+//   3. ligas_conhecidas: mercado campeão da liga (o que mais bate nessa liga)
+//   4. Correlação inversa: se o oposto falha na liga → boost para este bet
+// API teams/statistics: médias reais da temporada substituem projeções do jogo
+
+const teamStatsEngineCache = new Map(); // "teamId|ligaId|season" → response
+const ENGINE_ANO = new Date().getFullYear();
+
+async function buscarStatsTimeEngine(teamId, ligaId) {
+  if (!teamId || !ligaId || !APIFOOTBALL_KEY) return null;
+  const k = `${teamId}|${ligaId}|${ENGINE_ANO}`;
+  if (teamStatsEngineCache.has(k)) return teamStatsEngineCache.get(k);
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/teams/statistics?team=${teamId}&season=${ENGINE_ANO}&league=${ligaId}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const stats = res.ok ? (await res.json()).response || null : null;
+    teamStatsEngineCache.set(k, stats);
+    return stats;
+  } catch(e) { teamStatsEngineCache.set(k, null); return null; }
+}
 
 async function carregarHistoricoLiga() {
   try {
-    const res = await fetch(
+    const rows = await fetch(
       `${SUPABASE_URL}/rest/v1/jogos_historico?select=liga_id,mercado_escolhido,resultado_aposta&limit=5000`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-    );
-    if (!res.ok) return { porLigaMercado: {}, porMercado: {}, total: 0 };
-    const rows = await res.json();
-
+    ).then(r => r.json());
     const lm = {}, gm = {};
     for (const r of rows) {
       const k = `${r.liga_id}|${r.mercado_escolhido}`;
@@ -6675,20 +6691,77 @@ async function carregarHistoricoLiga() {
       if (!gm[m]) gm[m] = { g: 0, t: 0 };
       gm[m].t++; if (r.resultado_aposta === 'green') gm[m].g++;
     }
-
     const porLigaMercado = {};
     for (const [k, v] of Object.entries(lm))
       if (v.t >= 3) porLigaMercado[k] = { ass: Math.round(v.g / v.t * 100), total: v.t };
     const porMercado = {};
     for (const [k, v] of Object.entries(gm))
       if (v.t >= 3) porMercado[k] = { ass: Math.round(v.g / v.t * 100), total: v.t };
-
     return { porLigaMercado, porMercado, total: rows.length };
-  } catch(e) {
-    console.error('carregarHistoricoLiga erro:', e.message);
-    return { porLigaMercado: {}, porMercado: {}, total: 0 };
-  }
+  } catch(e) { console.error('carregarHistoricoLiga erro:', e.message); return { porLigaMercado: {}, porMercado: {}, total: 0 }; }
 }
+
+async function carregarHistoricoLinhaLiga() {
+  try {
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/jogos_historico?select=liga_id,mercado_escolhido,aposta_escolhida,resultado_aposta&limit=5000`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+    const acc = {};
+    for (const r of rows) {
+      const linha = engineParsarLinha(r.aposta_escolhida, r.mercado_escolhido);
+      if (!linha) continue;
+      const k = `${r.liga_id}|${r.mercado_escolhido}|${linha}`;
+      if (!acc[k]) acc[k] = { g: 0, t: 0 };
+      acc[k].t++; if (r.resultado_aposta === 'green') acc[k].g++;
+    }
+    const result = {};
+    for (const [k, v] of Object.entries(acc))
+      if (v.t >= 3) result[k] = { ass: Math.round(v.g / v.t * 100), total: v.t };
+    return result;
+  } catch(e) { console.error('carregarHistoricoLinhaLiga erro:', e.message); return {}; }
+}
+
+async function carregarLigasEngine() {
+  try {
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/ligas_conhecidas?select=liga_id,mercados,media_escanteios,media_cartoes&limit=500`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+    const porLiga = {};
+    for (const l of rows) {
+      if (!l.liga_id) continue;
+      const m = l.mercados || {};
+      let bestMercado = null, bestAss = 0, bestTotal = 0;
+      for (const [merc, stats] of Object.entries(m)) {
+        const t = (stats.green || 0) + (stats.red || 0);
+        if (t < 3) continue;
+        const ass = (stats.green || 0) / t * 100;
+        if (ass > bestAss) { bestAss = ass; bestMercado = merc; bestTotal = t; }
+      }
+      porLiga[l.liga_id] = {
+        mercados: m, bestMercado,
+        bestAss: Math.round(bestAss), bestTotal,
+        media_escanteios: parseFloat(l.media_escanteios) || null,
+        media_cartoes:    parseFloat(l.media_cartoes)    || null,
+      };
+    }
+    return porLiga;
+  } catch(e) { console.error('carregarLigasEngine erro:', e.message); return {}; }
+}
+
+// Pares inversos para correlação inversa
+const ENGINE_INVERSE_PAIRS = {
+  'over_0.5': 'under_0.5', 'over_1.5': 'under_1.5', 'over_2.5': 'under_2.5',
+  'over_3.5': 'under_3.5', 'over_4.5': 'under_4.5',
+  'under_0.5': 'over_0.5', 'under_1.5': 'over_1.5', 'under_2.5': 'over_2.5',
+  'under_3.5': 'over_3.5', 'under_4.5': 'over_4.5',
+  'over_7.5': 'under_7.5', 'over_8.5': 'under_8.5', 'over_9.5': 'under_9.5', 'over_10.5': 'under_10.5',
+  'under_7.5': 'over_7.5', 'under_8.5': 'over_8.5', 'under_9.5': 'over_9.5', 'under_10.5': 'over_10.5',
+  'over_2.5c': 'under_2.5c', 'over_3.5c': 'under_3.5c', 'under_2.5c': 'over_2.5c', 'under_3.5c': 'over_3.5c',
+  'casa': 'X2', 'X2': 'casa', 'fora': '1X', '1X': 'fora',
+};
+function engineGetInversa(linha) { return ENGINE_INVERSE_PAIRS[linha] || null; }
 
 async function carregarCorrelacaoCalib() {
   try {
@@ -6760,13 +6833,14 @@ function engineFaixaOdd(odd) {
   return '2.00+';
 }
 
-// Filtros de sanidade: veta apostas inconsistentes com as médias do jogo
+// Filtros de sanidade: usa médias pré-computadas (_mc*) quando disponíveis (season stats API)
+// Fallback para campos do jogo quando não há dados da API
 function engineSanityOk(linha, mercado, jogo) {
-  const mcGols = parseFloat(jogo.media_gols_casa || 0) + parseFloat(jogo.media_gols_fora || 0);
-  const mcEsc  = parseFloat(jogo.media_escanteios || 0);
-  const mcCart = parseFloat(jogo.media_cartoes || 0);
-  const fhS = engineFormaScore(jogo.forma_casa);
-  const faS = engineFormaScore(jogo.forma_fora);
+  const mcGols = jogo._mcGols  ?? (parseFloat(jogo.media_gols_casa || 0) + parseFloat(jogo.media_gols_fora || 0));
+  const mcEsc  = jogo._mcEsc   ?? parseFloat(jogo.media_escanteios || 0);
+  const mcCart = jogo._mcCart  ?? parseFloat(jogo.media_cartoes || 0);
+  const fhS    = jogo._winHome ?? engineFormaScore(jogo.forma_casa);
+  const faS    = jogo._winAway ?? engineFormaScore(jogo.forma_fora);
 
   if (mercado === 'gols') {
     if (linha === 'over_0.5') return mcGols >= 0.8;
@@ -6798,11 +6872,27 @@ function engineSanityOk(linha, mercado, jogo) {
   return true; // sem filtro específico → aceita
 }
 
-function engineScoreJogo(jogo, correlacao, historico) {
+function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsTimeCasa, statsTimeFora) {
+  const ligaId  = jogo.ligaId || jogo.liga_id;
+  const ligaInfo = ligasData?.[ligaId];
+
+  // ── Médias: API season stats têm prioridade sobre projeções do jogo ────────
+  const goalsHome = parseFloat(statsTimeCasa?.goals?.for?.average?.home)  || parseFloat(jogo.media_gols_casa || 0);
+  const goalsAway = parseFloat(statsTimeFora?.goals?.for?.average?.away)  || parseFloat(jogo.media_gols_fora || 0);
+  const _mcGols   = goalsHome + goalsAway;
+  // Escanteios/cartões: preferir média real da liga (ligas_conhecidas) > jogo
+  const _mcEsc    = ligaInfo?.media_escanteios ?? parseFloat(jogo.media_escanteios || 0);
+  const _mcCart   = ligaInfo?.media_cartoes    ?? parseFloat(jogo.media_cartoes    || 0);
+  // Win rate: % de vitórias em casa/fora na temporada > forma dos últimos 5
+  const playedH   = statsTimeCasa?.fixtures?.played?.home || 0;
+  const playedA   = statsTimeFora?.fixtures?.played?.away || 0;
+  const _winHome  = playedH >= 3 ? (statsTimeCasa.fixtures.wins.home / playedH * 100) : engineFormaScore(jogo.forma_casa);
+  const _winAway  = playedA >= 3 ? (statsTimeFora.fixtures.wins.away / playedA * 100) : engineFormaScore(jogo.forma_fora);
+
+  const jogoMedidas = { ...jogo, _mcGols, _mcEsc, _mcCart, _winHome, _winAway };
+
   const candidatos = [];
-  const AMOSTRA_MIN_CALIB = 5;
-  const AMOSTRA_MIN_HIST  = 3;
-  const ligaId = jogo.ligaId || jogo.liga_id;
+  const AMIN_CALIB = 5, AMIN_HIST = 3;
 
   for (const o of (jogo.odds_confirmadas || [])) {
     const { aposta, mercado, odd } = o;
@@ -6812,63 +6902,65 @@ function engineScoreJogo(jogo, correlacao, historico) {
     const faixa = engineFaixaOdd(odd);
     if (!linha || !faixa) continue;
 
-    // Veto de sanidade: descarta bets incompatíveis com as médias do jogo
-    if (!engineSanityOk(linha, mercado, jogo)) continue;
+    if (!engineSanityOk(linha, mercado, jogoMedidas)) continue;
 
-    // ── Sinal 1: correlacao_odds (mercado + linha + faixa_odd) ──────────────
+    // ── Sinal 1: correlacao_odds — assertividade global mercado+linha+faixa ──
     let assCalib = null, totalCalib = 0;
     if (correlacao) {
-      const kExato  = `${mercado}|${linha}|${faixa}`;
-      const kSemOdd = `${mercado}|${linha}|sem_odd`;
-      const entry   = correlacao.lookup[kExato] || correlacao.lookup[kSemOdd];
-      if (entry && entry.total >= AMOSTRA_MIN_CALIB) {
-        assCalib  = entry.ass;
-        totalCalib = entry.total;
-      }
+      const entry = correlacao.lookup[`${mercado}|${linha}|${faixa}`]
+                 || correlacao.lookup[`${mercado}|${linha}|sem_odd`];
+      if (entry?.total >= AMIN_CALIB) { assCalib = entry.ass; totalCalib = entry.total; }
     }
 
-    // ── Sinal 2: jogos_historico (liga + mercado) ────────────────────────────
+    // ── Sinal 2: histórico liga+mercado — como essa liga se saiu nesse mercado ─
     let assLiga = null, totalLiga = 0;
-    if (historico) {
-      const kLiga  = `${ligaId}|${mercado}`;
-      const entryL = historico.porLigaMercado[kLiga];
-      const entryG = historico.porMercado[mercado];
-      if (entryL && entryL.total >= AMOSTRA_MIN_HIST) {
-        assLiga  = entryL.ass;
-        totalLiga = entryL.total;
-      } else if (entryG && entryG.total >= AMOSTRA_MIN_HIST) {
-        // Fallback: mercado global (sem liga específica)
-        assLiga  = entryG.ass;
-        totalLiga = entryG.total;
-      }
+    if (historicoLiga) {
+      const eL = historicoLiga.porLigaMercado[`${ligaId}|${mercado}`];
+      const eG = historicoLiga.porMercado[mercado];
+      if (eL?.total >= AMIN_HIST)      { assLiga = eL.ass; totalLiga = eL.total; }
+      else if (eG?.total >= AMIN_HIST) { assLiga = eG.ass; totalLiga = eG.total; }
     }
 
-    // Precisa de pelo menos um sinal para incluir o candidato
     if (assCalib === null && assLiga === null) continue;
 
-    // ── Score combinado ──────────────────────────────────────────────────────
-    // Pesos: calib tem mais peso (mais específico) quando a amostra é grande
-    // Liga complementa, especialmente quando não há dado de correlação
-    let score;
-    const wCalib = assCalib !== null ? Math.min(totalCalib / 20, 1.0) : 0;  // 0–1
-    const wLiga  = assLiga  !== null ? Math.min(totalLiga  / 15, 1.0) * 0.7 : 0; // 0–0.7
-    const wTotal = wCalib + wLiga;
+    // ── Score base: média ponderada pelos tamanhos de amostra ────────────────
+    const wC = assCalib !== null ? Math.min(totalCalib / 20, 1.0)       : 0;
+    const wL = assLiga  !== null ? Math.min(totalLiga  / 15, 1.0) * 0.7 : 0;
+    const wT = wC + wL || 1;
+    let score = ((assCalib || 0) * wC + (assLiga || 0) * wL) / wT;
 
-    if (wTotal === 0) continue;
-    const assMedia = (
-      (assCalib ?? 0) * wCalib +
-      (assLiga  ?? 0) * wLiga
-    ) / wTotal;
+    // ── Sinal 3: mercado campeão da liga (ligas_conhecidas) ─────────────────
+    let assLigaBest = null;
+    if (ligaInfo?.bestMercado === mercado && ligaInfo.bestTotal >= 3) {
+      assLigaBest = ligaInfo.bestAss;
+      score += ligaInfo.bestAss >= 80 ? 8 : ligaInfo.bestAss >= 70 ? 5 : 2;
+    }
 
-    score = Math.round(assMedia);
+    // ── Sinal 4: correlação inversa ──────────────────────────────────────────
+    let assInversa = null, totalInversa = 0;
+    const linhaInv = engineGetInversa(linha);
+    if (linhaInv && histLinhaLiga) {
+      const eInv = histLinhaLiga[`${ligaId}|${mercado}|${linhaInv}`];
+      if (eInv?.total >= AMIN_HIST) { assInversa = eInv.ass; totalInversa = eInv.total; }
+    }
+    if (assInversa !== null) {
+      if      (assInversa < 35) score += 12; // inverso bomba → forte boost
+      else if (assInversa < 45) score += 7;
+      else if (assInversa < 50) score += 3;
+      else if (assInversa > 70) score -= 5;  // inverso indo bem → penalidade
+    }
+
+    // Penalidade: próprio mercado+linha falhando nessa liga
+    const eProprio = histLinhaLiga?.[`${ligaId}|${mercado}|${linha}`];
+    if (eProprio?.total >= 5 && eProprio.ass < 40) score -= 15;
 
     candidatos.push({
       aposta, mercado, odd, linha, faixa,
-      ass_calib:  assCalib,
-      total_calib: totalCalib,
-      ass_liga:   assLiga,
-      total_liga: totalLiga,
-      score,
+      ass_calib: assCalib, total_calib: totalCalib,
+      ass_liga: assLiga,   total_liga: totalLiga,
+      ass_liga_best: assLigaBest,
+      ass_inversa: assInversa, total_inversa: totalInversa, linha_inversa: linhaInv,
+      score: Math.round(score),
     });
   }
 
@@ -6894,26 +6986,45 @@ async function gerarApostasEngine(data) {
   const THRESHOLD_ASS = 65;
   const MAX_JOGOS = 15;
 
-  const [rowArr, correlacao, historico] = await Promise.all([
+  const [rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData] = await Promise.all([
     fetch(
       `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     ).then(r => r.json()),
     carregarCorrelacaoCalib(),
     carregarHistoricoLiga(),
+    carregarHistoricoLinhaLiga(),
+    carregarLigasEngine(),
   ]);
 
   const row = rowArr[0];
   if (!row?.apostas?.jogos?.length) return { erro: 'sem apostas para esta data', data };
 
-  console.log(`🤖 Engine: correlação=${correlacao?.total_apostas||0} apostas · histórico=${historico?.total||0} jogos`);
+  console.log(`🤖 Engine: calib=${correlacao?.total_apostas||0} · hist=${historicoLiga?.total||0} · ligas=${Object.keys(ligasData||{}).length} · linhas=${Object.keys(histLinhaLiga||{}).length}`);
+
+  // Buscar stats da temporada para cada time em paralelo (com cache por season)
+  const teamStatsMap = new Map();
+  const jogosAtivos = row.apostas.jogos.filter(j => !j.descartado);
+  await Promise.all(jogosAtivos.map(async (jogo) => {
+    if (!jogo.ligaId) return;
+    const [sc, sf] = await Promise.all([
+      jogo.teamCasaId ? buscarStatsTimeEngine(jogo.teamCasaId, jogo.ligaId) : null,
+      jogo.teamForaId ? buscarStatsTimeEngine(jogo.teamForaId, jogo.ligaId) : null,
+    ]);
+    teamStatsMap.set(jogo.id, { casa: sc, fora: sf });
+  }));
+  const comApiStats = [...teamStatsMap.values()].filter(v => v.casa || v.fora).length;
+  console.log(`🤖 Engine: season stats via API = ${comApiStats}/${jogosAtivos.length} jogos`);
 
   const picks = [];
-  for (const jogo of row.apostas.jogos) {
-    if (jogo.descartado) continue;
-    const candidatos = engineScoreJogo(jogo, correlacao, historico);
+  for (const jogo of jogosAtivos) {
+    const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.id) || {};
+    const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora);
     const melhor = candidatos[0];
     if (!melhor || melhor.score < THRESHOLD_ASS) continue;
+
+    const mcGolsReal = (parseFloat(statsCasa?.goals?.for?.average?.home) || parseFloat(jogo.media_gols_casa || 0))
+                     + (parseFloat(statsFora?.goals?.for?.average?.away) || parseFloat(jogo.media_gols_fora || 0));
 
     picks.push({
       id: jogo.id,
@@ -6921,47 +7032,40 @@ async function gerarApostasEngine(data) {
       time_casa: jogo.time_casa,
       time_fora: jogo.time_fora,
       horario: jogo.horario || '',
-      // IA pick (para comparação na segunda)
-      aposta_ia: jogo.aposta,
-      mercado_ia: jogo.mercado,
-      odd_ia: jogo.odd_mercado,
-      confianca_ia: jogo.confianca,
-      // Engine pick
-      aposta_engine: melhor.aposta,
-      mercado_engine: melhor.mercado,
-      odd_engine: melhor.odd,
-      linha_engine: melhor.linha,
-      faixa_odd_engine: melhor.faixa,
-      // Sinais de calibração
-      ass_calib:   melhor.ass_calib,   // correlacao_odds: mercado+linha+faixa
-      total_calib: melhor.total_calib,
-      ass_liga:    melhor.ass_liga,    // jogos_historico: liga+mercado
-      total_liga:  melhor.total_liga,
-      score_engine: melhor.score,      // combinação ponderada dos dois sinais
+      aposta_ia: jogo.aposta, mercado_ia: jogo.mercado,
+      odd_ia: jogo.odd_mercado, confianca_ia: jogo.confianca,
+      aposta_engine: melhor.aposta, mercado_engine: melhor.mercado,
+      odd_engine: melhor.odd, linha_engine: melhor.linha, faixa_odd_engine: melhor.faixa,
+      // 4 sinais
+      ass_calib:     melhor.ass_calib,  total_calib:   melhor.total_calib,
+      ass_liga:      melhor.ass_liga,   total_liga:    melhor.total_liga,
+      ass_liga_best: melhor.ass_liga_best,
+      ass_inversa:   melhor.ass_inversa, total_inversa: melhor.total_inversa,
+      linha_inversa: melhor.linha_inversa,
+      score_engine:  melhor.score,
       alternativas_engine: candidatos.slice(1, 5).map(c => ({
-        aposta: c.aposta, mercado: c.mercado, odd: c.odd,
-        ass_calib: c.ass_calib, total_calib: c.total_calib,
-        ass_liga: c.ass_liga, total_liga: c.total_liga, score: c.score,
+        aposta: c.aposta, mercado: c.mercado, odd: c.odd, score: c.score,
+        ass_calib: c.ass_calib, ass_liga: c.ass_liga, ass_inversa: c.ass_inversa,
       })),
-      // Estatísticas usadas nos filtros de sanidade
-      media_gols_casa: jogo.media_gols_casa,
-      media_gols_fora: jogo.media_gols_fora,
-      media_escanteios: jogo.media_escanteios,
-      media_cartoes: jogo.media_cartoes,
+      media_gols_combinada: mcGolsReal.toFixed(2),
+      media_gols_casa: statsCasa?.goals?.for?.average?.home || jogo.media_gols_casa,
+      media_gols_fora: statsFora?.goals?.for?.average?.away || jogo.media_gols_fora,
+      media_escanteios: ligasData?.[jogo.ligaId]?.media_escanteios || jogo.media_escanteios,
+      media_cartoes:    ligasData?.[jogo.ligaId]?.media_cartoes    || jogo.media_cartoes,
       forma_casa: engineParsForma(jogo.forma_casa),
       forma_fora: engineParsForma(jogo.forma_fora),
+      api_season_stats: !!(statsCasa || statsFora),
     });
   }
 
-  // Ordenar por assertividade calibrada decrescente, pegar top 15
-  picks.sort((a, b) => b.ass_calib - a.ass_calib || b.score_engine - a.score_engine);
+  picks.sort((a, b) => b.score_engine - a.score_engine);
   const top = picks.slice(0, MAX_JOGOS);
 
   const payload = {
     gerado_em: new Date().toISOString(),
     correlacao_base: correlacao?.total_apostas || 0,
     correlacao_periodo: correlacao?.periodo || null,
-    historico_base: historico?.total || 0,
+    historico_base: historicoLiga?.total || 0,
     assertividade_geral_hist: correlacao?.assertividade_geral || null,
     threshold_usado: THRESHOLD_ASS,
     total: top.length,

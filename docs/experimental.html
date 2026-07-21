@@ -595,8 +595,9 @@ function renderEngine(d){
           <th style="padding:8px 10px;font-weight:700;color:#0F766E;white-space:nowrap">Pick IA</th>
           <th style="padding:8px 10px;font-weight:700;color:#7C3AED;white-space:nowrap">Pick Engine</th>
           <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Score</th>
-          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Correlação</th>
-          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Liga</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap" title="Correlação: assertividade global por mercado+linha+faixa de odd">Correl.</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap" title="Histórico: performance desta liga neste mercado">Liga</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap" title="Inversa: assertividade do bet oposto nesta liga (quanto menor, melhor para este)">Inv.</th>
           <th style="padding:8px 10px;font-weight:700;color:#94A3B8;white-space:nowrap">Médias</th>
         </tr>
       </thead>
@@ -619,12 +620,18 @@ function renderEngine(d){
             </td>
             <td style="padding:8px 10px;text-align:center;">
               ${j.score_engine!=null ? `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:${j.score_engine>=75?'#F0FDF4':j.score_engine>=65?'#EFF6FF':'#FFF7ED'};color:${j.score_engine>=75?'#16A34A':j.score_engine>=65?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
+              ${j.api_season_stats?'<div style="font-size:9px;color:#0F766E;margin-top:2px">📡 API</div>':''}
             </td>
             <td style="padding:8px 10px;text-align:center;font-size:11px;">
-              ${j.ass_calib!=null ? `<span style="color:#0F766E;font-weight:600">${j.ass_calib}%</span><br><span style="color:#94A3B8">${j.total_calib} jgs</span>` : '<span style="color:#94A3B8">—</span>'}
+              ${j.ass_calib!=null ? `<span style="color:#0F766E;font-weight:600">${j.ass_calib}%</span><br><span style="color:#94A3B8">${j.total_calib}j</span>` : '<span style="color:#94A3B8">—</span>'}
             </td>
             <td style="padding:8px 10px;text-align:center;font-size:11px;">
-              ${j.ass_liga!=null ? `<span style="color:#7C3AED;font-weight:600">${j.ass_liga}%</span><br><span style="color:#94A3B8">${j.total_liga} jgs</span>` : '<span style="color:#94A3B8">—</span>'}
+              ${j.ass_liga!=null ? `<span style="color:#7C3AED;font-weight:600">${j.ass_liga}%</span><br><span style="color:#94A3B8">${j.total_liga}j${j.ass_liga_best!=null?' ★':''}</span>` : '<span style="color:#94A3B8">—</span>'}
+            </td>
+            <td style="padding:8px 10px;text-align:center;font-size:11px;">
+              ${j.ass_inversa!=null
+                ? `<span style="color:${j.ass_inversa<45?'#16A34A':j.ass_inversa>70?'#DC2626':'#94A3B8'};font-weight:600" title="Inversa (${j.linha_inversa}): ${j.ass_inversa}% em ${j.total_inversa} jogos">${j.ass_inversa}%</span><br><span style="color:#94A3B8">${j.total_inversa}j</span>`
+                : '<span style="color:#E2E8F0">—</span>'}
             </td>
             <td style="padding:8px 10px;font-size:10px;color:#64748B;white-space:nowrap">
               ⚽${mcGols} · 🚩${j.media_escanteios||'—'} · 🟨${j.media_cartoes||'—'}<br>
@@ -635,8 +642,11 @@ function renderEngine(d){
       </tbody>
     </table>
     </div>
-    <div style="margin-top:12px;font-size:11px;color:#94A3B8">
-      🟢 Linhas destacadas = IA e Engine escolheram o mesmo mercado
+    <div style="margin-top:12px;font-size:11px;color:#94A3B8;display:flex;flex-wrap:wrap;gap:12px;">
+      <span>🟢 linha = IA e Engine no mesmo mercado</span>
+      <span>📡 API = season stats da temporada usados</span>
+      <span>★ Liga = mercado campeão da liga</span>
+      <span title="Inversa verde = oposto falha nessa liga, boost para este bet">Inv. verde = oposto falhando → boost</span>
     </div>`;
 }
 
