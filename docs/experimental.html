@@ -550,7 +550,7 @@ const MERCADO_COR = {gols:'#0F766E',escanteios:'#7C3AED',cartoes:'#B45309',resul
 function renderEngine(d){
   const jogos = d.jogos || [];
   document.getElementById('engine-sub').textContent =
-    `${jogos.length} jogos selecionados · ${d.correlacao_base||0} apostas na correlação · threshold ≥${d.threshold_usado||65}% · gerado ${d.gerado_em ? new Date(d.gerado_em).toLocaleString('pt-BR') : ''}`;
+    `${jogos.length} jogos · correlação: ${d.correlacao_base||0} apostas · histórico: ${d.historico_base||0} jogos · threshold ≥${d.threshold_usado||65}% · ${d.gerado_em ? new Date(d.gerado_em).toLocaleString('pt-BR') : ''}`;
 
   // Contagem por mercado
   const porMercado = {};
@@ -594,8 +594,9 @@ function renderEngine(d){
           <th style="padding:8px 10px;font-weight:700;color:#94A3B8;white-space:nowrap">Hora</th>
           <th style="padding:8px 10px;font-weight:700;color:#0F766E;white-space:nowrap">Pick IA</th>
           <th style="padding:8px 10px;font-weight:700;color:#7C3AED;white-space:nowrap">Pick Engine</th>
-          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Ass.Calib</th>
-          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Amostra</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Score</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Correlação</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Liga</th>
           <th style="padding:8px 10px;font-weight:700;color:#94A3B8;white-space:nowrap">Médias</th>
         </tr>
       </thead>
@@ -617,9 +618,14 @@ function renderEngine(d){
               <div style="font-size:10px;color:#94A3B8">@${j.odd_engine||'—'}</div>
             </td>
             <td style="padding:8px 10px;text-align:center;">
-              ${j.ass_calib!=null ? `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:${j.ass_calib>=75?'#F0FDF4':j.ass_calib>=65?'#EFF6FF':'#FFF7ED'};color:${j.ass_calib>=75?'#16A34A':j.ass_calib>=65?'#3B82F6':'#B45309'}">${j.ass_calib}%</span>` : '—'}
+              ${j.score_engine!=null ? `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:${j.score_engine>=75?'#F0FDF4':j.score_engine>=65?'#EFF6FF':'#FFF7ED'};color:${j.score_engine>=75?'#16A34A':j.score_engine>=65?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
             </td>
-            <td style="padding:8px 10px;text-align:center;font-size:11px;color:#94A3B8">${j.total_calib||'—'} jogos</td>
+            <td style="padding:8px 10px;text-align:center;font-size:11px;">
+              ${j.ass_calib!=null ? `<span style="color:#0F766E;font-weight:600">${j.ass_calib}%</span><br><span style="color:#94A3B8">${j.total_calib} jgs</span>` : '<span style="color:#94A3B8">—</span>'}
+            </td>
+            <td style="padding:8px 10px;text-align:center;font-size:11px;">
+              ${j.ass_liga!=null ? `<span style="color:#7C3AED;font-weight:600">${j.ass_liga}%</span><br><span style="color:#94A3B8">${j.total_liga} jgs</span>` : '<span style="color:#94A3B8">—</span>'}
+            </td>
             <td style="padding:8px 10px;font-size:10px;color:#64748B;white-space:nowrap">
               ⚽${mcGols} · 🚩${j.media_escanteios||'—'} · 🟨${j.media_cartoes||'—'}<br>
               <span title="Forma casa">${j.forma_casa||'—'}</span> vs <span title="Forma fora">${j.forma_fora||'—'}</span>

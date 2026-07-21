@@ -6651,9 +6651,44 @@ app.get('/historico', async (req, res) => {
 });
 
 // ─── ENGINE DE REGRAS ───────────────────────────────────────────────────────
-// Seleção de apostas usando tabela correlacao_odds da calibração como sinal primário.
-// Correlação: mercado + linha + faixa_odd → assertividade real do histórico.
-// Sanity filters baseados em médias/forma como veto secundário.
+// Combina dois sinais independentes para pontuar cada aposta disponível:
+//   1. correlacao_odds (calibracao table): assertividade por mercado+linha+faixa_odd
+//   2. jogos_historico: assertividade por liga+mercado (performance da liga naquele mercado)
+// Sanity filters (médias/forma) como veto secundário.
+// Threshold: score combinado ≥ 65 para incluir.
+
+async function carregarHistoricoLiga() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/jogos_historico?select=liga_id,mercado_escolhido,resultado_aposta&limit=5000`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (!res.ok) return { porLigaMercado: {}, porMercado: {}, total: 0 };
+    const rows = await res.json();
+
+    const lm = {}, gm = {};
+    for (const r of rows) {
+      const k = `${r.liga_id}|${r.mercado_escolhido}`;
+      if (!lm[k]) lm[k] = { g: 0, t: 0 };
+      lm[k].t++; if (r.resultado_aposta === 'green') lm[k].g++;
+      const m = r.mercado_escolhido || 'outros';
+      if (!gm[m]) gm[m] = { g: 0, t: 0 };
+      gm[m].t++; if (r.resultado_aposta === 'green') gm[m].g++;
+    }
+
+    const porLigaMercado = {};
+    for (const [k, v] of Object.entries(lm))
+      if (v.t >= 3) porLigaMercado[k] = { ass: Math.round(v.g / v.t * 100), total: v.t };
+    const porMercado = {};
+    for (const [k, v] of Object.entries(gm))
+      if (v.t >= 3) porMercado[k] = { ass: Math.round(v.g / v.t * 100), total: v.t };
+
+    return { porLigaMercado, porMercado, total: rows.length };
+  } catch(e) {
+    console.error('carregarHistoricoLiga erro:', e.message);
+    return { porLigaMercado: {}, porMercado: {}, total: 0 };
+  }
+}
 
 async function carregarCorrelacaoCalib() {
   try {
@@ -6763,43 +6798,76 @@ function engineSanityOk(linha, mercado, jogo) {
   return true; // sem filtro específico → aceita
 }
 
-function engineScoreJogo(jogo, correlacao) {
+function engineScoreJogo(jogo, correlacao, historico) {
   const candidatos = [];
-  const AMOSTRA_MIN = 5;
+  const AMOSTRA_MIN_CALIB = 5;
+  const AMOSTRA_MIN_HIST  = 3;
+  const ligaId = jogo.ligaId || jogo.liga_id;
 
   for (const o of (jogo.odds_confirmadas || [])) {
     const { aposta, mercado, odd } = o;
     if (!aposta || !odd || odd < 1.25) continue;
 
-    const linha  = engineParsarLinha(aposta, mercado);
-    const faixa  = engineFaixaOdd(odd);
+    const linha = engineParsarLinha(aposta, mercado);
+    const faixa = engineFaixaOdd(odd);
     if (!linha || !faixa) continue;
 
-    // Filtro de sanidade: veta bets inconsistentes com medias/forma
+    // Veto de sanidade: descarta bets incompatíveis com as médias do jogo
     if (!engineSanityOk(linha, mercado, jogo)) continue;
 
-    // Lookup na correlação calibrada
+    // ── Sinal 1: correlacao_odds (mercado + linha + faixa_odd) ──────────────
     let assCalib = null, totalCalib = 0;
     if (correlacao) {
-      const kExato   = `${mercado}|${linha}|${faixa}`;
-      const kSemOdd  = `${mercado}|${linha}|sem_odd`;
-      const entry    = correlacao.lookup[kExato] || correlacao.lookup[kSemOdd];
-      if (entry && entry.total >= AMOSTRA_MIN) {
+      const kExato  = `${mercado}|${linha}|${faixa}`;
+      const kSemOdd = `${mercado}|${linha}|sem_odd`;
+      const entry   = correlacao.lookup[kExato] || correlacao.lookup[kSemOdd];
+      if (entry && entry.total >= AMOSTRA_MIN_CALIB) {
         assCalib  = entry.ass;
         totalCalib = entry.total;
       }
     }
 
-    // Pontuação: assertividade calibrada (peso 80%) + confiança na amostra (peso 20%)
-    // Se não há dado calibrado suficiente, não inclui o candidato
-    if (assCalib === null) continue;
-    const sampleWeight = Math.min(totalCalib / 30, 1.0); // satura em 30 jogos
-    const score = Math.round(assCalib * 0.8 + assCalib * sampleWeight * 0.2);
+    // ── Sinal 2: jogos_historico (liga + mercado) ────────────────────────────
+    let assLiga = null, totalLiga = 0;
+    if (historico) {
+      const kLiga  = `${ligaId}|${mercado}`;
+      const entryL = historico.porLigaMercado[kLiga];
+      const entryG = historico.porMercado[mercado];
+      if (entryL && entryL.total >= AMOSTRA_MIN_HIST) {
+        assLiga  = entryL.ass;
+        totalLiga = entryL.total;
+      } else if (entryG && entryG.total >= AMOSTRA_MIN_HIST) {
+        // Fallback: mercado global (sem liga específica)
+        assLiga  = entryG.ass;
+        totalLiga = entryG.total;
+      }
+    }
+
+    // Precisa de pelo menos um sinal para incluir o candidato
+    if (assCalib === null && assLiga === null) continue;
+
+    // ── Score combinado ──────────────────────────────────────────────────────
+    // Pesos: calib tem mais peso (mais específico) quando a amostra é grande
+    // Liga complementa, especialmente quando não há dado de correlação
+    let score;
+    const wCalib = assCalib !== null ? Math.min(totalCalib / 20, 1.0) : 0;  // 0–1
+    const wLiga  = assLiga  !== null ? Math.min(totalLiga  / 15, 1.0) * 0.7 : 0; // 0–0.7
+    const wTotal = wCalib + wLiga;
+
+    if (wTotal === 0) continue;
+    const assMedia = (
+      (assCalib ?? 0) * wCalib +
+      (assLiga  ?? 0) * wLiga
+    ) / wTotal;
+
+    score = Math.round(assMedia);
 
     candidatos.push({
       aposta, mercado, odd, linha, faixa,
-      ass_calib: assCalib,
+      ass_calib:  assCalib,
       total_calib: totalCalib,
+      ass_liga:   assLiga,
+      total_liga: totalLiga,
       score,
     });
   }
@@ -6826,29 +6894,26 @@ async function gerarApostasEngine(data) {
   const THRESHOLD_ASS = 65;
   const MAX_JOGOS = 15;
 
-  const [rowArr, correlacao] = await Promise.all([
+  const [rowArr, correlacao, historico] = await Promise.all([
     fetch(
       `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     ).then(r => r.json()),
     carregarCorrelacaoCalib(),
+    carregarHistoricoLiga(),
   ]);
 
   const row = rowArr[0];
   if (!row?.apostas?.jogos?.length) return { erro: 'sem apostas para esta data', data };
 
-  if (!correlacao) {
-    console.warn('⚠️ Engine: sem tabela de correlação disponível');
-  } else {
-    console.log(`🤖 Engine: correlação carregada — ${correlacao.total_apostas} apostas analisadas, período ${correlacao.periodo}`);
-  }
+  console.log(`🤖 Engine: correlação=${correlacao?.total_apostas||0} apostas · histórico=${historico?.total||0} jogos`);
 
   const picks = [];
   for (const jogo of row.apostas.jogos) {
     if (jogo.descartado) continue;
-    const candidatos = engineScoreJogo(jogo, correlacao);
+    const candidatos = engineScoreJogo(jogo, correlacao, historico);
     const melhor = candidatos[0];
-    if (!melhor || melhor.ass_calib < THRESHOLD_ASS) continue;
+    if (!melhor || melhor.score < THRESHOLD_ASS) continue;
 
     picks.push({
       id: jogo.id,
@@ -6867,12 +6932,16 @@ async function gerarApostasEngine(data) {
       odd_engine: melhor.odd,
       linha_engine: melhor.linha,
       faixa_odd_engine: melhor.faixa,
-      ass_calib: melhor.ass_calib,
+      // Sinais de calibração
+      ass_calib:   melhor.ass_calib,   // correlacao_odds: mercado+linha+faixa
       total_calib: melhor.total_calib,
-      score_engine: melhor.score,
+      ass_liga:    melhor.ass_liga,    // jogos_historico: liga+mercado
+      total_liga:  melhor.total_liga,
+      score_engine: melhor.score,      // combinação ponderada dos dois sinais
       alternativas_engine: candidatos.slice(1, 5).map(c => ({
         aposta: c.aposta, mercado: c.mercado, odd: c.odd,
-        ass_calib: c.ass_calib, total_calib: c.total_calib, score: c.score,
+        ass_calib: c.ass_calib, total_calib: c.total_calib,
+        ass_liga: c.ass_liga, total_liga: c.total_liga, score: c.score,
       })),
       // Estatísticas usadas nos filtros de sanidade
       media_gols_casa: jogo.media_gols_casa,
@@ -6892,6 +6961,7 @@ async function gerarApostasEngine(data) {
     gerado_em: new Date().toISOString(),
     correlacao_base: correlacao?.total_apostas || 0,
     correlacao_periodo: correlacao?.periodo || null,
+    historico_base: historico?.total || 0,
     assertividade_geral_hist: correlacao?.assertividade_geral || null,
     threshold_usado: THRESHOLD_ASS,
     total: top.length,
