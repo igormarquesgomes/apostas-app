@@ -4569,6 +4569,60 @@ async function agentValidar(data, opcoes = {}) {
   console.log(`✅ Validação: ${g} green, ${r} red, ${p} pendente`);
 
   await recalcularMultiplas(data, resultados);
+  salvarHistorico(data, row.apostas.jogos, resultados).catch(e => console.error('Erro salvarHistorico:', e.message));
+}
+
+async function salvarHistorico(data, jogos, resultados) {
+  const registros = [];
+  for (const r of resultados) {
+    if (!['green', 'red'].includes(r.resultado_aposta)) continue;
+    const j = jogos.find(x => x.id === r.jogo_id);
+    if (!j || !j.fixtureId) continue;
+    const [gC, gF] = (r.placar || '').split('-').map(Number);
+    registros.push({
+      fixture_id:             j.fixtureId,
+      data,
+      liga_id:                j.ligaId || null,
+      liga_nome:              j.liga || null,
+      time_casa:              j.time_casa,
+      time_fora:              j.time_fora,
+      team_casa_id:           j.teamCasaId || null,
+      team_fora_id:           j.teamForaId || null,
+      placar:                 r.placar || null,
+      gols_casa:              isNaN(gC) ? null : gC,
+      gols_fora:              isNaN(gF) ? null : gF,
+      escanteios_total:       r.escanteios_total || null,
+      cartoes_total:          r.cartoes_total || null,
+      forma_casa:             j.forma_casa || null,
+      forma_fora:             j.forma_fora || null,
+      media_gols_casa:        parseFloat(j.media_gols_casa) || null,
+      media_gols_fora:        parseFloat(j.media_gols_fora) || null,
+      media_escanteios:       parseFloat(j.media_escanteios) || null,
+      media_cartoes:          parseFloat(j.media_cartoes) || null,
+      aposta_escolhida:       j.aposta || null,
+      mercado_escolhido:      j.mercado || null,
+      odd_escolhida:          j.odd_mercado || null,
+      resultado_aposta:       r.resultado_aposta,
+      confianca:              j.confianca || null,
+      probabilidade_estimada: j.probabilidade_estimada || null,
+      odds_confirmadas:       j.odds_confirmadas || null,
+      mercados_resultado:     r.mercados_resultado || null,
+      alternativas:           j.alternativas || null,
+    });
+  }
+  if (!registros.length) return;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/jogos_historico`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(registros),
+  });
+  if (!res.ok) { const err = await res.text(); console.error(`❌ salvarHistorico erro ${res.status}: ${err}`); }
+  else console.log(`📚 Histórico salvo: ${registros.length} jogo(s) de ${data}`);
 }
 
 async function recalcularMultiplas(data, resultadosApostas) {
