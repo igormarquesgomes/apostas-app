@@ -6659,7 +6659,44 @@ app.get('/historico', async (req, res) => {
 // API teams/statistics: médias reais da temporada substituem projeções do jogo
 
 const teamStatsEngineCache = new Map(); // "teamId|ligaId|season" → response
+const standingsEngineCache  = new Map(); // "ligaId|season" → Map<teamId, {rank, points, goalsDiff}>
 const ENGINE_ANO = new Date().getFullYear();
+
+async function buscarStandingsEngine(ligaId) {
+  if (!ligaId || !APIFOOTBALL_KEY) return new Map();
+  const k = `${ligaId}|${ENGINE_ANO}`;
+  if (standingsEngineCache.has(k)) return standingsEngineCache.get(k);
+  try {
+    const res = await fetch(
+      `https://v3.football.api-sports.io/standings?league=${ligaId}&season=${ENGINE_ANO}`,
+      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
+    );
+    const teamMap = new Map();
+    if (res.ok) {
+      const json = await res.json();
+      const groups = json.response?.[0]?.league?.standings || [];
+      for (const group of groups) {
+        for (const entry of group) {
+          teamMap.set(entry.team.id, {
+            rank:      entry.rank,
+            points:    entry.points,
+            goalsDiff: entry.goalsDiff,
+            form:      entry.form || '',          // últimos 5 da tabela (ex: "WDWLW")
+            winsHome:  entry.home?.win  ?? null,
+            playsHome: entry.home?.played ?? null,
+            winsAway:  entry.away?.win  ?? null,
+            playsAway: entry.away?.played ?? null,
+          });
+        }
+      }
+    }
+    standingsEngineCache.set(k, teamMap);
+    return teamMap;
+  } catch(e) {
+    standingsEngineCache.set(k, new Map());
+    return new Map();
+  }
+}
 
 async function buscarStatsTimeEngine(teamId, ligaId) {
   if (!teamId || !ligaId || !APIFOOTBALL_KEY) return null;
@@ -6872,14 +6909,24 @@ function engineSanityOk(linha, mercado, jogo) {
   return true; // sem filtro específico → aceita
 }
 
-function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsTimeCasa, statsTimeFora) {
+function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsTimeCasa, statsTimeFora, standings) {
   const ligaId  = jogo.ligaId || jogo.liga_id;
   const ligaInfo = ligasData?.[ligaId];
+
+  // ── Dados de standings (posição na tabela) ───────────────────────────────
+  const stCasa = standings?.get(jogo.teamCasaId) || null;
+  const stFora = standings?.get(jogo.teamForaId) || null;
+  const rankDiff = (stCasa && stFora) ? (stFora.rank - stCasa.rank) : null;
+  // rankDiff > 0 → time casa está melhor colocado; < 0 → time fora está melhor
 
   // ── Médias: API season stats têm prioridade sobre projeções do jogo ────────
   const goalsHome = parseFloat(statsTimeCasa?.goals?.for?.average?.home)  || parseFloat(jogo.media_gols_casa || 0);
   const goalsAway = parseFloat(statsTimeFora?.goals?.for?.average?.away)  || parseFloat(jogo.media_gols_fora || 0);
-  const _mcGols   = goalsHome + goalsAway;
+  // goalsDiff da tabela reforça estimativa de gols: times com saldo positivo tendem a marcar mais
+  const gdCasa    = stCasa?.goalsDiff ?? 0;
+  const gdFora    = stFora?.goalsDiff ?? 0;
+  const gdBonus   = (gdCasa + gdFora) / 20; // normaliza: saldo total +20 = +1 gol extra estimado
+  const _mcGols   = goalsHome + goalsAway + Math.max(gdBonus, 0);
   // Escanteios/cartões: preferir média real da liga (ligas_conhecidas) > jogo
   const _mcEsc    = ligaInfo?.media_escanteios ?? parseFloat(jogo.media_escanteios || 0);
   const _mcCart   = ligaInfo?.media_cartoes    ?? parseFloat(jogo.media_cartoes    || 0);
@@ -6929,6 +6976,31 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     const wT = wC + wL || 1;
     let score = ((assCalib || 0) * wC + (assLiga || 0) * wL) / wT;
 
+    // ── Bônus/penalidade de posição na tabela (standings) ───────────────────
+    if (rankDiff !== null && mercado === 'resultado') {
+      const ap = (aposta || '').toLowerCase();
+      const isCasa = ap.includes('casa') || ap.includes('home') || ap.includes('mandante') || ap.includes('1x') || linha === '1X' || linha === 'casa';
+      const isFora = ap.includes('fora') || ap.includes('away') || ap.includes('visitante') || ap.includes('x2') || linha === 'X2' || linha === 'fora';
+      if (isCasa) {
+        // rankDiff > 0 → casa melhor colocado → reforça aposta em casa/1X
+        if      (rankDiff >= 10) score += 10;
+        else if (rankDiff >= 5)  score += 6;
+        else if (rankDiff >= 2)  score += 3;
+        else if (rankDiff <= -5) score -= 5;
+      } else if (isFora) {
+        // rankDiff < 0 → fora melhor colocado → reforça aposta em fora/X2
+        if      (rankDiff <= -10) score += 10;
+        else if (rankDiff <= -5)  score += 6;
+        else if (rankDiff <= -2)  score += 3;
+        else if (rankDiff >= 5)   score -= 5;
+      }
+    }
+    // Para gols: pontuação positiva combinada de saldo de gols reforça Over
+    if (rankDiff !== null && mercado === 'gols' && (stCasa?.goalsDiff ?? 0) + (stFora?.goalsDiff ?? 0) < -5) {
+      const ap = (aposta || '').toLowerCase();
+      if (ap.includes('over')) score -= 4; // ambos times com saldo negativo → menos gols
+    }
+
     // ── Sinal 3: mercado campeão da liga (ligas_conhecidas) ─────────────────
     let assLigaBest = null;
     if (ligaInfo?.bestMercado === mercado && ligaInfo.bestTotal >= 3) {
@@ -6960,6 +7032,8 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
       ass_liga: assLiga,   total_liga: totalLiga,
       ass_liga_best: assLigaBest,
       ass_inversa: assInversa, total_inversa: totalInversa, linha_inversa: linhaInv,
+      rank_casa: stCasa?.rank ?? null, rank_fora: stFora?.rank ?? null,
+      rank_diff: rankDiff,
       score: Math.round(score),
     });
   }
@@ -7002,24 +7076,39 @@ async function gerarApostasEngine(data) {
 
   console.log(`🤖 Engine: calib=${correlacao?.total_apostas||0} · hist=${historicoLiga?.total||0} · ligas=${Object.keys(ligasData||{}).length} · linhas=${Object.keys(histLinhaLiga||{}).length}`);
 
-  // Buscar stats da temporada para cada time em paralelo (com cache por season)
-  const teamStatsMap = new Map();
+  // Buscar stats da temporada + standings por liga (em paralelo, com cache por season)
   const jogosAtivos = row.apostas.jogos.filter(j => !j.descartado);
-  await Promise.all(jogosAtivos.map(async (jogo) => {
-    if (!jogo.ligaId) return;
-    const [sc, sf] = await Promise.all([
-      jogo.teamCasaId ? buscarStatsTimeEngine(jogo.teamCasaId, jogo.ligaId) : null,
-      jogo.teamForaId ? buscarStatsTimeEngine(jogo.teamForaId, jogo.ligaId) : null,
-    ]);
-    teamStatsMap.set(jogo.id, { casa: sc, fora: sf });
-  }));
+  const ligasUnicas = [...new Set(jogosAtivos.map(j => j.ligaId).filter(Boolean))];
+
+  const teamStatsMap = new Map();
+  const standingsMap = new Map(); // ligaId → Map<teamId, standings>
+
+  await Promise.all([
+    // teams/statistics por time
+    ...jogosAtivos.map(async (jogo) => {
+      if (!jogo.ligaId) return;
+      const [sc, sf] = await Promise.all([
+        jogo.teamCasaId ? buscarStatsTimeEngine(jogo.teamCasaId, jogo.ligaId) : null,
+        jogo.teamForaId ? buscarStatsTimeEngine(jogo.teamForaId, jogo.ligaId) : null,
+      ]);
+      teamStatsMap.set(jogo.id, { casa: sc, fora: sf });
+    }),
+    // standings por liga (1 req por liga, não por time)
+    ...ligasUnicas.map(async (ligaId) => {
+      const sm = await buscarStandingsEngine(ligaId);
+      standingsMap.set(ligaId, sm);
+    }),
+  ]);
+
   const comApiStats = [...teamStatsMap.values()].filter(v => v.casa || v.fora).length;
-  console.log(`🤖 Engine: season stats via API = ${comApiStats}/${jogosAtivos.length} jogos`);
+  const comStandings = [...standingsMap.values()].filter(m => m.size > 0).length;
+  console.log(`🤖 Engine: season stats=${comApiStats}/${jogosAtivos.length} · standings=${comStandings}/${ligasUnicas.length} ligas`);
 
   const picks = [];
   for (const jogo of jogosAtivos) {
     const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.id) || {};
-    const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora);
+    const standings = standingsMap.get(jogo.ligaId) || null;
+    const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings);
     const melhor = candidatos[0];
     if (!melhor || melhor.score < THRESHOLD_ASS) continue;
 
@@ -7042,6 +7131,7 @@ async function gerarApostasEngine(data) {
       ass_liga_best: melhor.ass_liga_best,
       ass_inversa:   melhor.ass_inversa, total_inversa: melhor.total_inversa,
       linha_inversa: melhor.linha_inversa,
+      rank_casa: melhor.rank_casa, rank_fora: melhor.rank_fora, rank_diff: melhor.rank_diff,
       score_engine:  melhor.score,
       alternativas_engine: candidatos.slice(1, 5).map(c => ({
         aposta: c.aposta, mercado: c.mercado, odd: c.odd, score: c.score,
