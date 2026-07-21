@@ -7192,14 +7192,21 @@ async function gerarApostasEngine(data) {
       .map(o => ({ ...o, linha: engineParsarLinha(o.aposta, o.mercado, jogo.time_casa, jogo.time_fora) }))
       .filter(o => o.linha);
 
-    if (!oddsEngine.length) continue;
+    if (!oddsEngine.length) {
+      const raw = oddsConfirmadas.map(o => `${o.aposta}[${o.mercado}]@${o.odd}`).join(', ');
+      console.log(`🔍 Engine skip sem linha: ${jogo.time_casa}x${jogo.time_fora} | odds_raw: ${raw}`);
+      continue;
+    }
 
     const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.fixtureId) || {};
     const standings = standingsMap.get(jogo.ligaId) || null;
 
     const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings, oddsEngine);
     const melhor = candidatos[0];
-    if (!melhor) continue;
+    if (!melhor) {
+      console.log(`🔍 Engine skip sem candidato: ${jogo.time_casa}x${jogo.time_fora} | linhas: ${oddsEngine.map(o=>o.linha).join(',')}`);
+      continue;
+    }
 
     const mcGolsReal = (parseFloat(statsCasa?.goals?.for?.average?.home) || parseFloat(jogo.media_gols_casa || 0))
                      + (parseFloat(statsFora?.goals?.for?.average?.away) || parseFloat(jogo.media_gols_fora || 0));
