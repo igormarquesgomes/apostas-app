@@ -7015,12 +7015,14 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
   // Usa apenas odds reais da API-Football — sem invenção
   for (const o of (oddsExternas || [])) {
     const { aposta, mercado, odd } = o;
-    if (!aposta || !odd || odd < 1.25) continue;
+    if (!aposta) continue;
+    if (odd != null && odd < 1.25) continue; // só descarta se odd conhecida e abaixo do mínimo
 
     // usa linha já normalizada (com nome do time) se disponível no objeto
     const linha = o.linha || engineParsarLinha(aposta, mercado, jogo.time_casa, jogo.time_fora);
-    const faixa = engineFaixaOdd(odd);
-    if (!linha || !faixa) continue;
+    // faixa=null quando odd desconhecida → sinal 1 usa fallback 'sem_odd' no lookup
+    const faixa = odd != null ? engineFaixaOdd(odd) : null;
+    if (!linha) continue;
 
     if (!engineSanityOk(linha, mercado, jogoMedidas)) continue;
 
@@ -7187,8 +7189,9 @@ async function gerarApostasEngine(data) {
       : [{ aposta: jogo.aposta, mercado: jogo.mercado, odd: jogo.odd_mercado }];
 
     // Converte para formato do engine (adiciona linha normalizada)
+    // odd=null é permitido — engine pontua pelos sinais históricos sem faixa_odd
     const oddsEngine = oddsConfirmadas
-      .filter(o => o.aposta && o.mercado && o.odd >= 1.20)
+      .filter(o => o.aposta && o.mercado && (o.odd == null || o.odd >= 1.20))
       .map(o => ({ ...o, linha: engineParsarLinha(o.aposta, o.mercado, jogo.time_casa, jogo.time_fora) }))
       .filter(o => o.linha);
 
