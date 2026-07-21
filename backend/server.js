@@ -6944,7 +6944,14 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
   const candidatos = [];
   const AMIN_CALIB = 5, AMIN_HIST = 3;
 
-  for (const o of (jogo.odds_confirmadas || [])) {
+  // Se não há odds confirmadas, usa a aposta da IA como candidato único para não descartar o jogo
+  const oddsParaAvaliar = (jogo.odds_confirmadas?.length > 0)
+    ? jogo.odds_confirmadas
+    : (jogo.aposta && jogo.mercado && jogo.odd_mercado
+        ? [{ aposta: jogo.aposta, mercado: jogo.mercado, odd: jogo.odd_mercado }]
+        : []);
+
+  for (const o of oddsParaAvaliar) {
     const { aposta, mercado, odd } = o;
     if (!aposta || !odd || odd < 1.25) continue;
 
@@ -6971,13 +6978,14 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
       else if (eG?.total >= AMIN_HIST) { assLiga = eG.ass; totalLiga = eG.total; }
     }
 
-    if (assCalib === null && assLiga === null) continue;
+    // sem dados históricos: não descarta — score começa em 50 (neutro)
+    const semDados = assCalib === null && assLiga === null;
 
     // ── Score base: média ponderada pelos tamanhos de amostra ────────────────
     const wC = assCalib !== null ? Math.min(totalCalib / 20, 1.0)       : 0;
     const wL = assLiga  !== null ? Math.min(totalLiga  / 15, 1.0) * 0.7 : 0;
     const wT = wC + wL || 1;
-    let score = ((assCalib || 0) * wC + (assLiga || 0) * wL) / wT;
+    let score = semDados ? 50 : ((assCalib || 0) * wC + (assLiga || 0) * wL) / wT;
 
     // ── Bônus/penalidade de posição na tabela (standings) ───────────────────
     if (rankDiff !== null && mercado === 'resultado') {
