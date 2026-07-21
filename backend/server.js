@@ -6606,6 +6606,50 @@ app.delete('/excluir-jogo', async (req, res) => {
   }
 });
 
+app.get('/historico', async (req, res) => {
+  try {
+    const { mercado, resultado, liga_id, limit = 100, offset = 0 } = req.query;
+    let filtros = `order=data.desc&limit=${limit}&offset=${offset}`;
+    if (mercado)   filtros += `&mercado_escolhido=eq.${encodeURIComponent(mercado)}`;
+    if (resultado) filtros += `&resultado_aposta=eq.${resultado}`;
+    if (liga_id)   filtros += `&liga_id=eq.${liga_id}`;
+
+    const [rows, statsRows] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/jogos_historico?select=fixture_id,data,liga_nome,time_casa,time_fora,placar,aposta_escolhida,mercado_escolhido,odd_escolhida,resultado_aposta,confianca,escanteios_total,cartoes_total,mercados_resultado&${filtros}`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/jogos_historico?select=mercado_escolhido,resultado_aposta`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).then(r => r.json()),
+    ]);
+
+    // Calcular stats por mercado
+    const porMercado = {};
+    for (const r of statsRows) {
+      const m = r.mercado_escolhido || 'outros';
+      if (!porMercado[m]) porMercado[m] = { green: 0, red: 0 };
+      porMercado[m][r.resultado_aposta]++;
+    }
+    const statsFormatadas = Object.entries(porMercado).map(([mercado, s]) => ({
+      mercado,
+      green: s.green || 0,
+      red: s.red || 0,
+      total: (s.green || 0) + (s.red || 0),
+      assertividade: s.green ? Math.round(s.green / ((s.green || 0) + (s.red || 0)) * 100) : 0,
+    })).sort((a, b) => b.total - a.total);
+
+    const totalGreen = statsRows.filter(r => r.resultado_aposta === 'green').length;
+    const totalRed   = statsRows.filter(r => r.resultado_aposta === 'red').length;
+
+    res.json({
+      total: totalGreen + totalRed,
+      green: totalGreen,
+      red: totalRed,
+      assertividade: totalGreen ? Math.round(totalGreen / (totalGreen + totalRed) * 100) : 0,
+      por_mercado: statsFormatadas,
+      jogos: rows,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/calibracao', async (req, res) => {
   const [semestral, mensal, semanal, diario] = await Promise.all([
     dbGetCalibracao('semestral'), dbGetCalibracao('mensal'),

@@ -145,6 +145,14 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
       <span class="card-action" id="just-card-label">→ abrir ferramenta</span>
       <span class="badge beta">Beta</span>
     </div>
+
+    <div class="card" id="card-hist" onclick="toggleHistorico()">
+      <div class="card-icon" style="background:#FFF7ED;">📊</div>
+      <div class="card-title">Histórico · Engine</div>
+      <div class="card-desc">Acompanhar os dados coletados por mercado para calibração do engine de regras.</div>
+      <span class="card-action" id="hist-card-label">→ abrir ferramenta</span>
+      <span class="badge beta">Novo</span>
+    </div>
   </div>
 
   <!-- Justificativa tool panel -->
@@ -221,6 +229,47 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
         </div>
         <div id="mult-output" style="margin-top:16px"></div>
       </div>
+
+    </div>
+  </div>
+
+  <!-- Histórico · Engine panel -->
+  <div class="tool-panel" id="tool-hist">
+    <div class="tool-hd">
+      <div class="tool-hd-left">
+        <div class="tool-hd-icon">📊</div>
+        <div>
+          <div class="tool-hd-title">Histórico · Engine de Regras</div>
+          <div class="tool-hd-sub">Dados coletados para calibração — atualizado a cada validação</div>
+        </div>
+      </div>
+      <button class="tool-close" onclick="fecharHistorico()">×</button>
+    </div>
+    <div class="tool-body">
+
+      <!-- Filtros -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
+        <select id="hist-filtro-mercado" onchange="carregarHistorico()" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:12px;color:#1E293B;background:#fff;outline:none;">
+          <option value="">Todos os mercados</option>
+          <option value="gols">Gols</option>
+          <option value="escanteios">Escanteios</option>
+          <option value="cartoes">Cartões</option>
+          <option value="resultado">Resultado</option>
+        </select>
+        <select id="hist-filtro-resultado" onchange="carregarHistorico()" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:12px;color:#1E293B;background:#fff;outline:none;">
+          <option value="">Green + Red</option>
+          <option value="green">Só Green</option>
+          <option value="red">Só Red</option>
+        </select>
+        <button class="btn sm" onclick="carregarHistorico()">↻ Atualizar</button>
+        <span id="hist-total-label" style="margin-left:auto;font-size:12px;color:#64748B;"></span>
+      </div>
+
+      <!-- Cards de stats por mercado -->
+      <div id="hist-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:24px;"></div>
+
+      <!-- Tabela de jogos -->
+      <div id="hist-lista" style="overflow-x:auto;"></div>
 
     </div>
   </div>
@@ -304,6 +353,93 @@ function fecharJustificativa(){
   document.getElementById('tool-just').classList.remove('open');
   document.getElementById('card-just').classList.remove('selected');
   document.getElementById('just-card-label').textContent = '→ abrir ferramenta';
+}
+
+// ── HISTÓRICO ENGINE ──────────────────────────────────────────────────────────
+
+function toggleHistorico(){
+  const panel = document.getElementById('tool-hist');
+  if(panel.classList.contains('open')){ fecharHistorico(); return; }
+  fecharTelegram(); fecharJustificativa();
+  panel.classList.add('open');
+  document.getElementById('card-hist').classList.add('selected');
+  document.getElementById('hist-card-label').textContent = '→ fechar ferramenta';
+  carregarHistorico();
+}
+
+function fecharHistorico(){
+  document.getElementById('tool-hist').classList.remove('open');
+  document.getElementById('card-hist').classList.remove('selected');
+  document.getElementById('hist-card-label').textContent = '→ abrir ferramenta';
+}
+
+async function carregarHistorico(){
+  const mercado  = document.getElementById('hist-filtro-mercado').value;
+  const resultado = document.getElementById('hist-filtro-resultado').value;
+  document.getElementById('hist-stats').innerHTML = '<div style="color:#94A3B8;font-size:12px;grid-column:1/-1">Carregando...</div>';
+  document.getElementById('hist-lista').innerHTML = '';
+  document.getElementById('hist-total-label').textContent = '';
+
+  try {
+    let url = `${BACKEND_URL}/historico?limit=200`;
+    if(mercado)   url += `&mercado=${encodeURIComponent(mercado)}`;
+    if(resultado) url += `&resultado=${resultado}`;
+    const r = await fetch(url);
+    const d = await r.json();
+
+    // Stats por mercado
+    const cores = {gols:'#0F766E',escanteios:'#7C3AED',cartoes:'#B45309',resultado:'#1D4ED8',outros:'#64748B'};
+    document.getElementById('hist-total-label').textContent = `${d.total} jogos · ${d.assertividade}% assertividade geral`;
+    document.getElementById('hist-stats').innerHTML = d.por_mercado.map(m => `
+      <div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 16px;">
+        <div style="font-size:10px;font-weight:700;color:${cores[m.mercado]||cores.outros};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${m.mercado}</div>
+        <div style="font-size:22px;font-weight:800;color:#1E293B;margin-bottom:2px">${m.assertividade}%</div>
+        <div style="font-size:11px;color:#64748B">${m.green}G · ${m.red}R · ${m.total} jogos</div>
+        <div style="margin-top:8px;height:4px;border-radius:4px;background:#E2E8F0;overflow:hidden">
+          <div style="height:100%;width:${m.assertividade}%;background:${cores[m.mercado]||cores.outros};border-radius:4px;"></div>
+        </div>
+      </div>`).join('');
+
+    // Tabela de jogos
+    if(!d.jogos.length){
+      document.getElementById('hist-lista').innerHTML = '<div class="empty-state">Nenhum jogo encontrado.</div>';
+      return;
+    }
+    document.getElementById('hist-lista').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:2px solid #E2E8F0;text-align:left;">
+            <th style="padding:8px 10px;font-weight:700;color:#94A3B8;white-space:nowrap">Data</th>
+            <th style="padding:8px 10px;font-weight:700;color:#94A3B8">Liga</th>
+            <th style="padding:8px 10px;font-weight:700;color:#94A3B8">Jogo</th>
+            <th style="padding:8px 10px;font-weight:700;color:#94A3B8">Aposta</th>
+            <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center">Odd</th>
+            <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center">Placar</th>
+            <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center">Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${d.jogos.map(j => {
+            const isGreen = j.resultado_aposta === 'green';
+            return `<tr style="border-bottom:1px solid #F1F5F9;">
+              <td style="padding:8px 10px;color:#64748B;white-space:nowrap">${j.data}</td>
+              <td style="padding:8px 10px;color:#64748B;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${j.liga_nome||''}">${j.liga_nome||'—'}</td>
+              <td style="padding:8px 10px;font-weight:600;color:#1E293B;white-space:nowrap">${j.time_casa} × ${j.time_fora}</td>
+              <td style="padding:8px 10px;color:#0F766E;font-weight:500">${j.aposta_escolhida||'—'}</td>
+              <td style="padding:8px 10px;text-align:center;color:#475569">${j.odd_escolhida||'—'}</td>
+              <td style="padding:8px 10px;text-align:center;font-weight:600;color:#1E293B">${j.placar||'—'}</td>
+              <td style="padding:8px 10px;text-align:center;">
+                <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${isGreen?'#F0FDF4':'#FFF1F2'};color:${isGreen?'#16A34A':'#DC2626'}">
+                  ${isGreen?'GREEN':'RED'}
+                </span>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) {
+    document.getElementById('hist-stats').innerHTML = `<div style="color:#DC2626;font-size:12px;grid-column:1/-1">Erro: ${e.message}</div>`;
+  }
 }
 
 function selDiaJust(periodo, btn){
