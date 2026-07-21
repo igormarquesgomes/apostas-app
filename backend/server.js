@@ -7184,20 +7184,21 @@ async function gerarApostasEngine(data) {
 
   const picks = [];
   for (const jogo of jogosAtivos) {
-    // Monta candidatos a partir das odds já confirmadas pela IA.
-    // odds_confirmadas: [{aposta, mercado, odd}] — todos mercados com odd real verificada.
-    // Fallback: aposta principal da IA (sempre existe).
-    const oddsConfirmadas = jogo.odds_confirmadas?.length
-      ? jogo.odds_confirmadas
-      : [{ aposta: jogo.aposta, mercado: jogo.mercado, odd: jogo.odd_mercado }];
+    // Busca TODOS os mercados disponíveis para o fixture via cache da API-Football.
+    // A IA pode ter escolhido um mercado sem odd — o engine pivota para o melhor com odd real.
+    const oddsRaw = await buscarOddsFixture(jogo.fixtureId, data);
+    const todosOsMercados = oddsMapParaCandidatos(oddsRaw, jogo.time_casa, jogo.time_fora);
 
-    // Converte para formato do engine — odd real obrigatória (sem odd = mercado inválido)
-    const oddsEngine = oddsConfirmadas
-      .filter(o => o.aposta && o.mercado && o.odd >= 1.20)
-      .map(o => ({ ...o, linha: engineParsarLinha(o.aposta, o.mercado, jogo.time_casa, jogo.time_fora) }))
-      .filter(o => o.linha);
+    // Se não há nenhum mercado com odd real no bookmaker → jogo sem cobertura, exclui
+    if (!todosOsMercados.length) continue;
 
-    if (!oddsEngine.length) continue; // sem odd real confirmada = mercado inválido
+    // Garante que a aposta principal da IA também está no pool (pode ter nome do time)
+    const iaLinha = engineParsarLinha(jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
+    if (iaLinha && jogo.odd_mercado >= 1.20 && !todosOsMercados.find(o => o.linha === iaLinha)) {
+      todosOsMercados.push({ aposta: jogo.aposta, mercado: jogo.mercado, odd: jogo.odd_mercado, linha: iaLinha });
+    }
+
+    const oddsEngine = todosOsMercados; // todos já têm odd real confirmada e linha válida
 
     const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.fixtureId) || {};
     const standings = standingsMap.get(jogo.ligaId) || null;
