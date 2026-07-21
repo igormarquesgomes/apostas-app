@@ -6902,23 +6902,31 @@ function engineFormaScore(forma) {
   return Math.round(pts / (str.length * 3) * 100);
 }
 
-function engineParsarLinha(aposta, mercado) {
+// timeCasa/timeFora opcionais: usados para detectar apostas com nome do time ("Atletico-MG vence")
+function engineParsarLinha(aposta, mercado, timeCasa = '', timeFora = '') {
   const ap = (aposta || '').toLowerCase();
   const num = ap.match(/(\d+[.,]\d+|\d+)/);
   const n = num ? parseFloat(num[1].replace(',', '.')) : null;
 
   if (mercado === 'gols' || mercado === 'escanteios' || mercado === 'cartoes') {
-    if (ap.includes('over') || ap.includes('mais de')) return n != null ? `over_${n}` : null;
-    if (ap.includes('under') || ap.includes('menos de')) return n != null ? `under_${n}` : null;
-    if (ap.includes('btts') || ap.includes('ambos marcam')) return 'btts';
+    if (ap.includes('over') || ap.includes('mais de') || ap.includes('acima de')) return n != null ? `over_${n}` : null;
+    if (ap.includes('under') || ap.includes('menos de') || ap.includes('abaixo de')) return n != null ? `under_${n}` : null;
+    if (ap.includes('btts') || ap.includes('ambos marcam') || ap.includes('ambas as equipes')) return 'btts';
+    if (ap.includes('não btts') || ap.includes('nao btts') || ap.includes('no btts')) return 'no_btts';
   }
   if (mercado === 'resultado') {
     if (ap.includes('1x') || (ap.includes('dupla') && (ap.includes('casa') || ap.includes('empate')))) return '1X';
     if (ap.includes('x2') || (ap.includes('dupla') && (ap.includes('fora') || ap.includes('visitante')))) return 'X2';
     if (ap.includes('12') || (ap.includes('dupla') && !ap.includes('empate') && !ap.includes('draw'))) return '12';
+    if (ap.includes('empate') || ap.includes('draw') || ap === 'x') return 'empate';
     if (ap.includes('casa') || ap.includes('home') || ap.includes('mandante')) return 'casa';
     if (ap.includes('fora') || ap.includes('away') || ap.includes('visitante')) return 'fora';
-    if (ap.includes('empate') || ap.includes('draw')) return 'empate';
+    // Detecção por nome do time quando a IA usa "Atletico-MG vence" em vez de "Casa vence"
+    const nc = (timeCasa || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6);
+    const nf = (timeFora  || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6);
+    const apNorm = ap.replace(/[^a-z0-9]/g, '');
+    if (nc && apNorm.includes(nc)) return 'casa';
+    if (nf && apNorm.includes(nf)) return 'fora';
   }
   return null;
 }
@@ -6967,10 +6975,7 @@ function engineSanityOk(linha, mercado, jogo) {
     if (linha === 'over_3.5') return mcCart >= 3.2;
     if (linha === 'over_4.5') return mcCart >= 4.0;
   }
-  if (mercado === 'resultado') {
-    if (linha === 'casa') return fhS > faS + 10;
-    if (linha === 'fora') return faS > fhS + 10;
-  }
+  // resultado: sem veto por sanity — o score já penaliza via standings e forma
   return true;
 }
 
@@ -7183,7 +7188,7 @@ async function gerarApostasEngine(data) {
     // Converte para formato do engine (adiciona linha normalizada)
     const oddsEngine = oddsConfirmadas
       .filter(o => o.aposta && o.mercado && o.odd >= 1.20)
-      .map(o => ({ ...o, linha: engineParsarLinha(o.aposta, o.mercado) }))
+      .map(o => ({ ...o, linha: engineParsarLinha(o.aposta, o.mercado, jogo.time_casa, jogo.time_fora) }))
       .filter(o => o.linha);
 
     if (!oddsEngine.length) continue;
