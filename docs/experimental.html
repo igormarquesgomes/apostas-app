@@ -25,9 +25,9 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 .page-title{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:5px;}
 .page-sub{font-size:13px;color:#64748B;}
 
-/* HUB GRID — 3 cards fixos */
-.hub{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;}
-@media(max-width:700px){.hub{grid-template-columns:1fr;}}
+/* HUB GRID */
+.hub{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px;}
+@media(max-width:600px){.hub{grid-template-columns:1fr;}}
 .card{background:#fff;border:1.5px solid #E2E8F0;border-radius:16px;padding:24px;cursor:pointer;transition:all .18s;display:flex;flex-direction:column;min-height:160px;}
 .card:hover:not(.disabled){border-color:#0F766E;box-shadow:0 6px 24px rgba(15,118,110,.1);}
 .card.selected{border-color:#0F766E;background:#F0FDF9;}
@@ -153,6 +153,14 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
       <span class="card-action" id="hist-card-label">→ abrir ferramenta</span>
       <span class="badge beta">Novo</span>
     </div>
+
+    <div class="card" id="card-engine" onclick="toggleEngine()">
+      <div class="card-icon" style="background:#F0FDF4;">🤖</div>
+      <div class="card-title">Engine · Picks do Dia</div>
+      <div class="card-desc">Apostas selecionadas pelo engine de regras (sem IA). Compare com as picks da IA na segunda-feira.</div>
+      <span class="card-action" id="engine-card-label">→ abrir ferramenta</span>
+      <span class="badge beta">Novo</span>
+    </div>
   </div>
 
   <!-- Justificativa tool panel -->
@@ -270,6 +278,35 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
 
       <!-- Tabela de jogos -->
       <div id="hist-lista" style="overflow-x:auto;"></div>
+
+    </div>
+  </div>
+
+  <!-- Engine · Picks do Dia panel -->
+  <div class="tool-panel" id="tool-engine">
+    <div class="tool-hd">
+      <div class="tool-hd-left">
+        <div class="tool-hd-icon">🤖</div>
+        <div>
+          <div class="tool-hd-title">Engine · Picks do Dia</div>
+          <div class="tool-hd-sub" id="engine-sub">Apostas selecionadas por regras — sem Anthropic</div>
+        </div>
+      </div>
+      <button class="tool-close" onclick="fecharEngine()">×</button>
+    </div>
+    <div class="tool-body">
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
+        <div class="day-tabs" style="margin:0;flex:1;">
+          <button class="day-tab active" id="eng-tab-hoje" onclick="selDiaEngine('hoje',this)">Hoje</button>
+          <button class="day-tab" id="eng-tab-amanha" onclick="selDiaEngine('amanha',this)">Amanhã</button>
+          <input class="day-inp" type="date" id="eng-data-input" onchange="carregarEngine(this.value)">
+        </div>
+        <button class="btn primary sm" id="btn-engine-gerar" onclick="gerarEngine()">⚡ Gerar/Atualizar</button>
+      </div>
+
+      <div id="engine-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;"></div>
+      <div id="engine-lista"></div>
 
     </div>
   </div>
@@ -440,6 +477,161 @@ async function carregarHistorico(){
   } catch(e) {
     document.getElementById('hist-stats').innerHTML = `<div style="color:#DC2626;font-size:12px;grid-column:1/-1">Erro: ${e.message}</div>`;
   }
+}
+
+// ── ENGINE PICKS ───────────────────────────────────────────────────────────────
+
+let _engineData = '';
+
+function toggleEngine(){
+  const panel = document.getElementById('tool-engine');
+  if(panel.classList.contains('open')){ fecharEngine(); return; }
+  fecharTelegram(); fecharJustificativa(); fecharHistorico();
+  panel.classList.add('open');
+  document.getElementById('card-engine').classList.add('selected');
+  document.getElementById('engine-card-label').textContent = '→ fechar ferramenta';
+  selDiaEngine('hoje', document.getElementById('eng-tab-hoje'));
+}
+
+function fecharEngine(){
+  document.getElementById('tool-engine').classList.remove('open');
+  document.getElementById('card-engine').classList.remove('selected');
+  document.getElementById('engine-card-label').textContent = '→ abrir ferramenta';
+}
+
+function selDiaEngine(periodo, btn){
+  document.querySelectorAll('#tool-engine .day-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const d = periodo==='hoje' ? hoje() : offset(hoje(),1);
+  document.getElementById('eng-data-input').value = d;
+  carregarEngine(d);
+}
+
+async function carregarEngine(data){
+  if(!data) return;
+  _engineData = data;
+  document.getElementById('engine-stats').innerHTML = '<div style="color:#94A3B8;font-size:12px;grid-column:1/-1">Carregando...</div>';
+  document.getElementById('engine-lista').innerHTML = '';
+  document.getElementById('engine-sub').textContent = 'Carregando picks do engine...';
+  try {
+    const r = await fetch(`${BACKEND_URL}/engine/${data}`);
+    if(!r.ok){ throw new Error(r.status === 404 ? 'Nenhuma aposta gerada para esta data. Clique em "Gerar/Atualizar".' : `HTTP ${r.status}`); }
+    const d2 = await r.json();
+    if(d2.erro){ throw new Error(d2.erro); }
+    renderEngine(d2);
+  } catch(e){
+    document.getElementById('engine-stats').innerHTML = '';
+    document.getElementById('engine-lista').innerHTML = `<div style="color:#DC2626;font-size:13px;padding:16px 0">${e.message}</div>`;
+    document.getElementById('engine-sub').textContent = 'Erro ao carregar';
+  }
+}
+
+async function gerarEngine(){
+  const data = _engineData || hoje();
+  const btn = document.getElementById('btn-engine-gerar');
+  btn.disabled = true; btn.textContent = '⏳ Gerando...';
+  try {
+    const r = await fetch(`${BACKEND_URL}/engine/gerar`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ data })
+    });
+    const d2 = await r.json();
+    if(d2.erro) throw new Error(d2.erro);
+    renderEngine(d2);
+  } catch(e){
+    alert('Erro: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Gerar/Atualizar';
+  }
+}
+
+const MERCADO_COR = {gols:'#0F766E',escanteios:'#7C3AED',cartoes:'#B45309',resultado:'#1D4ED8',handicap:'#64748B'};
+
+function renderEngine(d){
+  const jogos = d.jogos || [];
+  document.getElementById('engine-sub').textContent =
+    `${jogos.length} jogos selecionados · base: ${d.historico_base||0} jogos históricos · gerado ${d.gerado_em ? new Date(d.gerado_em).toLocaleString('pt-BR') : ''}`;
+
+  // Contagem por mercado
+  const porMercado = {};
+  for(const j of jogos){
+    const m = j.mercado_engine || 'outros';
+    if(!porMercado[m]) porMercado[m] = 0;
+    porMercado[m]++;
+  }
+  const concordam = jogos.filter(j => j.mercado_engine === j.mercado_ia).length;
+  document.getElementById('engine-stats').innerHTML = [
+    `<div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 16px;">
+      <div style="font-size:10px;font-weight:700;color:#0F766E;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Total picks</div>
+      <div style="font-size:28px;font-weight:800;color:#1E293B">${jogos.length}</div>
+      <div style="font-size:11px;color:#64748B">jogos selecionados</div>
+    </div>`,
+    `<div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 16px;">
+      <div style="font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Acordo c/ IA</div>
+      <div style="font-size:28px;font-weight:800;color:#1E293B">${concordam}</div>
+      <div style="font-size:11px;color:#64748B">mesmo mercado</div>
+    </div>`,
+    ...Object.entries(porMercado).sort((a,b)=>b[1]-a[1]).map(([m,n]) =>
+      `<div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 16px;">
+        <div style="font-size:10px;font-weight:700;color:${MERCADO_COR[m]||'#64748B'};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${m}</div>
+        <div style="font-size:28px;font-weight:800;color:#1E293B">${n}</div>
+        <div style="font-size:11px;color:#64748B">picks</div>
+      </div>`)
+  ].join('');
+
+  if(!jogos.length){
+    document.getElementById('engine-lista').innerHTML = '<div style="color:#94A3B8;font-size:13px;padding:16px 0">Nenhum jogo acima do threshold. Tente "Gerar/Atualizar".</div>';
+    return;
+  }
+
+  document.getElementById('engine-lista').innerHTML = `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:780px;">
+      <thead>
+        <tr style="border-bottom:2px solid #E2E8F0;text-align:left;">
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;white-space:nowrap">Liga</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8">Jogo</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;white-space:nowrap">Hora</th>
+          <th style="padding:8px 10px;font-weight:700;color:#0F766E;white-space:nowrap">Pick IA</th>
+          <th style="padding:8px 10px;font-weight:700;color:#7C3AED;white-space:nowrap">Pick Engine</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Score</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;text-align:center;white-space:nowrap">Ass.Hist</th>
+          <th style="padding:8px 10px;font-weight:700;color:#94A3B8;white-space:nowrap">Médias</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${jogos.map(j => {
+          const acordo = j.mercado_engine === j.mercado_ia;
+          const corEngine = MERCADO_COR[j.mercado_engine] || '#64748B';
+          const mcGols = (parseFloat(j.media_gols_casa||0)+parseFloat(j.media_gols_fora||0)).toFixed(1);
+          return `<tr style="border-bottom:1px solid #F1F5F9;${acordo?'background:#F0FDF9;':''}">
+            <td style="padding:8px 10px;color:#64748B;font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${j.liga||''}">${j.liga||'—'}</td>
+            <td style="padding:8px 10px;font-weight:600;color:#1E293B;white-space:nowrap">${j.time_casa} × ${j.time_fora}</td>
+            <td style="padding:8px 10px;color:#64748B;white-space:nowrap">${j.horario||'—'}</td>
+            <td style="padding:8px 10px;">
+              <div style="font-size:11px;color:#0F766E;font-weight:600">${j.aposta_ia||'—'}</div>
+              <div style="font-size:10px;color:#94A3B8">${j.odd_ia ? '@'+j.odd_ia : ''} · ${j.confianca_ia||''}</div>
+            </td>
+            <td style="padding:8px 10px;">
+              <div style="font-size:11px;color:${corEngine};font-weight:700">${j.aposta_engine||'—'}</div>
+              <div style="font-size:10px;color:#94A3B8">@${j.odd_engine||'—'}</div>
+            </td>
+            <td style="padding:8px 10px;text-align:center;">
+              <span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:#EFF6FF;color:#3B82F6">${j.score_engine||'—'}</span>
+            </td>
+            <td style="padding:8px 10px;text-align:center;font-size:11px;color:#475569">${j.ass_historica!=null?j.ass_historica+'%':'—'}</td>
+            <td style="padding:8px 10px;font-size:10px;color:#64748B;white-space:nowrap">
+              ⚽${mcGols} · 🚩${j.media_escanteios||'—'} · 🟨${j.media_cartoes||'—'}<br>
+              <span title="Forma casa">${j.forma_casa||'—'}</span> vs <span title="Forma fora">${j.forma_fora||'—'}</span>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:#94A3B8">
+      🟢 Linhas destacadas = IA e Engine escolheram o mesmo mercado
+    </div>`;
 }
 
 function selDiaJust(periodo, btn){
