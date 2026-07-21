@@ -7015,14 +7015,12 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
   // Usa apenas odds reais da API-Football — sem invenção
   for (const o of (oddsExternas || [])) {
     const { aposta, mercado, odd } = o;
-    if (!aposta) continue;
-    if (odd != null && odd < 1.25) continue; // só descarta se odd conhecida e abaixo do mínimo
+    if (!aposta || !odd || odd < 1.25) continue;
 
     // usa linha já normalizada (com nome do time) se disponível no objeto
     const linha = o.linha || engineParsarLinha(aposta, mercado, jogo.time_casa, jogo.time_fora);
-    // faixa=null quando odd desconhecida → sinal 1 usa fallback 'sem_odd' no lookup
-    const faixa = odd != null ? engineFaixaOdd(odd) : null;
-    if (!linha) continue;
+    const faixa = engineFaixaOdd(odd);
+    if (!linha || !faixa) continue;
 
     if (!engineSanityOk(linha, mercado, jogoMedidas)) continue;
 
@@ -7177,7 +7175,12 @@ async function gerarApostasEngine(data) {
 
   const comApiStats  = [...teamStatsMap.values()].filter(v => v.casa || v.fora).length;
   const comStandings = [...standingsMap.values()].filter(m => m.size > 0).length;
-  console.log(`🤖 Engine: season stats=${comApiStats}/${jogosAtivos.length} · standings=${comStandings}/${ligasUnicas.length} ligas`);
+  const semOdds = jogosAtivos.filter(j => {
+    const conf = j.odds_confirmadas?.length
+      ? j.odds_confirmadas : [{ aposta: j.aposta, mercado: j.mercado, odd: j.odd_mercado }];
+    return !conf.some(o => o.odd >= 1.20);
+  });
+  console.log(`🤖 Engine: season stats=${comApiStats}/${jogosAtivos.length} · standings=${comStandings}/${ligasUnicas.length} ligas · sem_odds=${semOdds.length} (${semOdds.map(j=>`${j.time_casa}x${j.time_fora}`).join(', ')})`);
 
   const picks = [];
   for (const jogo of jogosAtivos) {
@@ -7188,28 +7191,20 @@ async function gerarApostasEngine(data) {
       ? jogo.odds_confirmadas
       : [{ aposta: jogo.aposta, mercado: jogo.mercado, odd: jogo.odd_mercado }];
 
-    // Converte para formato do engine (adiciona linha normalizada)
-    // odd=null é permitido — engine pontua pelos sinais históricos sem faixa_odd
+    // Converte para formato do engine — odd real obrigatória (sem odd = mercado inválido)
     const oddsEngine = oddsConfirmadas
-      .filter(o => o.aposta && o.mercado && (o.odd == null || o.odd >= 1.20))
+      .filter(o => o.aposta && o.mercado && o.odd >= 1.20)
       .map(o => ({ ...o, linha: engineParsarLinha(o.aposta, o.mercado, jogo.time_casa, jogo.time_fora) }))
       .filter(o => o.linha);
 
-    if (!oddsEngine.length) {
-      const raw = oddsConfirmadas.map(o => `${o.aposta}[${o.mercado}]@${o.odd}`).join(', ');
-      console.log(`🔍 Engine skip sem linha: ${jogo.time_casa}x${jogo.time_fora} | odds_raw: ${raw}`);
-      continue;
-    }
+    if (!oddsEngine.length) continue; // sem odd real confirmada = mercado inválido
 
     const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.fixtureId) || {};
     const standings = standingsMap.get(jogo.ligaId) || null;
 
     const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings, oddsEngine);
     const melhor = candidatos[0];
-    if (!melhor) {
-      console.log(`🔍 Engine skip sem candidato: ${jogo.time_casa}x${jogo.time_fora} | linhas: ${oddsEngine.map(o=>o.linha).join(',')}`);
-      continue;
-    }
+    if (!melhor) continue;
 
     const mcGolsReal = (parseFloat(statsCasa?.goals?.for?.average?.home) || parseFloat(jogo.media_gols_casa || 0))
                      + (parseFloat(statsFora?.goals?.for?.average?.away) || parseFloat(jogo.media_gols_fora || 0));
