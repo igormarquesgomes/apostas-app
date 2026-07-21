@@ -6670,7 +6670,7 @@ function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora) {
   const EXCLUIR = ['1st half','2nd half','first half','second half','half time','halftime','1h ','2h ','ht ','home team','away team','total - home','total - away','home total','away total'];
   const candidatos = [];
   for (const [chave, odd] of Object.entries(oddsMap)) {
-    if (!odd || odd < 1.20 || odd > 12) continue;
+    if (!odd || odd < 1.25 || odd > 12) continue;
     const [betNome, val] = chave.split('|');
     if (!betNome || !val) continue;
     if (EXCLUIR.some(ex => betNome.includes(ex))) continue;
@@ -7178,7 +7178,7 @@ async function gerarApostasEngine(data) {
   const semOdds = jogosAtivos.filter(j => {
     const conf = j.odds_confirmadas?.length
       ? j.odds_confirmadas : [{ aposta: j.aposta, mercado: j.mercado, odd: j.odd_mercado }];
-    return !conf.some(o => o.odd >= 1.20);
+    return !conf.some(o => o.odd >= 1.25);
   });
   console.log(`🤖 Engine: season stats=${comApiStats}/${jogosAtivos.length} · standings=${comStandings}/${ligasUnicas.length} ligas · sem_odds=${semOdds.length} (${semOdds.map(j=>`${j.time_casa}x${j.time_fora}`).join(', ')})`);
 
@@ -7194,7 +7194,7 @@ async function gerarApostasEngine(data) {
 
     // Garante que a aposta principal da IA também está no pool (pode ter nome do time)
     const iaLinha = engineParsarLinha(jogo.aposta, jogo.mercado, jogo.time_casa, jogo.time_fora);
-    if (iaLinha && jogo.odd_mercado >= 1.20 && !todosOsMercados.find(o => o.linha === iaLinha)) {
+    if (iaLinha && jogo.odd_mercado >= 1.25 && !todosOsMercados.find(o => o.linha === iaLinha)) {
       todosOsMercados.push({ aposta: jogo.aposta, mercado: jogo.mercado, odd: jogo.odd_mercado, linha: iaLinha });
     }
 
@@ -7287,8 +7287,19 @@ app.get('/engine/:data', async (req, res) => {
 
 app.post('/engine/gerar', async (req, res) => {
   try {
-    const { data } = req.body;
+    const { data, forcar } = req.body;
     if (!data) return res.status(400).json({ error: 'data obrigatória' });
+    // Não regenera se já tiver 15 picks para o dia (a não ser que forcar=true)
+    if (!forcar) {
+      const existing = await fetch(
+        `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      ).then(r => r.json()).then(r => r[0]);
+      if (existing?.apostas_engine?.jogos?.length >= 15) {
+        console.log(`🔒 Engine: ${data} já tem ${existing.apostas_engine.jogos.length} picks — retornando cache`);
+        return res.json(existing.apostas_engine);
+      }
+    }
     const resultado = await gerarApostasEngine(data);
     if (resultado.erro) return res.status(404).json(resultado);
     res.json(resultado);
