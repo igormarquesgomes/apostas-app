@@ -620,7 +620,7 @@ function renderEngine(d){
               <div style="font-size:10px;color:#94A3B8">@${j.odd_engine||'—'}</div>
             </td>
             <td style="padding:8px 10px;text-align:center;">
-              ${j.score_engine!=null ? `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:${j.score_engine>=75?'#F0FDF4':j.score_engine>=65?'#EFF6FF':'#FFF7ED'};color:${j.score_engine>=75?'#16A34A':j.score_engine>=65?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
+              ${j.score_engine!=null ? `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:${j.confianca_engine==='alta'?'#F0FDF4':j.confianca_engine==='media'?'#EFF6FF':'#FFF7ED'};color:${j.confianca_engine==='alta'?'#16A34A':j.confianca_engine==='media'?'#3B82F6':'#B45309'}">${j.score_engine}% <span style="font-weight:400;font-size:10px">${j.confianca_engine==='alta'?'alta':j.confianca_engine==='media'?'méd':'baixa'}</span></span>` : '—'}
               ${j.api_season_stats?'<div style="font-size:9px;color:#0F766E;margin-top:2px">📡 API</div>':''}
             </td>
             <td style="padding:8px 10px;text-align:center;font-size:11px;">

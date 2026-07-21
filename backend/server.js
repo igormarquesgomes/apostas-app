@@ -6870,8 +6870,9 @@ function engineFaixaOdd(odd) {
   return '2.00+';
 }
 
-// Filtros de sanidade: usa médias pré-computadas (_mc*) quando disponíveis (season stats API)
-// Fallback para campos do jogo quando não há dados da API
+// Filtros de sanidade: usa médias pré-computadas (_mc*) quando disponíveis.
+// Quando não há dado (0 ou null), o filtro é relaxado — melhor incluir e pontuar baixo
+// do que excluir um jogo por falta de dados.
 function engineSanityOk(linha, mercado, jogo) {
   const mcGols = jogo._mcGols  ?? (parseFloat(jogo.media_gols_casa || 0) + parseFloat(jogo.media_gols_fora || 0));
   const mcEsc  = jogo._mcEsc   ?? parseFloat(jogo.media_escanteios || 0);
@@ -6880,6 +6881,7 @@ function engineSanityOk(linha, mercado, jogo) {
   const faS    = jogo._winAway ?? engineFormaScore(jogo.forma_fora);
 
   if (mercado === 'gols') {
+    if (mcGols === 0) return true; // sem dados → não veta
     if (linha === 'over_0.5') return mcGols >= 0.8;
     if (linha === 'over_1.5') return mcGols >= 1.3;
     if (linha === 'over_2.5') return mcGols >= 1.9;
@@ -6890,23 +6892,24 @@ function engineSanityOk(linha, mercado, jogo) {
     if (linha === 'btts') return mcGols >= 2.0;
   }
   if (mercado === 'escanteios') {
-    if (linha === 'over_7.5') return mcEsc >= 7.5;
-    if (linha === 'over_8.5') return mcEsc >= 8.0;
-    if (linha === 'over_9.5') return mcEsc >= 9.0;
+    if (mcEsc === 0) return true; // sem dados → não veta
+    if (linha === 'over_7.5')  return mcEsc >= 7.5;
+    if (linha === 'over_8.5')  return mcEsc >= 8.0;
+    if (linha === 'over_9.5')  return mcEsc >= 9.0;
     if (linha === 'over_10.5') return mcEsc >= 10.0;
     if (linha === 'over_11.5') return mcEsc >= 11.0;
   }
   if (mercado === 'cartoes') {
+    if (mcCart === 0) return true; // sem dados → não veta
     if (linha === 'over_2.5') return mcCart >= 2.5;
     if (linha === 'over_3.5') return mcCart >= 3.2;
     if (linha === 'over_4.5') return mcCart >= 4.0;
   }
   if (mercado === 'resultado') {
-    if (linha === 'casa') return fhS > faS + 10; // diferença mínima de forma
+    if (linha === 'casa') return fhS > faS + 10;
     if (linha === 'fora') return faS > fhS + 10;
-    // Dupla chance e empate: sempre elegível
   }
-  return true; // sem filtro específico → aceita
+  return true;
 }
 
 function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsTimeCasa, statsTimeFora, standings) {
@@ -7056,8 +7059,6 @@ async function dbSaveApostasEngine(data, apostasEngine) {
 }
 
 async function gerarApostasEngine(data) {
-  // Threshold: só inclui se assertividade calibrada ≥ 65%
-  const THRESHOLD_ASS = 65;
   const MAX_JOGOS = 15;
 
   const [rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData] = await Promise.all([
@@ -7110,7 +7111,7 @@ async function gerarApostasEngine(data) {
     const standings = standingsMap.get(jogo.ligaId) || null;
     const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings);
     const melhor = candidatos[0];
-    if (!melhor || melhor.score < THRESHOLD_ASS) continue;
+    if (!melhor) continue; // sem candidatos (nenhuma odd passou sanity)
 
     const mcGolsReal = (parseFloat(statsCasa?.goals?.for?.average?.home) || parseFloat(jogo.media_gols_casa || 0))
                      + (parseFloat(statsFora?.goals?.for?.average?.away) || parseFloat(jogo.media_gols_fora || 0));
@@ -7133,6 +7134,7 @@ async function gerarApostasEngine(data) {
       linha_inversa: melhor.linha_inversa,
       rank_casa: melhor.rank_casa, rank_fora: melhor.rank_fora, rank_diff: melhor.rank_diff,
       score_engine:  melhor.score,
+      confianca_engine: melhor.score >= 75 ? 'alta' : melhor.score >= 65 ? 'media' : 'baixa',
       alternativas_engine: candidatos.slice(1, 5).map(c => ({
         aposta: c.aposta, mercado: c.mercado, odd: c.odd, score: c.score,
         ass_calib: c.ass_calib, ass_liga: c.ass_liga, ass_inversa: c.ass_inversa,
@@ -7157,7 +7159,6 @@ async function gerarApostasEngine(data) {
     correlacao_periodo: correlacao?.periodo || null,
     historico_base: historicoLiga?.total || 0,
     assertividade_geral_hist: correlacao?.assertividade_geral || null,
-    threshold_usado: THRESHOLD_ASS,
     total: top.length,
     jogos: top,
   };
