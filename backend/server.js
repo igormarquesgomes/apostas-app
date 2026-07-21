@@ -6660,8 +6660,59 @@ app.get('/historico', async (req, res) => {
 
 const teamStatsEngineCache = new Map(); // "teamId|ligaId|season" → response
 const standingsEngineCache  = new Map(); // "ligaId|season" → Map<teamId, {rank, points, goalsDiff}>
-const oddsFixtureEngineCache = new Map(); // "fixtureId" → [{aposta, mercado, odd, linha}]
 const ENGINE_ANO = new Date().getFullYear();
+
+// Converte o mapa flat de odds (retornado por buscarOddsFixture) para lista de candidatos
+// com {aposta, mercado, odd, linha} prontos para o engine de pontuação.
+// Exclui: mercados parciais (1º tempo), individuais por time, odd fora de [1.20, 12.0]
+function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora) {
+  if (!oddsMap) return [];
+  const EXCLUIR = ['1st half','2nd half','first half','second half','half time','halftime','1h ','2h ','ht ','home team','away team','total - home','total - away','home total','away total'];
+  const candidatos = [];
+  for (const [chave, odd] of Object.entries(oddsMap)) {
+    if (!odd || odd < 1.20 || odd > 12) continue;
+    const [betNome, val] = chave.split('|');
+    if (!betNome || !val) continue;
+    if (EXCLUIR.some(ex => betNome.includes(ex))) continue;
+
+    let mercado = null, linha = null, aposta = null;
+
+    if (betNome.includes('match winner') || betNome === '1x2') {
+      mercado = 'resultado';
+      if (val === 'home')      { linha = 'casa';   aposta = `${timeCasa || 'Casa'} vence`; }
+      else if (val === 'draw') { linha = 'empate';  aposta = 'Empate'; }
+      else if (val === 'away') { linha = 'fora';   aposta = `${timeFora || 'Fora'} vence`; }
+    } else if (betNome.includes('double chance')) {
+      mercado = 'resultado';
+      if      (val.includes('home') && val.includes('draw'))  { linha = '1X'; aposta = 'Dupla Chance 1X'; }
+      else if (val.includes('draw') && val.includes('away'))  { linha = 'X2'; aposta = 'Dupla Chance X2'; }
+      else if (val.includes('home') && val.includes('away'))  { linha = '12'; aposta = 'Dupla Chance 12'; }
+    } else if ((betNome.includes('goals over') || betNome.includes('total goals') ||
+                (betNome.includes('over/under') && !betNome.includes('corner') && !betNome.includes('card'))) &&
+               !betNome.includes('home') && !betNome.includes('away')) {
+      mercado = 'gols';
+      const m = val.match(/^(over|under)\s+([\d.]+)$/);
+      if (m) { linha = `${m[1]}_${m[2]}`; aposta = `${m[1] === 'over' ? 'Over' : 'Under'} ${m[2]} gols`; }
+    } else if (betNome.includes('both teams') || betNome.includes('btts') || betNome === 'goals scored') {
+      mercado = 'gols';
+      if      (val === 'yes') { linha = 'btts';     aposta = 'BTTS'; }
+      else if (val === 'no')  { linha = 'no_btts';  aposta = 'Não BTTS'; }
+    } else if (betNome.includes('corner') && !betNome.includes('home') && !betNome.includes('away')) {
+      mercado = 'escanteios';
+      const m = val.match(/^(over|under)\s+([\d.]+)$/);
+      if (m) { linha = `${m[1]}_${m[2]}`; aposta = `${m[1] === 'over' ? 'Over' : 'Under'} ${m[2]} escanteios`; }
+    } else if ((betNome.includes('card') || betNome.includes('yellow')) &&
+               !betNome.includes('home') && !betNome.includes('away') && !betNome.includes('red')) {
+      mercado = 'cartoes';
+      const m = val.match(/^(over|under)\s+([\d.]+)$/);
+      if (m) { linha = `${m[1]}_${m[2]}`; aposta = `${m[1] === 'over' ? 'Over' : 'Under'} ${m[2]} cartões`; }
+    }
+
+    if (!mercado || !linha) continue;
+    candidatos.push({ aposta, mercado, odd, linha });
+  }
+  return candidatos;
+}
 
 async function buscarStandingsEngine(ligaId) {
   if (!ligaId || !APIFOOTBALL_KEY) return new Map();
@@ -6706,92 +6757,7 @@ async function buscarStandingsEngine(ligaId) {
   return new Map();
 }
 
-// Busca odds reais da API-Football para um fixture e converte para candidatos do engine.
-// Usa bookmakers disponíveis — não inventa nada.
-async function buscarOddsFixtureEngine(fixtureId) {
-  if (!fixtureId || !APIFOOTBALL_KEY) return [];
-  const k = String(fixtureId);
-  if (oddsFixtureEngineCache.has(k)) return oddsFixtureEngineCache.get(k);
-  try {
-    const res = await fetch(
-      `https://v3.football.api-sports.io/odds?fixture=${fixtureId}`,
-      { headers: { 'x-apisports-key': APIFOOTBALL_KEY } }
-    );
-    if (!res.ok) { oddsFixtureEngineCache.set(k, []); return []; }
-    const json = await res.json();
-    const fixtureData = json.response?.[0];
-    if (!fixtureData) { oddsFixtureEngineCache.set(k, []); return []; }
 
-    const candidatos = [];
-    const adicionados = new Set(); // dedup: mesma linha de bookmakers diferentes → mantém primeira
-
-    for (const bookmaker of (fixtureData.bookmakers || [])) {
-      for (const bet of (bookmaker.bets || [])) {
-        for (const v of (bet.values || [])) {
-          const odd = parseFloat(v.odd);
-          if (!odd || odd < 1.20 || odd > 12) continue;
-
-          let mercado = null, aposta = null, linha = null;
-          const bname = bet.name || '';
-          const val   = v.value || '';
-
-          if (bet.id === 1 || bname === 'Match Winner') {
-            mercado = 'resultado';
-            if (val === 'Home')      { aposta = 'Casa vence'; linha = 'casa'; }
-            else if (val === 'Draw') { aposta = 'Empate';     linha = 'empate'; }
-            else if (val === 'Away') { aposta = 'Fora vence'; linha = 'fora'; }
-          } else if (bet.id === 5 || bname === 'Goals Over/Under') {
-            mercado = 'gols';
-            const m = val.match(/^(Over|Under)\s+([\d.]+)$/i);
-            if (m) {
-              const dir = m[1].toLowerCase();
-              const num = m[2];
-              linha = `${dir}_${num}`;
-              aposta = `${val} gols`;
-            }
-          } else if (bet.id === 8 || bname === 'Both Teams Score') {
-            mercado = 'gols';
-            if (val === 'Yes')      { aposta = 'BTTS';    linha = 'btts'; }
-            else if (val === 'No') { aposta = 'Não BTTS'; linha = 'no_btts'; }
-          } else if (bet.id === 12 || bname === 'Double Chance') {
-            mercado = 'resultado';
-            if (val === 'Home/Draw')  { aposta = 'Dupla Chance 1X'; linha = '1X'; }
-            else if (val === 'Draw/Away') { aposta = 'Dupla Chance X2'; linha = 'X2'; }
-            else if (val === 'Home/Away') { aposta = 'Dupla Chance 12'; linha = '12'; }
-          } else if (bet.id === 45 || bname === 'Corners Over/Under') {
-            mercado = 'escanteios';
-            const m = val.match(/^(Over|Under)\s+([\d.]+)$/i);
-            if (m) {
-              const dir = m[1].toLowerCase();
-              linha = `${dir}_${m[2]}`;
-              aposta = `${val} escanteios`;
-            }
-          } else if (bet.id === 56 || bname === 'Cards Over/Under') {
-            mercado = 'cartoes';
-            const m = val.match(/^(Over|Under)\s+([\d.]+)$/i);
-            if (m) {
-              const dir = m[1].toLowerCase();
-              linha = `${dir}_${m[2]}`;
-              aposta = `${val} cartões`;
-            }
-          }
-
-          if (!mercado || !linha) continue;
-          const dk = `${mercado}|${linha}`;
-          if (adicionados.has(dk)) continue;
-          adicionados.add(dk);
-          candidatos.push({ aposta, mercado, odd, linha });
-        }
-      }
-    }
-    oddsFixtureEngineCache.set(k, candidatos);
-    return candidatos;
-  } catch(e) {
-    console.error(`buscarOddsFixtureEngine(${fixtureId}) erro:`, e.message);
-    oddsFixtureEngineCache.set(k, []);
-    return [];
-  }
-}
 
 async function buscarStatsTimeEngine(teamId, ligaId) {
   if (!teamId || !ligaId || !APIFOOTBALL_KEY) return null;
@@ -7191,18 +7157,18 @@ async function gerarApostasEngine(data) {
         jogo.teamCasaId ? buscarStatsTimeEngine(jogo.teamCasaId, jogo.ligaId) : null,
         jogo.teamForaId ? buscarStatsTimeEngine(jogo.teamForaId, jogo.ligaId) : null,
       ]);
-      teamStatsMap.set(jogo.id, { casa: sc, fora: sf });
+      teamStatsMap.set(jogo.fixtureId, { casa: sc, fora: sf });
     }),
     // standings por liga (1 req por liga, não por time)
     ...ligasUnicas.map(async (ligaId) => {
       const sm = await buscarStandingsEngine(ligaId);
       standingsMap.set(ligaId, sm);
     }),
-    // odds reais da API-Football por fixture
+    // odds reais da API-Football por fixture — reutiliza buscarOddsFixture (já cacheado)
     ...jogosAtivos.map(async (jogo) => {
-      if (!jogo.id) return;
-      const odds = await buscarOddsFixtureEngine(jogo.id);
-      oddsMap.set(jogo.id, odds);
+      if (!jogo.fixtureId) return;
+      const oddsRaw = await buscarOddsFixture(jogo.fixtureId, data);
+      oddsMap.set(jogo.fixtureId, oddsMapParaCandidatos(oddsRaw, jogo.time_casa, jogo.time_fora));
     }),
   ]);
 
@@ -7210,12 +7176,17 @@ async function gerarApostasEngine(data) {
   const comStandings = [...standingsMap.values()].filter(m => m.size > 0).length;
   const comOdds = [...oddsMap.values()].filter(o => o.length > 0).length;
   console.log(`🤖 Engine: season stats=${comApiStats}/${jogosAtivos.length} · standings=${comStandings}/${ligasUnicas.length} ligas · odds=${comOdds}/${jogosAtivos.length} fixtures`);
+  // Debug: lista fixtures sem odds para diagnóstico
+  if (comOdds < jogosAtivos.length) {
+    const semOdds = jogosAtivos.filter(j => !(oddsMap.get(j.fixtureId)?.length > 0));
+    console.log(`🤖 Engine sem odds: ${semOdds.map(j => `${j.time_casa}x${j.time_fora}[fid=${j.fixtureId}]`).join(' · ')}`);
+  }
 
   const picks = [];
   for (const jogo of jogosAtivos) {
-    const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.id) || {};
+    const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.fixtureId) || {};
     const standings   = standingsMap.get(jogo.ligaId) || null;
-    const oddsJogo    = oddsMap.get(jogo.id) || [];
+    const oddsJogo    = oddsMap.get(jogo.fixtureId) || [];
     if (!oddsJogo.length) continue; // sem mercados reais disponíveis na API → pula
     const candidatos  = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings, oddsJogo);
     const melhor = candidatos[0];
