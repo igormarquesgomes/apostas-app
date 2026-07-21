@@ -7017,7 +7017,8 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     const { aposta, mercado, odd } = o;
     if (!aposta || !odd || odd < 1.25) continue;
 
-    const linha = engineParsarLinha(aposta, mercado);
+    // usa linha já normalizada (com nome do time) se disponível no objeto
+    const linha = o.linha || engineParsarLinha(aposta, mercado, jogo.time_casa, jogo.time_fora);
     const faixa = engineFaixaOdd(odd);
     if (!linha || !faixa) continue;
 
