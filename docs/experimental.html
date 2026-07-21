@@ -550,7 +550,7 @@ const MERCADO_COR = {gols:'#0F766E',escanteios:'#7C3AED',cartoes:'#B45309',resul
 function renderEngine(d){
   const jogos = d.jogos || [];
   document.getElementById('engine-sub').textContent =
-    `${jogos.length} jogos · correlação: ${d.correlacao_base||0} apostas · histórico: ${d.historico_base||0} jogos · threshold ≥${d.threshold_usado||65}% · ${d.gerado_em ? new Date(d.gerado_em).toLocaleString('pt-BR') : ''}`;
+    `${jogos.length} picks · pool: ${d.pool_com_odds||0}/${d.pool_total||0} com odds · correlação: ${d.correlacao_base||0} apostas · histórico: ${d.historico_base||0} jogos · ${d.gerado_em ? new Date(d.gerado_em).toLocaleString('pt-BR') : ''}`;
 
   // Contagem por mercado
   const porMercado = {};
@@ -612,8 +612,11 @@ function renderEngine(d){
             <td style="padding:8px 10px;font-weight:600;color:#1E293B;white-space:nowrap">${j.time_casa} × ${j.time_fora}</td>
             <td style="padding:8px 10px;color:#64748B;white-space:nowrap">${j.horario||'—'}</td>
             <td style="padding:8px 10px;">
-              <div style="font-size:11px;color:#0F766E;font-weight:600">${j.aposta_ia||'—'}</div>
-              <div style="font-size:10px;color:#94A3B8">${j.odd_ia ? '@'+j.odd_ia : ''} · ${j.confianca_ia||''}</div>
+              ${j.ia_analisou
+                ? `<div style="font-size:11px;color:#0F766E;font-weight:600">${j.aposta_ia||'—'}</div>
+                   <div style="font-size:10px;color:#94A3B8">${j.odd_ia ? '@'+j.odd_ia : ''} · ${j.confianca_ia||''}</div>`
+                : `<div style="font-size:11px;color:#94A3B8;font-style:italic">Não analisado</div>`
+              }
             </td>
             <td style="padding:8px 10px;">
               <div style="font-size:11px;color:${corEngine};font-weight:700">${j.aposta_engine||'—'}</div>

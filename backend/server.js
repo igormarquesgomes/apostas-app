@@ -6870,7 +6870,8 @@ async function carregarCorrelacaoCalib() {
     if (!res.ok) return null;
     const rows = await res.json();
     if (!rows.length) return null;
-    const rel = rows[0].relatorio;
+    // relatorio pode ser string (double-stringify) ou objeto (jsonb)
+    const rel = typeof rows[0].relatorio === 'string' ? JSON.parse(rows[0].relatorio) : rows[0].relatorio;
     const tabela = rel?.tabela_correlacao || [];
     // Monta lookup: "mercado|linha|faixa_odd" → {assertividade, total}
     const lookup = {};
@@ -7125,7 +7126,9 @@ async function dbSaveApostasEngine(data, apostasEngine) {
 async function gerarApostasEngine(data) {
   const MAX_JOGOS = 15;
 
-  const [rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData] = await Promise.all([
+  // Carrega dados históricos + picks da IA (para comparação) em paralelo com fixtures do dia
+  const [fixturesRaw, rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData] = await Promise.all([
+    buscarFixturesPorData(data),   // TODOS os jogos do dia (mesmo pool da IA)
     fetch(
       `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
@@ -7136,38 +7139,53 @@ async function gerarApostasEngine(data) {
     carregarLigasEngine(),
   ]);
 
-  const row = rowArr[0];
-  if (!row?.apostas?.jogos?.length) return { erro: 'sem apostas para esta data', data };
+  // Mapa fixtureId → pick da IA (para exibição comparativa no frontend)
+  const iaPorFixture = new Map();
+  for (const j of (rowArr[0]?.apostas?.jogos || [])) {
+    if (j.fixtureId) iaPorFixture.set(j.fixtureId, j);
+  }
 
-  console.log(`🤖 Engine: calib=${correlacao?.total_apostas||0} · hist=${historicoLiga?.total||0} · ligas=${Object.keys(ligasData||{}).length} · linhas=${Object.keys(histLinhaLiga||{}).length}`);
+  console.log(`🤖 Engine: calib=${correlacao?.total_apostas||0} · hist=${historicoLiga?.total||0} · ligas=${Object.keys(ligasData||{}).length} · fixtures_dia=${fixturesRaw.length}`);
 
-  // Buscar stats da temporada + standings por liga (em paralelo, com cache por season)
-  const jogosAtivos = row.apostas.jogos.filter(j => !j.descartado);
-  const ligasUnicas = [...new Set(jogosAtivos.map(j => j.ligaId).filter(Boolean))];
+  // Filtra pelo mesmo critério da IA: ligas em LIGAS_PRIORITY (priority map)
+  // Inclui jogos NS (não iniciados) e jogos do dia em qualquer status para reprocessar
+  const pool = fixturesRaw
+    .filter(f => LIGAS_PRIORITY[f.league?.id] != null)
+    .map(f => ({
+      fixtureId:   f.fixture?.id,
+      ligaId:      f.league?.id,
+      liga:        LIGAS_PRIORITY[f.league?.id]?.nome || f.league?.name,
+      time_casa:   f.teams?.home?.name,
+      time_fora:   f.teams?.away?.name,
+      teamCasaId:  f.teams?.home?.id,
+      teamForaId:  f.teams?.away?.id,
+      horario:     new Date(f.fixture?.timestamp * 1000)
+                     .toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }),
+      status:      f.fixture?.status?.short,
+    }))
+    .filter(j => j.fixtureId);
+
+  const ligasUnicas = [...new Set(pool.map(j => j.ligaId).filter(Boolean))];
 
   const teamStatsMap = new Map();
-  const standingsMap = new Map(); // ligaId → Map<teamId, standings>
-  const oddsMap      = new Map(); // fixtureId → [{aposta, mercado, odd, linha}]
+  const standingsMap = new Map();
+  const oddsMap      = new Map();
 
+  // Busca tudo em paralelo: stats + standings + odds (forcarAtualizar=true para ignorar cache null)
   await Promise.all([
-    // teams/statistics por time
-    ...jogosAtivos.map(async (jogo) => {
-      if (!jogo.ligaId) return;
+    ...pool.map(async (jogo) => {
       const [sc, sf] = await Promise.all([
         jogo.teamCasaId ? buscarStatsTimeEngine(jogo.teamCasaId, jogo.ligaId) : null,
         jogo.teamForaId ? buscarStatsTimeEngine(jogo.teamForaId, jogo.ligaId) : null,
       ]);
       teamStatsMap.set(jogo.fixtureId, { casa: sc, fora: sf });
     }),
-    // standings por liga (1 req por liga, não por time)
     ...ligasUnicas.map(async (ligaId) => {
-      const sm = await buscarStandingsEngine(ligaId);
-      standingsMap.set(ligaId, sm);
+      standingsMap.set(ligaId, await buscarStandingsEngine(ligaId));
     }),
-    // odds reais da API-Football por fixture — reutiliza buscarOddsFixture (já cacheado)
-    ...jogosAtivos.map(async (jogo) => {
-      if (!jogo.fixtureId) return;
-      const oddsRaw = await buscarOddsFixture(jogo.fixtureId, data);
+    ...pool.map(async (jogo) => {
+      // forcarAtualizar=true: ignora null cacheado de horário anterior (odds ainda não liberadas)
+      const oddsRaw = await buscarOddsFixture(jogo.fixtureId, data, true);
       oddsMap.set(jogo.fixtureId, oddsMapParaCandidatos(oddsRaw, jogo.time_casa, jogo.time_fora));
     }),
   ]);
@@ -7175,56 +7193,62 @@ async function gerarApostasEngine(data) {
   const comApiStats = [...teamStatsMap.values()].filter(v => v.casa || v.fora).length;
   const comStandings = [...standingsMap.values()].filter(m => m.size > 0).length;
   const comOdds = [...oddsMap.values()].filter(o => o.length > 0).length;
-  console.log(`🤖 Engine: season stats=${comApiStats}/${jogosAtivos.length} · standings=${comStandings}/${ligasUnicas.length} ligas · odds=${comOdds}/${jogosAtivos.length} fixtures`);
-  // Debug: lista fixtures sem odds para diagnóstico
-  if (comOdds < jogosAtivos.length) {
-    const semOdds = jogosAtivos.filter(j => !(oddsMap.get(j.fixtureId)?.length > 0));
-    console.log(`🤖 Engine sem odds: ${semOdds.map(j => `${j.time_casa}x${j.time_fora}[fid=${j.fixtureId}]`).join(' · ')}`);
+  console.log(`🤖 Engine: season stats=${comApiStats}/${pool.length} · standings=${comStandings}/${ligasUnicas.length} ligas · odds=${comOdds}/${pool.length} fixtures`);
+
+  if (comOdds < pool.length) {
+    const semOdds = pool.filter(j => !(oddsMap.get(j.fixtureId)?.length > 0));
+    console.log(`🤖 Engine sem odds (${semOdds.length}): ${semOdds.map(j => `${j.time_casa}x${j.time_fora}[${j.fixtureId}]`).join(' · ')}`);
   }
 
   const picks = [];
-  for (const jogo of jogosAtivos) {
-    const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.fixtureId) || {};
-    const standings   = standingsMap.get(jogo.ligaId) || null;
-    const oddsJogo    = oddsMap.get(jogo.fixtureId) || [];
-    if (!oddsJogo.length) continue; // sem mercados reais disponíveis na API → pula
-    const candidatos  = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings, oddsJogo);
-    const melhor = candidatos[0];
-    if (!melhor) continue; // odds existem mas nenhuma passou sanity
+  for (const jogo of pool) {
+    const oddsJogo = oddsMap.get(jogo.fixtureId) || [];
+    if (!oddsJogo.length) continue; // sem mercados reais → pula
 
-    const mcGolsReal = (parseFloat(statsCasa?.goals?.for?.average?.home) || parseFloat(jogo.media_gols_casa || 0))
-                     + (parseFloat(statsFora?.goals?.for?.average?.away) || parseFloat(jogo.media_gols_fora || 0));
+    const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.fixtureId) || {};
+    const standings = standingsMap.get(jogo.ligaId) || null;
+
+    const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings, oddsJogo);
+    const melhor = candidatos[0];
+    if (!melhor) continue;
+
+    const iaJogo = iaPorFixture.get(jogo.fixtureId);
+    const mcGolsReal = (parseFloat(statsCasa?.goals?.for?.average?.home) || 0)
+                     + (parseFloat(statsFora?.goals?.for?.average?.away) || 0);
 
     picks.push({
-      id: jogo.id,
-      liga: jogo.liga,
-      time_casa: jogo.time_casa,
-      time_fora: jogo.time_fora,
-      horario: jogo.horario || '',
-      aposta_ia: jogo.aposta, mercado_ia: jogo.mercado,
-      odd_ia: jogo.odd_mercado, confianca_ia: jogo.confianca,
-      aposta_engine: melhor.aposta, mercado_engine: melhor.mercado,
-      odd_engine: melhor.odd, linha_engine: melhor.linha, faixa_odd_engine: melhor.faixa,
+      fixtureId:    jogo.fixtureId,
+      liga:         jogo.liga,
+      time_casa:    jogo.time_casa,
+      time_fora:    jogo.time_fora,
+      horario:      jogo.horario,
+      status:       jogo.status,
+      // Pick da IA para comparação (null se a IA não analisou este jogo)
+      aposta_ia:    iaJogo?.aposta    || null,
+      mercado_ia:   iaJogo?.mercado   || null,
+      odd_ia:       iaJogo?.odd_mercado || null,
+      confianca_ia: iaJogo?.confianca || null,
+      ia_analisou:  !!iaJogo,
+      // Pick do engine
+      aposta_engine:  melhor.aposta,
+      mercado_engine: melhor.mercado,
+      odd_engine:     melhor.odd,
+      linha_engine:   melhor.linha,
       // 4 sinais
-      ass_calib:     melhor.ass_calib,  total_calib:   melhor.total_calib,
-      ass_liga:      melhor.ass_liga,   total_liga:    melhor.total_liga,
-      ass_liga_best: melhor.ass_liga_best,
-      ass_inversa:   melhor.ass_inversa, total_inversa: melhor.total_inversa,
-      linha_inversa: melhor.linha_inversa,
-      rank_casa: melhor.rank_casa, rank_fora: melhor.rank_fora, rank_diff: melhor.rank_diff,
-      score_engine:  melhor.score,
+      ass_calib:      melhor.ass_calib,  total_calib:   melhor.total_calib,
+      ass_liga:       melhor.ass_liga,   total_liga:    melhor.total_liga,
+      ass_liga_best:  melhor.ass_liga_best,
+      ass_inversa:    melhor.ass_inversa, total_inversa: melhor.total_inversa,
+      linha_inversa:  melhor.linha_inversa,
+      rank_casa:      melhor.rank_casa, rank_fora: melhor.rank_fora, rank_diff: melhor.rank_diff,
+      score_engine:   melhor.score,
       confianca_engine: melhor.score >= 75 ? 'alta' : melhor.score >= 65 ? 'media' : 'baixa',
-      alternativas_engine: candidatos.slice(1, 5).map(c => ({
+      alternativas_engine: candidatos.slice(1, 4).map(c => ({
         aposta: c.aposta, mercado: c.mercado, odd: c.odd, score: c.score,
-        ass_calib: c.ass_calib, ass_liga: c.ass_liga, ass_inversa: c.ass_inversa,
       })),
       media_gols_combinada: mcGolsReal.toFixed(2),
-      media_gols_casa: statsCasa?.goals?.for?.average?.home || jogo.media_gols_casa,
-      media_gols_fora: statsFora?.goals?.for?.average?.away || jogo.media_gols_fora,
-      media_escanteios: ligasData?.[jogo.ligaId]?.media_escanteios || jogo.media_escanteios,
-      media_cartoes:    ligasData?.[jogo.ligaId]?.media_cartoes    || jogo.media_cartoes,
-      forma_casa: engineParsForma(jogo.forma_casa),
-      forma_fora: engineParsForma(jogo.forma_fora),
+      media_escanteios: ligasData?.[jogo.ligaId]?.media_escanteios || null,
+      media_cartoes:    ligasData?.[jogo.ligaId]?.media_cartoes    || null,
       api_season_stats: !!(statsCasa || statsFora),
     });
   }
@@ -7233,14 +7257,15 @@ async function gerarApostasEngine(data) {
   const top = picks.slice(0, MAX_JOGOS);
 
   const payload = {
-    gerado_em: new Date().toISOString(),
-    correlacao_base: correlacao?.total_apostas || 0,
-    correlacao_periodo: correlacao?.periodo || null,
-    historico_base: historicoLiga?.total || 0,
+    gerado_em:               new Date().toISOString(),
+    correlacao_base:         correlacao?.total_apostas || 0,
+    correlacao_periodo:      correlacao?.periodo || null,
+    historico_base:          historicoLiga?.total || 0,
     assertividade_geral_hist: correlacao?.assertividade_geral || null,
-    odds_api_fixtures: comOdds,
-    total: top.length,
-    jogos: top,
+    pool_total:              pool.length,
+    pool_com_odds:           comOdds,
+    total:                   top.length,
+    jogos:                   top,
   };
 
   await dbSaveApostasEngine(data, payload);
