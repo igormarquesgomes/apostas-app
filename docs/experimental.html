@@ -296,17 +296,40 @@ body{font-family:'Inter',sans-serif;background:#F0EDEA;min-height:100vh;color:#1
     </div>
     <div class="tool-body">
 
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
-        <div class="day-tabs" style="margin:0;flex:1;">
-          <button class="day-tab active" id="eng-tab-hoje" onclick="selDiaEngine('hoje',this)">Hoje</button>
-          <button class="day-tab" id="eng-tab-amanha" onclick="selDiaEngine('amanha',this)">Amanhã</button>
-          <input class="day-inp" type="date" id="eng-data-input" onchange="carregarEngine(this.value)">
-        </div>
-        <button class="btn primary sm" id="btn-engine-gerar" onclick="gerarEngine()">⚡ Gerar/Atualizar</button>
+      <!-- Abas Picks / Assertividade -->
+      <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #E2E8F0">
+        <button id="eng-tab-picks" onclick="trocarAbaEngine('picks')" style="background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#0F766E;border-bottom:2px solid #0F766E;margin-bottom:-2px;cursor:pointer;font-family:inherit">Picks do Dia</button>
+        <button id="eng-tab-ass" onclick="trocarAbaEngine('assertividade')" style="background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit">Assertividade</button>
       </div>
 
-      <div id="engine-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;"></div>
-      <div id="engine-lista"></div>
+      <!-- ABA PICKS -->
+      <div id="eng-aba-picks">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
+          <div class="day-tabs" style="margin:0;flex:1;">
+            <button class="day-tab active" id="eng-tab-hoje" onclick="selDiaEngine('hoje',this)">Hoje</button>
+            <button class="day-tab" id="eng-tab-amanha" onclick="selDiaEngine('amanha',this)">Amanhã</button>
+            <input class="day-inp" type="date" id="eng-data-input" onchange="carregarEngine(this.value)">
+          </div>
+          <button class="btn primary sm" id="btn-engine-gerar" onclick="gerarEngine()">⚡ Gerar</button>
+        </div>
+        <div id="engine-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;"></div>
+        <div id="engine-lista"></div>
+      </div>
+
+      <!-- ABA ASSERTIVIDADE -->
+      <div id="eng-aba-ass" style="display:none">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
+          <select id="ass-dias" onchange="carregarAssertividade()" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:12px;color:#1E293B;background:#fff;outline:none;">
+            <option value="14">Últimos 14 dias</option>
+            <option value="30" selected>Últimos 30 dias</option>
+            <option value="60">Últimos 60 dias</option>
+          </select>
+          <button class="btn sm" onclick="carregarAssertividade()">↻ Atualizar</button>
+        </div>
+        <div id="ass-resumo" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:24px;"></div>
+        <div id="ass-por-dia" style="overflow-x:auto;margin-bottom:24px;"></div>
+        <div id="ass-lista-jogos" style="overflow-x:auto;"></div>
+      </div>
 
     </div>
   </div>
@@ -482,6 +505,143 @@ async function carregarHistorico(){
 // ── ENGINE PICKS ───────────────────────────────────────────────────────────────
 
 let _engineData = '';
+let _engAbaAtual = 'picks';
+
+function trocarAbaEngine(aba){
+  _engAbaAtual = aba;
+  const isPicks = aba === 'picks';
+  document.getElementById('eng-aba-picks').style.display = isPicks ? '' : 'none';
+  document.getElementById('eng-aba-ass').style.display   = isPicks ? 'none' : '';
+  document.getElementById('eng-tab-picks').style.cssText = isPicks
+    ? 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#0F766E;border-bottom:2px solid #0F766E;margin-bottom:-2px;cursor:pointer;font-family:inherit'
+    : 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit';
+  document.getElementById('eng-tab-ass').style.cssText = !isPicks
+    ? 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#0F766E;border-bottom:2px solid #0F766E;margin-bottom:-2px;cursor:pointer;font-family:inherit'
+    : 'background:none;border:none;padding:8px 20px;font-size:13px;font-weight:600;color:#94A3B8;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit';
+  if (!isPicks) carregarAssertividade();
+}
+
+async function carregarAssertividade(){
+  const dias = document.getElementById('ass-dias').value;
+  document.getElementById('ass-resumo').innerHTML = '<div style="color:#94A3B8;font-size:12px;grid-column:1/-1">Carregando...</div>';
+  document.getElementById('ass-por-dia').innerHTML = '';
+  document.getElementById('ass-lista-jogos').innerHTML = '';
+  try {
+    const r = await fetch(`${BACKEND_URL}/engine/assertividade?dias=${dias}`);
+    const d = await r.json();
+    renderAssertividade(d);
+  } catch(e) {
+    document.getElementById('ass-resumo').innerHTML = `<div style="color:#DC2626;font-size:12px;grid-column:1/-1">Erro: ${e.message}</div>`;
+  }
+}
+
+function renderAssertividade(d){
+  const CORES = {gols:'#0F766E',escanteios:'#7C3AED',cartoes:'#B45309',resultado:'#1D4ED8',outros:'#64748B'};
+  const assGeral = d.assertividade_geral;
+  const corGeral = assGeral == null ? '#94A3B8' : assGeral >= 70 ? '#16A34A' : assGeral >= 55 ? '#B45309' : '#DC2626';
+
+  // Resumo geral + por mercado
+  document.getElementById('ass-resumo').innerHTML = [
+    `<div style="background:#fff;border:2px solid ${corGeral};border-radius:12px;padding:14px 16px;">
+      <div style="font-size:10px;font-weight:700;color:${corGeral};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Assertividade Geral</div>
+      <div style="font-size:28px;font-weight:800;color:${corGeral}">${assGeral != null ? assGeral+'%' : '—'}</div>
+      <div style="font-size:11px;color:#64748B;margin-top:2px">${d.total_green}G · ${d.total_red}R · ${d.total_validados} validados</div>
+      ${assGeral != null ? `<div style="margin-top:8px;height:4px;border-radius:4px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${assGeral}%;background:${corGeral};border-radius:4px;"></div></div>` : ''}
+    </div>`,
+    ...d.por_mercado.map(m => {
+      const cor = CORES[m.mercado] || CORES.outros;
+      return `<div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 16px;">
+        <div style="font-size:10px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${m.mercado}</div>
+        <div style="font-size:22px;font-weight:800;color:#1E293B">${m.assertividade != null ? m.assertividade+'%' : '—'}</div>
+        <div style="font-size:11px;color:#64748B">${m.green}G · ${m.red}R · ${m.total}j</div>
+        ${m.assertividade != null ? `<div style="margin-top:8px;height:4px;border-radius:4px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${m.assertividade}%;background:${cor};border-radius:4px;"></div></div>` : ''}
+      </div>`;
+    })
+  ].join('');
+
+  // Tabela por dia
+  if(!d.por_dia.length){
+    document.getElementById('ass-por-dia').innerHTML = '<div style="color:#94A3B8;font-size:13px;padding:16px 0">Nenhum dado com resultados validados ainda.</div>';
+    document.getElementById('ass-lista-jogos').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('ass-por-dia').innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Por dia</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:400px;">
+      <thead>
+        <tr style="border-bottom:2px solid #E2E8F0;text-align:left;">
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8">Data</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Picks</th>
+          <th style="padding:7px 10px;font-weight:700;color:#16A34A;text-align:center">Green</th>
+          <th style="padding:7px 10px;font-weight:700;color:#DC2626;text-align:center">Red</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Pendente</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Assert.</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Barra</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${d.por_dia.map(dia => {
+          const ass = dia.assertividade;
+          const cor = ass == null ? '#94A3B8' : ass >= 70 ? '#16A34A' : ass >= 55 ? '#B45309' : '#DC2626';
+          return `<tr style="border-bottom:1px solid #F1F5F9;" onclick="expandirDia('${dia.data}')" style="cursor:pointer;border-bottom:1px solid #F1F5F9;">
+            <td style="padding:7px 10px;font-weight:600;color:#1E293B;white-space:nowrap;cursor:pointer" onclick="expandirDia('${dia.data}')">${dia.data}</td>
+            <td style="padding:7px 10px;text-align:center;color:#64748B">${dia.total}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:700;color:#16A34A">${dia.green}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:700;color:#DC2626">${dia.red}</td>
+            <td style="padding:7px 10px;text-align:center;color:#94A3B8">${dia.pendente}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:800;color:${cor}">${ass != null ? ass+'%' : '—'}</td>
+            <td style="padding:7px 10px;min-width:80px;">
+              ${ass != null ? `<div style="height:6px;border-radius:3px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${ass}%;background:${cor};border-radius:3px;"></div></div>` : ''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  // Tabela completa de jogos (todos os dias)
+  const todosJogos = d.por_dia.flatMap(dia => dia.jogos.map(j => ({...j, _data: dia.data})));
+  document.getElementById('ass-lista-jogos').innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px">Todos os picks</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
+      <thead>
+        <tr style="border-bottom:2px solid #E2E8F0;text-align:left;">
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8">Data</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8">Jogo</th>
+          <th style="padding:7px 10px;font-weight:700;color:#7C3AED">Pick Engine</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Odd</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Placar</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Resultado</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${todosJogos.map(j => {
+          const isGreen = j.resultado_engine === 'green';
+          const isRed   = j.resultado_engine === 'red';
+          const corEngine = MERCADO_COR[j.mercado_engine] || '#64748B';
+          return `<tr style="border-bottom:1px solid #F1F5F9;${isGreen?'background:#F0FDF9;':isRed?'background:#FFF1F2;':''}">
+            <td style="padding:7px 10px;color:#94A3B8;white-space:nowrap">${j._data}</td>
+            <td style="padding:7px 10px;font-weight:600;color:#1E293B;white-space:nowrap">${j.time_casa} × ${j.time_fora}</td>
+            <td style="padding:7px 10px;">
+              <div style="font-size:11px;color:${corEngine};font-weight:700">${j.aposta_engine||'—'}</div>
+              <div style="font-size:10px;color:#94A3B8">${j.mercado_engine||''}</div>
+            </td>
+            <td style="padding:7px 10px;text-align:center;color:#475569">@${j.odd_engine||'—'}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:600;color:#1E293B">${j.placar||'—'}</td>
+            <td style="padding:7px 10px;text-align:center;">
+              ${isGreen || isRed
+                ? `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${isGreen?'#F0FDF4':'#FFF1F2'};color:${isGreen?'#16A34A':'#DC2626'}">${isGreen?'GREEN':'RED'}</span>`
+                : '<span style="color:#94A3B8;font-size:11px">pendente</span>'}
+            </td>
+            <td style="padding:7px 10px;text-align:center;">
+              ${j.score_engine != null ? `<span style="font-size:11px;font-weight:700;color:${j.confianca_engine==='alta'?'#16A34A':j.confianca_engine==='media'?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
 
 function toggleEngine(){
   const panel = document.getElementById('tool-engine');

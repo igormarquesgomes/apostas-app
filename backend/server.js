@@ -7306,6 +7306,129 @@ app.post('/engine/gerar', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Valida um pick do engine dado linha + mercado + placar (sem chamar IA)
+function validarPickEngine(linha, mercado, placar) {
+  if (!placar || !linha || !mercado) return 'pendente';
+  const parts = placar.split('-').map(Number);
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return 'pendente';
+  const [gC, gF] = parts;
+  const total = gC + gF;
+  if (mercado === 'gols') {
+    const m = linha.match(/^(over|under)_([\d.]+)$/);
+    if (m) {
+      const n = parseFloat(m[2]);
+      return m[1] === 'over' ? (total > n ? 'green' : 'red') : (total < n ? 'green' : 'red');
+    }
+    if (linha === 'btts')    return (gC > 0 && gF > 0) ? 'green' : 'red';
+    if (linha === 'no_btts') return !(gC > 0 && gF > 0) ? 'green' : 'red';
+  }
+  if (mercado === 'resultado') {
+    if (linha === 'casa')   return gC > gF  ? 'green' : 'red';
+    if (linha === 'fora')   return gF > gC  ? 'green' : 'red';
+    if (linha === 'empate') return gC === gF ? 'green' : 'red';
+    if (linha === '1X')     return gC >= gF ? 'green' : 'red';
+    if (linha === 'X2')     return gF >= gC ? 'green' : 'red';
+    if (linha === '12')     return gC !== gF ? 'green' : 'red';
+  }
+  return 'pendente'; // escanteios/cartoes precisam de stats — sem dados no placar
+}
+
+app.get('/engine/assertividade', async (req, res) => {
+  try {
+    const dias = parseInt(req.query.dias || '30');
+    // Busca os últimos N dias com engine picks e resultados
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+
+    const porDia = [];
+    let totalGreen = 0, totalRed = 0, totalPendente = 0;
+    const porMercado = {};
+
+    for (const row of rows) {
+      const engine = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
+      const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
+      if (!engine?.jogos?.length) continue;
+
+      // Mapa fixtureId → placar dos resultados
+      const placarMap = {};
+      for (const r of (resultados?.jogos_resultado || [])) {
+        if (r.placar && r.jogo_id) placarMap[r.jogo_id] = r.placar;
+      }
+
+      const jogosComResultado = [];
+      let dGreen = 0, dRed = 0, dPend = 0;
+      for (const j of engine.jogos) {
+        const placar = placarMap[j.fixtureId] || null;
+        const resultado = validarPickEngine(j.linha_engine, j.mercado_engine, placar);
+        if (resultado === 'green') { dGreen++; totalGreen++; }
+        else if (resultado === 'red')  { dRed++;  totalRed++;  }
+        else dPend++;
+
+        // Acumula por mercado
+        if (resultado !== 'pendente') {
+          const m = j.mercado_engine || 'outros';
+          if (!porMercado[m]) porMercado[m] = { green: 0, red: 0 };
+          if (resultado === 'green') porMercado[m].green++;
+          else porMercado[m].red++;
+        }
+
+        jogosComResultado.push({
+          fixtureId:    j.fixtureId,
+          liga:         j.liga,
+          time_casa:    j.time_casa,
+          time_fora:    j.time_fora,
+          horario:      j.horario,
+          aposta_engine:  j.aposta_engine,
+          mercado_engine: j.mercado_engine,
+          odd_engine:     j.odd_engine,
+          linha_engine:   j.linha_engine,
+          score_engine:   j.score_engine,
+          confianca_engine: j.confianca_engine,
+          placar,
+          resultado_engine: resultado,
+          // Pick IA para comparação
+          aposta_ia:  j.aposta_ia,
+          odd_ia:     j.odd_ia,
+        });
+      }
+
+      if (!jogosComResultado.length) continue;
+      const validados = dGreen + dRed;
+      porDia.push({
+        data: row.data,
+        total: jogosComResultado.length,
+        green: dGreen,
+        red: dRed,
+        pendente: dPend,
+        assertividade: validados > 0 ? Math.round((dGreen / validados) * 100) : null,
+        jogos: jogosComResultado,
+      });
+    }
+
+    const totalValidados = totalGreen + totalRed;
+    const assertividadeGeral = totalValidados > 0 ? Math.round((totalGreen / totalValidados) * 100) : null;
+    const mercadosArr = Object.entries(porMercado).map(([m, v]) => ({
+      mercado: m,
+      green: v.green,
+      red: v.red,
+      total: v.green + v.red,
+      assertividade: v.green + v.red > 0 ? Math.round((v.green / (v.green + v.red)) * 100) : null,
+    })).sort((a, b) => b.total - a.total);
+
+    res.json({
+      assertividade_geral: assertividadeGeral,
+      total_validados: totalValidados,
+      total_green: totalGreen,
+      total_red: totalRed,
+      total_pendente: totalPendente,
+      por_mercado: mercadosArr,
+      por_dia: porDia,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── FIM ENGINE DE REGRAS ────────────────────────────────────────────────────
 
 app.get('/calibracao', async (req, res) => {
@@ -7824,6 +7947,30 @@ async function rotinaComplementoDiurno() {
   }
 }
 
+async function rotinaEngine08h() {
+  const hoje = hojeStr();
+  const amanha = (() => { const d = new Date(hoje + 'T12:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+  const datas = [hoje, amanha];
+  for (const data of datas) {
+    try {
+      // Verifica se já há 15 picks para esta data
+      const existing = await fetch(
+        `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      ).then(r => r.json()).then(r => r[0]);
+      if (existing?.apostas_engine?.jogos?.length >= 15) {
+        console.log(`🔒 [Engine 08h] ${data} já tem ${existing.apostas_engine.jogos.length} picks — pulando`);
+        continue;
+      }
+      console.log(`🤖 [Engine 08h] Gerando picks para ${data}...`);
+      const resultado = await gerarApostasEngine(data);
+      console.log(`✅ [Engine 08h] ${data}: ${resultado?.total || 0} picks gerados`);
+    } catch(e) {
+      console.error(`❌ [Engine 08h] Erro em ${data}:`, e.message);
+    }
+  }
+}
+
 function agendarRotina() {
   // ── 00:00 BRT (03:00 UTC) — validação noturna inicial + calibrações ─────
   // SEM catch-up: não deve rodar fora da madrugada
@@ -7893,6 +8040,19 @@ function agendarRotina() {
     rotinaComplementoDiurno().catch(console.error);
     setTimeout(tick12h, 24 * 60 * 60 * 1000);
   }, ms12h);
+
+  // ── 08:00 BRT (11:00 UTC) — gerar picks do engine para hoje e amanhã ──────
+  if (deveExecutarCatchup(11, 0)) {
+    console.log(`⚡ Catch-up 08h: gerando picks engine`);
+    setTimeout(() => rotinaEngine08h().catch(console.error), 5000);
+  }
+  const ms08h = msAteHoraUTC(11, 0);
+  console.log(`⏰ Próxima rotinaEngine08h (08h) em ${Math.round(ms08h/60000)} min`);
+  setTimeout(function tick08h() {
+    console.log(`⏰ [08h] Gerando picks engine`);
+    rotinaEngine08h().catch(console.error);
+    setTimeout(tick08h, 24 * 60 * 60 * 1000);
+  }, ms08h);
 
   // ── 15:00 BRT (18:00 UTC) — primeira validação parcial dos jogos do dia ─
   const ms15h = msAteHoraUTC(18, 0);
