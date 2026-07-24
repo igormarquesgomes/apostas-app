@@ -7333,6 +7333,32 @@ function validarPickEngine(linha, mercado, placar) {
   return 'pendente'; // escanteios/cartoes precisam de stats — sem dados no placar
 }
 
+// Debug: retorna dados brutos para diagnóstico
+app.get('/engine/debug-raw', async (req, res) => {
+  try {
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=5`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+    if (!Array.isArray(rows)) return res.json({ erro: 'não é array', rows });
+    const debug = rows.map(row => {
+      const engine = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
+      const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
+      const primeiroJogoEngine = engine?.jogos?.[0] || null;
+      const primeiroResultado  = resultados?.jogos_resultado?.[0] || null;
+      return {
+        data: row.data,
+        engine_jogos_count: engine?.jogos?.length || 0,
+        engine_primeiro_jogo_keys: primeiroJogoEngine ? Object.keys(primeiroJogoEngine) : [],
+        engine_primeiro_jogo: primeiroJogoEngine,
+        resultados_count: resultados?.jogos_resultado?.length || 0,
+        resultado_primeiro: primeiroResultado,
+      };
+    });
+    res.json(debug);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/engine/assertividade', async (req, res) => {
   try {
     const dias = parseInt(req.query.dias || '30');
