@@ -536,6 +536,12 @@ async function carregarAssertividade(){
 }
 
 function renderAssertividade(d){
+  if (!d || d.error) {
+    document.getElementById('ass-resumo').innerHTML = `<div style="color:#DC2626;font-size:13px;grid-column:1/-1">Erro: ${d?.error || 'resposta inválida'}</div>`;
+    return;
+  }
+  const porMercado = d.por_mercado || [];
+  const porDia    = d.por_dia    || [];
   const CORES = {gols:'#0F766E',escanteios:'#7C3AED',cartoes:'#B45309',resultado:'#1D4ED8',outros:'#64748B'};
   const assGeral = d.assertividade_geral;
   const corGeral = assGeral == null ? '#94A3B8' : assGeral >= 70 ? '#16A34A' : assGeral >= 55 ? '#B45309' : '#DC2626';
@@ -548,7 +554,7 @@ function renderAssertividade(d){
       <div style="font-size:11px;color:#64748B;margin-top:2px">${d.total_green}G · ${d.total_red}R · ${d.total_validados} validados</div>
       ${assGeral != null ? `<div style="margin-top:8px;height:4px;border-radius:4px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${assGeral}%;background:${corGeral};border-radius:4px;"></div></div>` : ''}
     </div>`,
-    ...d.por_mercado.map(m => {
+    ...porMercado.map(m => {
       const cor = CORES[m.mercado] || CORES.outros;
       return `<div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 16px;">
         <div style="font-size:10px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${m.mercado}</div>
@@ -560,7 +566,7 @@ function renderAssertividade(d){
   ].join('');
 
   // Tabela por dia
-  if(!d.por_dia.length){
+  if(!porDia.length){
     document.getElementById('ass-por-dia').innerHTML = '<div style="color:#94A3B8;font-size:13px;padding:16px 0">Nenhum dado com resultados validados ainda.</div>';
     document.getElementById('ass-lista-jogos').innerHTML = '';
     return;
@@ -581,7 +587,7 @@ function renderAssertividade(d){
         </tr>
       </thead>
       <tbody>
-        ${d.por_dia.map(dia => {
+        ${porDia.map(dia => {
           const ass = dia.assertividade;
           const cor = ass == null ? '#94A3B8' : ass >= 70 ? '#16A34A' : ass >= 55 ? '#B45309' : '#DC2626';
           return `<tr style="border-bottom:1px solid #F1F5F9;" onclick="expandirDia('${dia.data}')" style="cursor:pointer;border-bottom:1px solid #F1F5F9;">
@@ -600,7 +606,7 @@ function renderAssertividade(d){
     </table>`;
 
   // Tabela completa de jogos (todos os dias)
-  const todosJogos = d.por_dia.flatMap(dia => dia.jogos.map(j => ({...j, _data: dia.data})));
+  const todosJogos = porDia.flatMap(dia => dia.jogos.map(j => ({...j, _data: dia.data})));
   document.getElementById('ass-lista-jogos').innerHTML = `
     <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px">Todos os picks</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
