@@ -546,13 +546,21 @@ function renderAssertividade(d){
   const assGeral = d.assertividade_geral;
   const corGeral = assGeral == null ? '#94A3B8' : assGeral >= 70 ? '#16A34A' : assGeral >= 55 ? '#B45309' : '#DC2626';
 
-  // Resumo geral + por mercado
+  // Cards de resumo: Engine vs IA
+  const assIa = d.assertividade_ia_geral;
+  const corIa = assIa == null ? '#94A3B8' : assIa >= 70 ? '#16A34A' : assIa >= 55 ? '#B45309' : '#DC2626';
   document.getElementById('ass-resumo').innerHTML = [
     `<div style="background:#fff;border:2px solid ${corGeral};border-radius:12px;padding:14px 16px;">
-      <div style="font-size:10px;font-weight:700;color:${corGeral};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Assertividade Geral</div>
+      <div style="font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🤖 Engine</div>
       <div style="font-size:28px;font-weight:800;color:${corGeral}">${assGeral != null ? assGeral+'%' : '—'}</div>
-      <div style="font-size:11px;color:#64748B;margin-top:2px">${d.total_green}G · ${d.total_red}R · ${d.total_validados} validados</div>
+      <div style="font-size:11px;color:#64748B;margin-top:2px">${d.total_green}G · ${d.total_red}R · ${d.total_validados} válidos</div>
       ${assGeral != null ? `<div style="margin-top:8px;height:4px;border-radius:4px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${assGeral}%;background:${corGeral};border-radius:4px;"></div></div>` : ''}
+    </div>`,
+    `<div style="background:#fff;border:2px solid ${corIa};border-radius:12px;padding:14px 16px;">
+      <div style="font-size:10px;font-weight:700;color:#0F766E;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🧠 IA</div>
+      <div style="font-size:28px;font-weight:800;color:${corIa}">${assIa != null ? assIa+'%' : '—'}</div>
+      <div style="font-size:11px;color:#64748B;margin-top:2px">${d.ia_green||0}G · ${d.ia_red||0}R · ${(d.ia_green||0)+(d.ia_red||0)} válidos</div>
+      ${assIa != null ? `<div style="margin-top:8px;height:4px;border-radius:4px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${assIa}%;background:${corIa};border-radius:4px;"></div></div>` : ''}
     </div>`,
     ...porMercado.map(m => {
       const cor = CORES[m.mercado] || CORES.outros;
@@ -572,34 +580,48 @@ function renderAssertividade(d){
     return;
   }
 
+  function badgeRes(r){ if(!r||r==='pendente'||r==='cancelado') return '<span style="color:#94A3B8;font-size:10px">—</span>'; const g=r==='green'; return `<span style="display:inline-block;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${g?'#F0FDF4':'#FFF1F2'};color:${g?'#16A34A':'#DC2626'}">${g?'G':'R'}</span>`; }
+
   document.getElementById('ass-por-dia').innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Por dia</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:400px;">
+    <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Por dia — Engine vs IA</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px;">
       <thead>
         <tr style="border-bottom:2px solid #E2E8F0;text-align:left;">
           <th style="padding:7px 10px;font-weight:700;color:#94A3B8">Data</th>
           <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Picks</th>
-          <th style="padding:7px 10px;font-weight:700;color:#16A34A;text-align:center">Green</th>
-          <th style="padding:7px 10px;font-weight:700;color:#DC2626;text-align:center">Red</th>
-          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Pendente</th>
-          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Assert.</th>
-          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Barra</th>
+          <th style="padding:7px 10px;font-weight:700;color:#7C3AED;text-align:center" colspan="3">🤖 Engine</th>
+          <th style="padding:7px 10px;font-weight:700;color:#0F766E;text-align:center" colspan="3">🧠 IA</th>
+          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Pend.</th>
+        </tr>
+        <tr style="border-bottom:1px solid #E2E8F0;text-align:center;">
+          <th style="padding:4px 10px"></th><th style="padding:4px 10px"></th>
+          <th style="padding:4px 6px;font-weight:600;color:#16A34A;font-size:11px">G</th>
+          <th style="padding:4px 6px;font-weight:600;color:#DC2626;font-size:11px">R</th>
+          <th style="padding:4px 6px;font-weight:600;color:#7C3AED;font-size:11px">%</th>
+          <th style="padding:4px 6px;font-weight:600;color:#16A34A;font-size:11px">G</th>
+          <th style="padding:4px 6px;font-weight:600;color:#DC2626;font-size:11px">R</th>
+          <th style="padding:4px 6px;font-weight:600;color:#0F766E;font-size:11px">%</th>
+          <th style="padding:4px 10px"></th>
         </tr>
       </thead>
       <tbody>
         ${porDia.map(dia => {
-          const ass = dia.assertividade;
-          const cor = ass == null ? '#94A3B8' : ass >= 70 ? '#16A34A' : ass >= 55 ? '#B45309' : '#DC2626';
-          return `<tr style="border-bottom:1px solid #F1F5F9;" onclick="expandirDia('${dia.data}')" style="cursor:pointer;border-bottom:1px solid #F1F5F9;">
-            <td style="padding:7px 10px;font-weight:600;color:#1E293B;white-space:nowrap;cursor:pointer" onclick="expandirDia('${dia.data}')">${dia.data}</td>
+          const ass   = dia.assertividade;
+          const assIa = dia.ia_assertividade;
+          const corE  = ass   == null ? '#94A3B8' : ass   >= 70 ? '#16A34A' : ass   >= 55 ? '#B45309' : '#DC2626';
+          const corI  = assIa == null ? '#94A3B8' : assIa >= 70 ? '#16A34A' : assIa >= 55 ? '#B45309' : '#DC2626';
+          const engine_vence = ass != null && assIa != null && ass > assIa;
+          const ia_vence     = ass != null && assIa != null && assIa > ass;
+          return `<tr style="border-bottom:1px solid #F1F5F9;${engine_vence?'background:#F5F3FF;':ia_vence?'background:#F0FDF9;':''}">
+            <td style="padding:7px 10px;font-weight:600;color:#1E293B;white-space:nowrap">${dia.data}</td>
             <td style="padding:7px 10px;text-align:center;color:#64748B">${dia.total}</td>
-            <td style="padding:7px 10px;text-align:center;font-weight:700;color:#16A34A">${dia.green}</td>
-            <td style="padding:7px 10px;text-align:center;font-weight:700;color:#DC2626">${dia.red}</td>
+            <td style="padding:7px 6px;text-align:center;font-weight:700;color:#16A34A">${dia.green}</td>
+            <td style="padding:7px 6px;text-align:center;font-weight:700;color:#DC2626">${dia.red}</td>
+            <td style="padding:7px 6px;text-align:center;font-weight:800;color:${corE}">${ass != null ? ass+'%' : '—'}</td>
+            <td style="padding:7px 6px;text-align:center;font-weight:700;color:#16A34A">${dia.ia_green ?? '—'}</td>
+            <td style="padding:7px 6px;text-align:center;font-weight:700;color:#DC2626">${dia.ia_red ?? '—'}</td>
+            <td style="padding:7px 6px;text-align:center;font-weight:800;color:${corI}">${assIa != null ? assIa+'%' : '—'}</td>
             <td style="padding:7px 10px;text-align:center;color:#94A3B8">${dia.pendente}</td>
-            <td style="padding:7px 10px;text-align:center;font-weight:800;color:${cor}">${ass != null ? ass+'%' : '—'}</td>
-            <td style="padding:7px 10px;min-width:80px;">
-              ${ass != null ? `<div style="height:6px;border-radius:3px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${ass}%;background:${cor};border-radius:3px;"></div></div>` : ''}
-            </td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -609,37 +631,39 @@ function renderAssertividade(d){
   const todosJogos = porDia.flatMap(dia => dia.jogos.map(j => ({...j, _data: dia.data})));
   document.getElementById('ass-lista-jogos').innerHTML = `
     <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px">Todos os picks</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:680px;">
       <thead>
         <tr style="border-bottom:2px solid #E2E8F0;text-align:left;">
           <th style="padding:7px 10px;font-weight:700;color:#94A3B8">Data</th>
           <th style="padding:7px 10px;font-weight:700;color:#94A3B8">Jogo</th>
           <th style="padding:7px 10px;font-weight:700;color:#7C3AED">Pick Engine</th>
-          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Odd</th>
+          <th style="padding:7px 10px;font-weight:700;color:#0F766E">Pick IA</th>
           <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Placar</th>
-          <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Resultado</th>
+          <th style="padding:7px 10px;font-weight:700;color:#7C3AED;text-align:center">Eng.</th>
+          <th style="padding:7px 10px;font-weight:700;color:#0F766E;text-align:center">IA</th>
           <th style="padding:7px 10px;font-weight:700;color:#94A3B8;text-align:center">Score</th>
         </tr>
       </thead>
       <tbody>
         ${todosJogos.map(j => {
-          const isGreen = j.resultado_engine === 'green';
-          const isRed   = j.resultado_engine === 'red';
-          const corEngine = MERCADO_COR[j.mercado_engine] || '#64748B';
-          return `<tr style="border-bottom:1px solid #F1F5F9;${isGreen?'background:#F0FDF9;':isRed?'background:#FFF1F2;':''}">
+          const eG = j.resultado_engine === 'green', eR = j.resultado_engine === 'red';
+          const iG = j.resultado_ia === 'green',     iR = j.resultado_ia === 'red';
+          const corEng = MERCADO_COR[j.mercado_engine] || '#64748B';
+          const ambosG = eG && iG, ambosR = eR && iR;
+          return `<tr style="border-bottom:1px solid #F1F5F9;${ambosG?'background:#F0FDF9;':ambosR?'background:#FFF1F2;':''}">
             <td style="padding:7px 10px;color:#94A3B8;white-space:nowrap">${j._data}</td>
             <td style="padding:7px 10px;font-weight:600;color:#1E293B;white-space:nowrap">${j.time_casa} × ${j.time_fora}</td>
             <td style="padding:7px 10px;">
-              <div style="font-size:11px;color:${corEngine};font-weight:700">${j.aposta_engine||'—'}</div>
-              <div style="font-size:10px;color:#94A3B8">${j.mercado_engine||''}</div>
+              <div style="font-size:11px;color:${corEng};font-weight:700">${j.aposta_engine||'—'}</div>
+              <div style="font-size:10px;color:#94A3B8">@${j.odd_engine||'—'}</div>
             </td>
-            <td style="padding:7px 10px;text-align:center;color:#475569">@${j.odd_engine||'—'}</td>
+            <td style="padding:7px 10px;">
+              <div style="font-size:11px;color:#0F766E;font-weight:600">${j.aposta_ia||'—'}</div>
+              <div style="font-size:10px;color:#94A3B8">@${j.odd_ia||'—'}</div>
+            </td>
             <td style="padding:7px 10px;text-align:center;font-weight:600;color:#1E293B">${j.placar||'—'}</td>
-            <td style="padding:7px 10px;text-align:center;">
-              ${isGreen || isRed
-                ? `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${isGreen?'#F0FDF4':'#FFF1F2'};color:${isGreen?'#16A34A':'#DC2626'}">${isGreen?'GREEN':'RED'}</span>`
-                : '<span style="color:#94A3B8;font-size:11px">pendente</span>'}
-            </td>
+            <td style="padding:7px 10px;text-align:center;">${badgeRes(j.resultado_engine)}</td>
+            <td style="padding:7px 10px;text-align:center;">${badgeRes(j.resultado_ia)}</td>
             <td style="padding:7px 10px;text-align:center;">
               ${j.score_engine != null ? `<span style="font-size:11px;font-weight:700;color:${j.confianca_engine==='alta'?'#16A34A':j.confianca_engine==='media'?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
             </td>

@@ -7344,6 +7344,7 @@ app.get('/engine/assertividade', async (req, res) => {
 
     const porDia = [];
     let totalGreen = 0, totalRed = 0, totalPendente = 0;
+    let totalIaGreen = 0, totalIaRed = 0;
     const porMercado = {};
 
     for (const row of rows) {
@@ -7351,22 +7352,31 @@ app.get('/engine/assertividade', async (req, res) => {
       const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
       if (!engine?.jogos?.length) continue;
 
-      // Mapa fixtureId → placar dos resultados
-      const placarMap = {};
+      // Mapa fixtureId → { placar, resultado_ia } dos resultados da IA
+      const resMap = {};
       for (const r of (resultados?.jogos_resultado || [])) {
-        if (r.placar && r.jogo_id) placarMap[r.jogo_id] = r.placar;
+        if (r.jogo_id) resMap[r.jogo_id] = { placar: r.placar || null, resultado_ia: r.resultado_aposta || null };
       }
 
       const jogosComResultado = [];
       let dGreen = 0, dRed = 0, dPend = 0;
+      let dIaGreen = 0, dIaRed = 0;
+
       for (const j of engine.jogos) {
-        const placar = placarMap[j.fixtureId] || null;
+        const res = resMap[j.fixtureId] || {};
+        const placar = res.placar || null;
         const resultado = validarPickEngine(j.linha_engine, j.mercado_engine, placar);
+
         if (resultado === 'green') { dGreen++; totalGreen++; }
-        else if (resultado === 'red')  { dRed++;  totalRed++;  }
+        else if (resultado === 'red') { dRed++; totalRed++; }
         else dPend++;
 
-        // Acumula por mercado
+        // Resultado da IA para o mesmo jogo (já validado pelo sistema normal)
+        const resultado_ia = res.resultado_ia || null;
+        if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; }
+        else if (resultado_ia === 'red') { dIaRed++; totalIaRed++; }
+
+        // Acumula por mercado (engine)
         if (resultado !== 'pendente') {
           const m = j.mercado_engine || 'outros';
           if (!porMercado[m]) porMercado[m] = { green: 0, red: 0 };
@@ -7375,40 +7385,48 @@ app.get('/engine/assertividade', async (req, res) => {
         }
 
         jogosComResultado.push({
-          fixtureId:    j.fixtureId,
-          liga:         j.liga,
-          time_casa:    j.time_casa,
-          time_fora:    j.time_fora,
-          horario:      j.horario,
-          aposta_engine:  j.aposta_engine,
-          mercado_engine: j.mercado_engine,
-          odd_engine:     j.odd_engine,
-          linha_engine:   j.linha_engine,
-          score_engine:   j.score_engine,
+          fixtureId:        j.fixtureId,
+          liga:             j.liga,
+          time_casa:        j.time_casa,
+          time_fora:        j.time_fora,
+          horario:          j.horario,
+          aposta_engine:    j.aposta_engine,
+          mercado_engine:   j.mercado_engine,
+          odd_engine:       j.odd_engine,
+          linha_engine:     j.linha_engine,
+          score_engine:     j.score_engine,
           confianca_engine: j.confianca_engine,
           placar,
           resultado_engine: resultado,
           // Pick IA para comparação
-          aposta_ia:  j.aposta_ia,
-          odd_ia:     j.odd_ia,
+          aposta_ia:    j.aposta_ia,
+          mercado_ia:   j.mercado_ia,
+          odd_ia:       j.odd_ia,
+          resultado_ia,
         });
       }
 
       if (!jogosComResultado.length) continue;
-      const validados = dGreen + dRed;
+      const validados   = dGreen + dRed;
+      const iaValidados = dIaGreen + dIaRed;
       porDia.push({
-        data: row.data,
-        total: jogosComResultado.length,
-        green: dGreen,
-        red: dRed,
-        pendente: dPend,
-        assertividade: validados > 0 ? Math.round((dGreen / validados) * 100) : null,
-        jogos: jogosComResultado,
+        data:              row.data,
+        total:             jogosComResultado.length,
+        green:             dGreen,
+        red:               dRed,
+        pendente:          dPend,
+        assertividade:     validados > 0 ? Math.round((dGreen / validados) * 100) : null,
+        ia_green:          dIaGreen,
+        ia_red:            dIaRed,
+        ia_assertividade:  iaValidados > 0 ? Math.round((dIaGreen / iaValidados) * 100) : null,
+        jogos:             jogosComResultado,
       });
     }
 
-    const totalValidados = totalGreen + totalRed;
-    const assertividadeGeral = totalValidados > 0 ? Math.round((totalGreen / totalValidados) * 100) : null;
+    const totalValidados   = totalGreen + totalRed;
+    const totalIaValidados = totalIaGreen + totalIaRed;
+    const assertividadeGeral   = totalValidados   > 0 ? Math.round((totalGreen   / totalValidados)   * 100) : null;
+    const assertividadeIaGeral = totalIaValidados > 0 ? Math.round((totalIaGreen / totalIaValidados) * 100) : null;
     const mercadosArr = Object.entries(porMercado).map(([m, v]) => ({
       mercado: m,
       green: v.green,
@@ -7418,11 +7436,14 @@ app.get('/engine/assertividade', async (req, res) => {
     })).sort((a, b) => b.total - a.total);
 
     res.json({
-      assertividade_geral: assertividadeGeral,
-      total_validados: totalValidados,
-      total_green: totalGreen,
-      total_red: totalRed,
-      total_pendente: totalPendente,
+      assertividade_geral:    assertividadeGeral,
+      assertividade_ia_geral: assertividadeIaGeral,
+      total_validados:        totalValidados,
+      total_green:            totalGreen,
+      total_red:              totalRed,
+      total_pendente:         totalPendente,
+      ia_green:               totalIaGreen,
+      ia_red:                 totalIaRed,
       por_mercado: mercadosArr,
       por_dia: porDia,
     });
