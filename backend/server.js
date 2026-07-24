@@ -7336,11 +7336,13 @@ function validarPickEngine(linha, mercado, placar) {
 app.get('/engine/assertividade', async (req, res) => {
   try {
     const dias = parseInt(req.query.dias || '30');
-    // Busca os últimos N dias com engine picks e resultados
+    // Busca os últimos N dias com engine picks, apostas IA e resultados
     const rows = await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     ).then(r => r.json());
+
+    if (!Array.isArray(rows)) throw new Error('Supabase retornou: ' + JSON.stringify(rows).slice(0, 200));
 
     const porDia = [];
     let totalGreen = 0, totalRed = 0, totalPendente = 0;
@@ -7348,14 +7350,26 @@ app.get('/engine/assertividade', async (req, res) => {
     const porMercado = {};
 
     for (const row of rows) {
-      const engine = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
-      const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
+      const engine    = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
+      const apostas   = typeof row.apostas        === 'string' ? JSON.parse(row.apostas)        : row.apostas;
+      const resultados = typeof row.resultados    === 'string' ? JSON.parse(row.resultados)     : row.resultados;
       if (!engine?.jogos?.length) continue;
 
-      // Mapa fixtureId → { placar, resultado_ia } dos resultados da IA
+      // Ponte: fixtureId (API-Football) → jogo_id (ID interno da IA)
+      // apostas.jogos[n].fixtureId ↔ apostas.jogos[n].id
+      const fixtureToJogoId = {};
+      // também mapeia por time_casa+time_fora como fallback
+      const timesToJogoId = {};
+      for (const j of (apostas?.jogos || [])) {
+        if (j.fixtureId && j.id) fixtureToJogoId[j.fixtureId] = j.id;
+        const key = `${j.time_casa}|${j.time_fora}`;
+        if (j.id) timesToJogoId[key] = j.id;
+      }
+
+      // Mapa jogo_id → { placar, resultado_ia }
       const resMap = {};
       for (const r of (resultados?.jogos_resultado || [])) {
-        if (r.jogo_id) resMap[r.jogo_id] = { placar: r.placar || null, resultado_ia: r.resultado_aposta || null };
+        if (r.jogo_id != null) resMap[r.jogo_id] = { placar: r.placar || null, resultado_ia: r.resultado_aposta || null };
       }
 
       const jogosComResultado = [];
@@ -7363,7 +7377,11 @@ app.get('/engine/assertividade', async (req, res) => {
       let dIaGreen = 0, dIaRed = 0;
 
       for (const j of engine.jogos) {
-        const res = resMap[j.fixtureId] || {};
+        // Resolve jogo_id via fixtureId ou via time_casa+time_fora
+        const jogoId = fixtureToJogoId[j.fixtureId]
+                    || timesToJogoId[`${j.time_casa}|${j.time_fora}`]
+                    || null;
+        const res    = (jogoId != null ? resMap[jogoId] : null) || {};
         const placar = res.placar || null;
         const resultado = validarPickEngine(j.linha_engine, j.mercado_engine, placar);
 

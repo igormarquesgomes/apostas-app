@@ -553,7 +553,7 @@ function renderAssertividade(d){
     `<div style="background:#fff;border:2px solid ${corGeral};border-radius:12px;padding:14px 16px;">
       <div style="font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🤖 Engine</div>
       <div style="font-size:28px;font-weight:800;color:${corGeral}">${assGeral != null ? assGeral+'%' : '—'}</div>
-      <div style="font-size:11px;color:#64748B;margin-top:2px">${d.total_green}G · ${d.total_red}R · ${d.total_validados} válidos</div>
+      <div style="font-size:11px;color:#64748B;margin-top:2px">${d.total_green??0}G · ${d.total_red??0}R · ${d.total_validados??0} válidos</div>
       ${assGeral != null ? `<div style="margin-top:8px;height:4px;border-radius:4px;background:#E2E8F0;overflow:hidden"><div style="height:100%;width:${assGeral}%;background:${corGeral};border-radius:4px;"></div></div>` : ''}
     </div>`,
     `<div style="background:#fff;border:2px solid ${corIa};border-radius:12px;padding:14px 16px;">
