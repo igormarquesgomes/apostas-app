@@ -7266,6 +7266,135 @@ async function gerarApostasEngine(data) {
   return payload;
 }
 
+// Debug: retorna dados brutos para diagnóstico
+app.get('/engine/debug-raw', async (req, res) => {
+  try {
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=5`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+    if (!Array.isArray(rows)) return res.json({ erro: 'não é array', rows });
+    const debug = rows.map(row => {
+      const engine = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
+      const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
+      const primeiroJogoEngine = engine?.jogos?.[0] || null;
+      const primeiroResultado  = resultados?.jogos_resultado?.[0] || null;
+      return {
+        data: row.data,
+        engine_jogos_count: engine?.jogos?.length || 0,
+        engine_primeiro_jogo_keys: primeiroJogoEngine ? Object.keys(primeiroJogoEngine) : [],
+        engine_primeiro_jogo: primeiroJogoEngine,
+        resultados_count: resultados?.jogos_resultado?.length || 0,
+        resultado_primeiro: primeiroResultado,
+      };
+    });
+    res.json(debug);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/engine/assertividade', async (req, res) => {
+  try {
+    const dias = parseInt(req.query.dias || '30');
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+
+    if (!Array.isArray(rows)) throw new Error('Supabase retornou: ' + JSON.stringify(rows).slice(0, 200));
+
+    const porDia = [];
+    let totalGreen = 0, totalRed = 0, totalPendente = 0;
+    let totalIaGreen = 0, totalIaRed = 0;
+    const porMercado = {};
+
+    for (const row of rows) {
+      const engine     = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
+      const apostas    = typeof row.apostas        === 'string' ? JSON.parse(row.apostas)        : row.apostas;
+      const resultados = typeof row.resultados     === 'string' ? JSON.parse(row.resultados)     : row.resultados;
+      if (!engine?.jogos?.length) continue;
+
+      // Ponte: fixtureId (API-Football) → jogo_id (ID interno da IA)
+      const fixtureToJogoId = {};
+      const timesToJogoId   = {};
+      for (const j of (apostas?.jogos || [])) {
+        if (j.fixtureId && j.id) fixtureToJogoId[j.fixtureId] = j.id;
+        const key = `${j.time_casa}|${j.time_fora}`;
+        if (j.id) timesToJogoId[key] = j.id;
+      }
+
+      // Mapa jogo_id → { placar, resultado_ia }
+      const resMap = {};
+      for (const r of (resultados?.jogos_resultado || [])) {
+        if (r.jogo_id != null) resMap[r.jogo_id] = { placar: r.placar || null, resultado_ia: r.resultado_aposta || null };
+      }
+
+      const jogosComResultado = [];
+      let dGreen = 0, dRed = 0, dPend = 0, dIaGreen = 0, dIaRed = 0;
+
+      for (const j of engine.jogos) {
+        const jogoId    = fixtureToJogoId[j.fixtureId] || timesToJogoId[`${j.time_casa}|${j.time_fora}`] || null;
+        const res       = (jogoId != null ? resMap[jogoId] : null) || {};
+        const placar    = res.placar || null;
+        const resultado = validarPickEngine(j.linha_engine, j.mercado_engine, placar);
+
+        if (resultado === 'green') { dGreen++; totalGreen++; }
+        else if (resultado === 'red') { dRed++; totalRed++; }
+        else dPend++;
+
+        const resultado_ia = res.resultado_ia || null;
+        if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; }
+        else if (resultado_ia === 'red') { dIaRed++; totalIaRed++; }
+
+        if (resultado !== 'pendente') {
+          const m = j.mercado_engine || 'outros';
+          if (!porMercado[m]) porMercado[m] = { green: 0, red: 0 };
+          if (resultado === 'green') porMercado[m].green++;
+          else porMercado[m].red++;
+        }
+
+        jogosComResultado.push({
+          fixtureId: j.fixtureId, liga: j.liga,
+          time_casa: j.time_casa, time_fora: j.time_fora, horario: j.horario,
+          aposta_engine: j.aposta_engine, mercado_engine: j.mercado_engine,
+          odd_engine: j.odd_engine, linha_engine: j.linha_engine,
+          score_engine: j.score_engine, confianca_engine: j.confianca_engine,
+          placar, resultado_engine: resultado,
+          aposta_ia: j.aposta_ia, mercado_ia: j.mercado_ia, odd_ia: j.odd_ia, resultado_ia,
+        });
+      }
+
+      if (!jogosComResultado.length) continue;
+      const validados   = dGreen + dRed;
+      const iaValidados = dIaGreen + dIaRed;
+      porDia.push({
+        data: row.data, total: jogosComResultado.length,
+        green: dGreen, red: dRed, pendente: dPend,
+        assertividade:    validados   > 0 ? Math.round((dGreen   / validados)   * 100) : null,
+        ia_green: dIaGreen, ia_red: dIaRed,
+        ia_assertividade: iaValidados > 0 ? Math.round((dIaGreen / iaValidados) * 100) : null,
+        jogos: jogosComResultado,
+      });
+    }
+
+    const totalValidados   = totalGreen + totalRed;
+    const totalIaValidados = totalIaGreen + totalIaRed;
+    const mercadosArr = Object.entries(porMercado).map(([m, v]) => ({
+      mercado: m, green: v.green, red: v.red, total: v.green + v.red,
+      assertividade: v.green + v.red > 0 ? Math.round((v.green / (v.green + v.red)) * 100) : null,
+    })).sort((a, b) => b.total - a.total);
+
+    res.json({
+      assertividade_geral:    totalValidados   > 0 ? Math.round((totalGreen   / totalValidados)   * 100) : null,
+      assertividade_ia_geral: totalIaValidados > 0 ? Math.round((totalIaGreen / totalIaValidados) * 100) : null,
+      total_validados: totalValidados,
+      total_green: totalGreen, total_red: totalRed, total_pendente: totalPendente,
+      ia_green: totalIaGreen, ia_red: totalIaRed,
+      por_mercado: mercadosArr,
+      por_dia: porDia,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/engine/:data', async (req, res) => {
   try {
     const { data } = req.params;
@@ -7332,167 +7461,6 @@ function validarPickEngine(linha, mercado, placar) {
   }
   return 'pendente'; // escanteios/cartoes precisam de stats — sem dados no placar
 }
-
-// Debug: retorna dados brutos para diagnóstico
-app.get('/engine/debug-raw', async (req, res) => {
-  try {
-    const rows = await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=5`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-    ).then(r => r.json());
-    if (!Array.isArray(rows)) return res.json({ erro: 'não é array', rows });
-    const debug = rows.map(row => {
-      const engine = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
-      const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
-      const primeiroJogoEngine = engine?.jogos?.[0] || null;
-      const primeiroResultado  = resultados?.jogos_resultado?.[0] || null;
-      return {
-        data: row.data,
-        engine_jogos_count: engine?.jogos?.length || 0,
-        engine_primeiro_jogo_keys: primeiroJogoEngine ? Object.keys(primeiroJogoEngine) : [],
-        engine_primeiro_jogo: primeiroJogoEngine,
-        resultados_count: resultados?.jogos_resultado?.length || 0,
-        resultado_primeiro: primeiroResultado,
-      };
-    });
-    res.json(debug);
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/engine/assertividade', async (req, res) => {
-  try {
-    const dias = parseInt(req.query.dias || '30');
-    // Busca os últimos N dias com engine picks, apostas IA e resultados
-    const rows = await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-    ).then(r => r.json());
-
-    if (!Array.isArray(rows)) throw new Error('Supabase retornou: ' + JSON.stringify(rows).slice(0, 200));
-
-    const porDia = [];
-    let totalGreen = 0, totalRed = 0, totalPendente = 0;
-    let totalIaGreen = 0, totalIaRed = 0;
-    const porMercado = {};
-
-    for (const row of rows) {
-      const engine    = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
-      const apostas   = typeof row.apostas        === 'string' ? JSON.parse(row.apostas)        : row.apostas;
-      const resultados = typeof row.resultados    === 'string' ? JSON.parse(row.resultados)     : row.resultados;
-      if (!engine?.jogos?.length) continue;
-
-      // Ponte: fixtureId (API-Football) → jogo_id (ID interno da IA)
-      // apostas.jogos[n].fixtureId ↔ apostas.jogos[n].id
-      const fixtureToJogoId = {};
-      // também mapeia por time_casa+time_fora como fallback
-      const timesToJogoId = {};
-      for (const j of (apostas?.jogos || [])) {
-        if (j.fixtureId && j.id) fixtureToJogoId[j.fixtureId] = j.id;
-        const key = `${j.time_casa}|${j.time_fora}`;
-        if (j.id) timesToJogoId[key] = j.id;
-      }
-
-      // Mapa jogo_id → { placar, resultado_ia }
-      const resMap = {};
-      for (const r of (resultados?.jogos_resultado || [])) {
-        if (r.jogo_id != null) resMap[r.jogo_id] = { placar: r.placar || null, resultado_ia: r.resultado_aposta || null };
-      }
-
-      const jogosComResultado = [];
-      let dGreen = 0, dRed = 0, dPend = 0;
-      let dIaGreen = 0, dIaRed = 0;
-
-      for (const j of engine.jogos) {
-        // Resolve jogo_id via fixtureId ou via time_casa+time_fora
-        const jogoId = fixtureToJogoId[j.fixtureId]
-                    || timesToJogoId[`${j.time_casa}|${j.time_fora}`]
-                    || null;
-        const res    = (jogoId != null ? resMap[jogoId] : null) || {};
-        const placar = res.placar || null;
-        const resultado = validarPickEngine(j.linha_engine, j.mercado_engine, placar);
-
-        if (resultado === 'green') { dGreen++; totalGreen++; }
-        else if (resultado === 'red') { dRed++; totalRed++; }
-        else dPend++;
-
-        // Resultado da IA para o mesmo jogo (já validado pelo sistema normal)
-        const resultado_ia = res.resultado_ia || null;
-        if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; }
-        else if (resultado_ia === 'red') { dIaRed++; totalIaRed++; }
-
-        // Acumula por mercado (engine)
-        if (resultado !== 'pendente') {
-          const m = j.mercado_engine || 'outros';
-          if (!porMercado[m]) porMercado[m] = { green: 0, red: 0 };
-          if (resultado === 'green') porMercado[m].green++;
-          else porMercado[m].red++;
-        }
-
-        jogosComResultado.push({
-          fixtureId:        j.fixtureId,
-          liga:             j.liga,
-          time_casa:        j.time_casa,
-          time_fora:        j.time_fora,
-          horario:          j.horario,
-          aposta_engine:    j.aposta_engine,
-          mercado_engine:   j.mercado_engine,
-          odd_engine:       j.odd_engine,
-          linha_engine:     j.linha_engine,
-          score_engine:     j.score_engine,
-          confianca_engine: j.confianca_engine,
-          placar,
-          resultado_engine: resultado,
-          // Pick IA para comparação
-          aposta_ia:    j.aposta_ia,
-          mercado_ia:   j.mercado_ia,
-          odd_ia:       j.odd_ia,
-          resultado_ia,
-        });
-      }
-
-      if (!jogosComResultado.length) continue;
-      const validados   = dGreen + dRed;
-      const iaValidados = dIaGreen + dIaRed;
-      porDia.push({
-        data:              row.data,
-        total:             jogosComResultado.length,
-        green:             dGreen,
-        red:               dRed,
-        pendente:          dPend,
-        assertividade:     validados > 0 ? Math.round((dGreen / validados) * 100) : null,
-        ia_green:          dIaGreen,
-        ia_red:            dIaRed,
-        ia_assertividade:  iaValidados > 0 ? Math.round((dIaGreen / iaValidados) * 100) : null,
-        jogos:             jogosComResultado,
-      });
-    }
-
-    const totalValidados   = totalGreen + totalRed;
-    const totalIaValidados = totalIaGreen + totalIaRed;
-    const assertividadeGeral   = totalValidados   > 0 ? Math.round((totalGreen   / totalValidados)   * 100) : null;
-    const assertividadeIaGeral = totalIaValidados > 0 ? Math.round((totalIaGreen / totalIaValidados) * 100) : null;
-    const mercadosArr = Object.entries(porMercado).map(([m, v]) => ({
-      mercado: m,
-      green: v.green,
-      red: v.red,
-      total: v.green + v.red,
-      assertividade: v.green + v.red > 0 ? Math.round((v.green / (v.green + v.red)) * 100) : null,
-    })).sort((a, b) => b.total - a.total);
-
-    res.json({
-      assertividade_geral:    assertividadeGeral,
-      assertividade_ia_geral: assertividadeIaGeral,
-      total_validados:        totalValidados,
-      total_green:            totalGreen,
-      total_red:              totalRed,
-      total_pendente:         totalPendente,
-      ia_green:               totalIaGreen,
-      ia_red:                 totalIaRed,
-      por_mercado: mercadosArr,
-      por_dia: porDia,
-    });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
 
 // ─── FIM ENGINE DE REGRAS ────────────────────────────────────────────────────
 
