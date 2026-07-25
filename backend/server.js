@@ -7313,9 +7313,9 @@ app.get('/engine/assertividade', async (req, res) => {
       const resultados = typeof row.resultados     === 'string' ? JSON.parse(row.resultados)     : row.resultados;
       if (!engine?.jogos?.length) continue;
 
-      // IA stats: performance geral da IA naquele dia (picks normais da lista)
+      // IA stats: performance geral da IA naquele dia (resultados.apostas[])
       let dIaGreen = 0, dIaRed = 0;
-      for (const r of (resultados?.jogos_resultado || [])) {
+      for (const r of (resultados?.apostas || resultados?.jogos_resultado || [])) {
         if (r.resultado_aposta === 'green') dIaGreen++;
         else if (r.resultado_aposta === 'red') dIaRed++;
       }
