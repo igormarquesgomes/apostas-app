@@ -7310,28 +7310,22 @@ app.get('/engine/assertividade', async (req, res) => {
 
     for (const row of rows) {
       const engine     = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
-      const apostas    = typeof row.apostas        === 'string' ? JSON.parse(row.apostas)        : row.apostas;
       const resultados = typeof row.resultados     === 'string' ? JSON.parse(row.resultados)     : row.resultados;
       if (!engine?.jogos?.length) continue;
 
-      // Ponte fixtureId → jogo_id (ID interno da IA) via apostas.jogos
-      const fixtureToJogoId = {};
-      const timesToJogoId   = {};
-      for (const j of (apostas?.jogos || [])) {
-        if (j.fixtureId && j.id) fixtureToJogoId[j.fixtureId] = j.id;
-        if (j.id) timesToJogoId[`${j.time_casa}|${j.time_fora}`] = j.id;
-      }
-      // Mapa jogo_id → resultado_ia
-      const iaResMap = {};
+      // IA stats: performance geral da IA naquele dia (picks normais da lista)
+      let dIaGreen = 0, dIaRed = 0;
       for (const r of (resultados?.jogos_resultado || [])) {
-        if (r.jogo_id != null) iaResMap[r.jogo_id] = r.resultado_aposta || null;
+        if (r.resultado_aposta === 'green') dIaGreen++;
+        else if (r.resultado_aposta === 'red') dIaRed++;
       }
+      totalIaGreen += dIaGreen;
+      totalIaRed   += dIaRed;
 
       const jogosComResultado = [];
-      let dGreen = 0, dRed = 0, dPend = 0, dIaGreen = 0, dIaRed = 0;
+      let dGreen = 0, dRed = 0, dPend = 0;
 
       for (const j of engine.jogos) {
-        // Placar já salvo pelo /engine/validar/:data
         const placar    = j.placar || null;
         const resultado = j.resultado_engine || validarPickEngine(j.linha_engine, j.mercado_engine, placar);
 
@@ -7339,12 +7333,7 @@ app.get('/engine/assertividade', async (req, res) => {
         else if (resultado === 'red') { dRed++; totalRed++; }
         else { dPend++; totalPendente++; }
 
-        // Resultado IA: usa o calculado pelo validar (j.resultado_ia),
-        // fallback para a ponte jogo_id caso exista
-        const jogoId = fixtureToJogoId[j.fixtureId] || timesToJogoId[`${j.time_casa}|${j.time_fora}`] || null;
-        const resultado_ia = j.resultado_ia || (jogoId != null ? iaResMap[jogoId] : null) || null;
-        if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; }
-        else if (resultado_ia === 'red') { dIaRed++; totalIaRed++; }
+        const resultado_ia = null; // IA é agregado do dia, não por jogo
 
         if (resultado !== 'pendente') {
           const m = j.mercado_engine || 'outros';
