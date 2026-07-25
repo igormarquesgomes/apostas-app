@@ -7297,7 +7297,7 @@ app.get('/engine/assertividade', async (req, res) => {
   try {
     const dias = parseInt(req.query.dias || '30');
     const rows = await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     ).then(r => r.json());
 
@@ -7310,15 +7310,21 @@ app.get('/engine/assertividade', async (req, res) => {
 
     for (const row of rows) {
       const engine     = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
+      const apostas    = typeof row.apostas        === 'string' ? JSON.parse(row.apostas)        : row.apostas;
       const resultados = typeof row.resultados     === 'string' ? JSON.parse(row.resultados)     : row.resultados;
       if (!engine?.jogos?.length) continue;
 
-      // Mapa fixtureId → { resultado_ia } a partir dos resultados da IA
+      // Ponte fixtureId → jogo_id (ID interno da IA) via apostas.jogos
+      const fixtureToJogoId = {};
+      const timesToJogoId   = {};
+      for (const j of (apostas?.jogos || [])) {
+        if (j.fixtureId && j.id) fixtureToJogoId[j.fixtureId] = j.id;
+        if (j.id) timesToJogoId[`${j.time_casa}|${j.time_fora}`] = j.id;
+      }
+      // Mapa jogo_id → resultado_ia
       const iaResMap = {};
       for (const r of (resultados?.jogos_resultado || [])) {
-        if (r.fixture_id) iaResMap[r.fixture_id] = r.resultado_aposta || null;
-        // fallback por time_casa+time_fora
-        if (r.time_casa && r.time_fora) iaResMap[`${r.time_casa}|${r.time_fora}`] = r.resultado_aposta || null;
+        if (r.jogo_id != null) iaResMap[r.jogo_id] = r.resultado_aposta || null;
       }
 
       const jogosComResultado = [];
@@ -7333,8 +7339,9 @@ app.get('/engine/assertividade', async (req, res) => {
         else if (resultado === 'red') { dRed++; totalRed++; }
         else { dPend++; totalPendente++; }
 
-        // Resultado IA para o mesmo jogo (por fixtureId ou times)
-        const resultado_ia = iaResMap[j.fixtureId] || iaResMap[`${j.time_casa}|${j.time_fora}`] || null;
+        // Resultado IA para o mesmo jogo via ponte fixtureId → jogo_id
+        const jogoId = fixtureToJogoId[j.fixtureId] || timesToJogoId[`${j.time_casa}|${j.time_fora}`] || null;
+        const resultado_ia = (jogoId != null ? iaResMap[jogoId] : null) || null;
         if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; }
         else if (resultado_ia === 'red') { dIaRed++; totalIaRed++; }
 
@@ -7446,27 +7453,64 @@ app.post('/engine/validar/:data', async (req, res) => {
         let stats = null;
         if (['cartoes','escanteios'].includes(jogo.mercado_engine)) {
           stats = await buscarStatsFixture(jogo.fixtureId);
-          if (stats) jogo.stats_engine = { cartoesTotal: stats.cartoesTotal, escanteiosTotal: stats.escanteiosTotal };
+          if (stats) jogo.stats_engine = { cartoesTotal: stats.cartoesTotal, escanteiosTotal: stats.escanteiosTotal, hasCardData: stats.hasCardData, hasCornerData: stats.hasCornerData };
         }
 
+        const anterior = jogo.resultado_engine;
         jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, stats || jogo.stats_engine);
+        if (jogo.resultado_engine !== anterior) atualizados++;
       } catch(e) { console.error(`Engine validar ${jogo.fixtureId}:`, e.message); }
     }
 
-    if (atualizados > 0) {
-      await fetch(
-        `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`,
-        {
-          method: 'PATCH',
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ apostas_engine: engine })
-        }
-      );
-    }
+    // Sempre salva para garantir que placar e resultado_engine persistam
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`,
+      {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ apostas_engine: engine })
+      }
+    );
 
     const green = engine.jogos.filter(j => j.resultado_engine === 'green').length;
     const red   = engine.jogos.filter(j => j.resultado_engine === 'red').length;
     res.json({ data, atualizados, green, red, pendente: engine.jogos.length - green - red });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Input manual de stats para picks pendentes do engine
+// Body: { fixtureId, cartoesTotal, escanteiosTotal }
+app.post('/engine/input-stats', async (req, res) => {
+  try {
+    const { data, fixtureId, cartoesTotal, escanteiosTotal } = req.body;
+    if (!data || !fixtureId) return res.status(400).json({ erro: 'data e fixtureId obrigatórios' });
+
+    const row = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json()).then(r => r[0]);
+
+    if (!row?.apostas_engine?.jogos?.length) return res.status(404).json({ erro: 'sem engine para esta data' });
+
+    const engine = row.apostas_engine;
+    const jogo = engine.jogos.find(j => String(j.fixtureId) === String(fixtureId));
+    if (!jogo) return res.status(404).json({ erro: 'jogo não encontrado' });
+
+    jogo.stats_engine = {
+      cartoesTotal:   cartoesTotal   != null ? Number(cartoesTotal)   : (jogo.stats_engine?.cartoesTotal   ?? null),
+      escanteiosTotal: escanteiosTotal != null ? Number(escanteiosTotal) : (jogo.stats_engine?.escanteiosTotal ?? null),
+      hasCardData:    cartoesTotal   != null,
+      hasCornerData:  escanteiosTotal != null,
+    };
+    jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, jogo.stats_engine);
+
+    await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ apostas_engine: engine })
+    });
+
+    res.json({ fixtureId, resultado_engine: jogo.resultado_engine, stats: jogo.stats_engine });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

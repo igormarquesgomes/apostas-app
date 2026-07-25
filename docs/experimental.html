@@ -665,12 +665,59 @@ function renderAssertividade(d){
             <td style="padding:7px 10px;text-align:center;">${badgeRes(j.resultado_engine)}</td>
             <td style="padding:7px 10px;text-align:center;">${badgeRes(j.resultado_ia)}</td>
             <td style="padding:7px 10px;text-align:center;">
-              ${j.score_engine != null ? `<span style="font-size:11px;font-weight:700;color:${j.confianca_engine==='alta'?'#16A34A':j.confianca_engine==='media'?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
+              ${j.resultado_engine === 'pendente' && ['cartoes','escanteios'].includes(j.mercado_engine)
+                ? `<button onclick="abrirInputStats('${j._data}','${j.fixtureId}','${j.time_casa} × ${j.time_fora}','${j.mercado_engine}')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1.5px solid #7C3AED;background:#F5F3FF;color:#7C3AED;cursor:pointer;font-weight:700">+ stats</button>`
+                : j.score_engine != null ? `<span style="font-size:11px;font-weight:700;color:${j.confianca_engine==='alta'?'#16A34A':j.confianca_engine==='media'?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
             </td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>`;
+}
+
+function abrirInputStats(data, fixtureId, jogo, mercado){
+  const isCart = mercado === 'cartoes';
+  const isEsc  = mercado === 'escanteios';
+  const html = `
+    <div id="modal-stats" onclick="if(event.target===this)fecharModalStats()" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:16px;padding:24px;width:340px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:4px">${jogo}</div>
+        <div style="font-size:11px;color:#94A3B8;margin-bottom:16px">${data} · ${mercado}</div>
+        ${isCart||isEsc ? `
+          ${isCart ? `<label style="display:block;font-size:12px;font-weight:600;color:#64748B;margin-bottom:4px">Total de cartões</label>
+          <input id="inp-cartoes" type="number" min="0" placeholder="ex: 4" style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px">` : ''}
+          ${isEsc ? `<label style="display:block;font-size:12px;font-weight:600;color:#64748B;margin-bottom:4px">Total de escanteios</label>
+          <input id="inp-esc" type="number" min="0" placeholder="ex: 9" style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px">` : ''}
+        ` : ''}
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button onclick="fecharModalStats()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-weight:600">Cancelar</button>
+          <button onclick="salvarInputStats('${data}','${fixtureId}','${mercado}')" style="flex:2;padding:10px;border-radius:8px;border:none;background:#7C3AED;color:#fff;cursor:pointer;font-weight:700">Salvar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function fecharModalStats(){
+  const m = document.getElementById('modal-stats');
+  if(m) m.remove();
+}
+
+async function salvarInputStats(data, fixtureId, mercado){
+  const cartoes    = document.getElementById('inp-cartoes')?.value;
+  const escanteios = document.getElementById('inp-esc')?.value;
+  if(cartoes === '' && escanteios === '') return alert('Informe ao menos um valor.');
+  const body = { data, fixtureId: parseInt(fixtureId) };
+  if(cartoes    !== '' && cartoes    != null) body.cartoesTotal    = parseInt(cartoes);
+  if(escanteios !== '' && escanteios != null) body.escanteiosTotal = parseInt(escanteios);
+  try {
+    const r = await fetch('/engine/input-stats', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const j = await r.json();
+    if(j.error) return alert('Erro: ' + j.error);
+    fecharModalStats();
+    alert(`Salvo! Resultado: ${j.resultado_engine}`);
+    carregarAssertividade();
+  } catch(e) { alert('Erro: ' + e.message); }
 }
 
 function toggleEngine(){
