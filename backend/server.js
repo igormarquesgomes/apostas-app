@@ -7296,7 +7296,7 @@ app.get('/engine/assertividade', async (req, res) => {
   try {
     const dias = parseInt(req.query.dias || '30');
     const rows = await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas_engine,resultados&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
     ).then(r => r.json());
 
@@ -7309,39 +7309,31 @@ app.get('/engine/assertividade', async (req, res) => {
 
     for (const row of rows) {
       const engine     = typeof row.apostas_engine === 'string' ? JSON.parse(row.apostas_engine) : row.apostas_engine;
-      const apostas    = typeof row.apostas        === 'string' ? JSON.parse(row.apostas)        : row.apostas;
       const resultados = typeof row.resultados     === 'string' ? JSON.parse(row.resultados)     : row.resultados;
       if (!engine?.jogos?.length) continue;
 
-      // Ponte: fixtureId (API-Football) → jogo_id (ID interno da IA)
-      const fixtureToJogoId = {};
-      const timesToJogoId   = {};
-      for (const j of (apostas?.jogos || [])) {
-        if (j.fixtureId && j.id) fixtureToJogoId[j.fixtureId] = j.id;
-        const key = `${j.time_casa}|${j.time_fora}`;
-        if (j.id) timesToJogoId[key] = j.id;
-      }
-
-      // Mapa jogo_id → { placar, resultado_ia }
-      const resMap = {};
+      // Mapa fixtureId → { resultado_ia } a partir dos resultados da IA
+      const iaResMap = {};
       for (const r of (resultados?.jogos_resultado || [])) {
-        if (r.jogo_id != null) resMap[r.jogo_id] = { placar: r.placar || null, resultado_ia: r.resultado_aposta || null };
+        if (r.fixture_id) iaResMap[r.fixture_id] = r.resultado_aposta || null;
+        // fallback por time_casa+time_fora
+        if (r.time_casa && r.time_fora) iaResMap[`${r.time_casa}|${r.time_fora}`] = r.resultado_aposta || null;
       }
 
       const jogosComResultado = [];
       let dGreen = 0, dRed = 0, dPend = 0, dIaGreen = 0, dIaRed = 0;
 
       for (const j of engine.jogos) {
-        const jogoId    = fixtureToJogoId[j.fixtureId] || timesToJogoId[`${j.time_casa}|${j.time_fora}`] || null;
-        const res       = (jogoId != null ? resMap[jogoId] : null) || {};
-        const placar    = res.placar || null;
-        const resultado = validarPickEngine(j.linha_engine, j.mercado_engine, placar);
+        // Placar já salvo pelo /engine/validar/:data
+        const placar    = j.placar || null;
+        const resultado = j.resultado_engine || validarPickEngine(j.linha_engine, j.mercado_engine, placar);
 
         if (resultado === 'green') { dGreen++; totalGreen++; }
         else if (resultado === 'red') { dRed++; totalRed++; }
-        else dPend++;
+        else { dPend++; totalPendente++; }
 
-        const resultado_ia = res.resultado_ia || null;
+        // Resultado IA para o mesmo jogo (por fixtureId ou times)
+        const resultado_ia = iaResMap[j.fixtureId] || iaResMap[`${j.time_casa}|${j.time_fora}`] || null;
         if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; }
         else if (resultado_ia === 'red') { dIaRed++; totalIaRed++; }
 
@@ -7363,7 +7355,6 @@ app.get('/engine/assertividade', async (req, res) => {
         });
       }
 
-      if (!jogosComResultado.length) continue;
       const validados   = dGreen + dRed;
       const iaValidados = dIaGreen + dIaRed;
       porDia.push({
@@ -7411,6 +7402,58 @@ app.get('/engine/:data', async (req, res) => {
     const resultado = await gerarApostasEngine(data);
     if (resultado.erro) return res.status(404).json(resultado);
     res.json(resultado);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Valida picks do engine buscando placar via API-Football e salvando em apostas_engine.jogos[n].placar
+app.post('/engine/validar/:data', async (req, res) => {
+  try {
+    const { data } = req.params;
+    const row = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json()).then(r => r[0]);
+
+    if (!row?.apostas_engine?.jogos?.length) return res.status(404).json({ erro: 'sem engine para esta data' });
+
+    const engine = row.apostas_engine;
+    let atualizados = 0;
+
+    for (const jogo of engine.jogos) {
+      if (jogo.placar) continue; // já tem placar
+      if (!jogo.fixtureId) continue;
+      try {
+        const fix = await fetch(
+          `https://v3.football.api-sports.io/fixtures?id=${jogo.fixtureId}`,
+          { headers: { 'x-apisports-key': process.env.APIFOOTBALL_KEY } }
+        ).then(r => r.json());
+        const f = fix?.response?.[0];
+        if (!f) continue;
+        const status = f.fixture?.status?.short;
+        if (!['FT','AET','PEN'].includes(status)) continue;
+        const gC = f.goals?.home;
+        const gF = f.goals?.away;
+        if (gC == null || gF == null) continue;
+        jogo.placar = `${gC}-${gF}`;
+        jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar);
+        atualizados++;
+      } catch(e) { console.error(`Engine validar ${jogo.fixtureId}:`, e.message); }
+    }
+
+    if (atualizados > 0) {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`,
+        {
+          method: 'PATCH',
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ apostas_engine: engine })
+        }
+      );
+    }
+
+    const green = engine.jogos.filter(j => j.resultado_engine === 'green').length;
+    const red   = engine.jogos.filter(j => j.resultado_engine === 'red').length;
+    res.json({ data, atualizados, green, red, pendente: engine.jogos.length - green - red });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
