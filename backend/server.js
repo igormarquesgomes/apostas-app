@@ -7339,9 +7339,10 @@ app.get('/engine/assertividade', async (req, res) => {
         else if (resultado === 'red') { dRed++; totalRed++; }
         else { dPend++; totalPendente++; }
 
-        // Resultado IA para o mesmo jogo via ponte fixtureId → jogo_id
+        // Resultado IA: usa o calculado pelo validar (j.resultado_ia),
+        // fallback para a ponte jogo_id caso exista
         const jogoId = fixtureToJogoId[j.fixtureId] || timesToJogoId[`${j.time_casa}|${j.time_fora}`] || null;
-        const resultado_ia = (jogoId != null ? iaResMap[jogoId] : null) || null;
+        const resultado_ia = j.resultado_ia || (jogoId != null ? iaResMap[jogoId] : null) || null;
         if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; }
         else if (resultado_ia === 'red') { dIaRed++; totalIaRed++; }
 
@@ -7459,6 +7460,14 @@ app.post('/engine/validar/:data', async (req, res) => {
         const anterior = jogo.resultado_engine;
         jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, stats || jogo.stats_engine);
         if (jogo.resultado_engine !== anterior) atualizados++;
+
+        // Calcula resultado_ia usando parseLinha no texto da aposta_ia
+        if (!jogo.resultado_ia || jogo.resultado_ia === 'pendente') {
+          const linhaIa = parseLinha(jogo.aposta_ia, jogo.mercado_ia);
+          const statsIa = ['cartoes'].includes(jogo.mercado_ia) ? (stats || jogo.stats_engine) :
+                          ['escanteios'].includes(jogo.mercado_ia) ? (stats || jogo.stats_engine) : null;
+          if (linhaIa) jogo.resultado_ia = validarPickEngine(linhaIa, jogo.mercado_ia, jogo.placar, statsIa);
+        }
       } catch(e) { console.error(`Engine validar ${jogo.fixtureId}:`, e.message); }
     }
 
@@ -7536,6 +7545,35 @@ app.post('/engine/gerar', async (req, res) => {
 });
 
 // Valida um pick do engine dado linha + mercado + placar (sem chamar IA)
+// Converte texto de aposta IA ("Over 2.5 gols", "Casa vence", etc.) em linha normalizada
+function parseLinha(aposta, mercado) {
+  if (!aposta || !mercado) return null;
+  const a = aposta.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (mercado === 'gols') {
+    const m = a.match(/(over|under)\s+([\d.]+)/);
+    if (m) return `${m[1]}_${m[2]}`;
+    if (a.includes('ambos marcam') || a.includes('btts')) return 'btts';
+    if (a.includes('nao btts') || a.includes('nbtts') || a.includes('nenhum')) return 'no_btts';
+  }
+  if (mercado === 'resultado') {
+    if (a.includes('dupla chance') && (a.includes('1x') || (a.includes('casa') && !a.includes('fora')))) return '1X';
+    if (a.includes('dupla chance') && (a.includes('x2') || (a.includes('fora') && !a.includes('casa')))) return 'X2';
+    if (a.includes('dupla chance') && a.includes('12')) return '12';
+    if (a.includes('casa vence') || a === '1' || a.includes('home win')) return 'casa';
+    if (a.includes('fora vence') || a.includes('visitante vence') || a === '2' || a.includes('away win')) return 'fora';
+    if (a.includes('empate') || a === 'x') return 'empate';
+  }
+  if (mercado === 'cartoes') {
+    const m = a.match(/(over|under)\s+([\d.]+)/);
+    if (m) return `${m[1]}_${m[2]}`;
+  }
+  if (mercado === 'escanteios') {
+    const m = a.match(/(over|under)\s+([\d.]+)/);
+    if (m) return `${m[1]}_${m[2]}`;
+  }
+  return null;
+}
+
 function validarPickEngine(linha, mercado, placar, stats) {
   if (!linha || !mercado) return 'pendente';
   const parts = (placar || '').split('-').map(Number);
