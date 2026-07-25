@@ -4617,7 +4617,8 @@ async function salvarHistorico(data, jogos, resultados) {
       'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates',
+      'Prefer': 'resolution=merge-duplicates,return=minimal',
+      'on-conflict': 'fixture_id',
     },
     body: JSON.stringify(registros),
   });
@@ -7420,23 +7421,35 @@ app.post('/engine/validar/:data', async (req, res) => {
     let atualizados = 0;
 
     for (const jogo of engine.jogos) {
-      if (jogo.placar) continue; // já tem placar
+      // Pula se já tem resultado definitivo
+      if (jogo.resultado_engine === 'green' || jogo.resultado_engine === 'red') continue;
       if (!jogo.fixtureId) continue;
       try {
-        const fix = await fetch(
-          `https://v3.football.api-sports.io/fixtures?id=${jogo.fixtureId}`,
-          { headers: { 'x-apisports-key': process.env.APIFOOTBALL_KEY } }
-        ).then(r => r.json());
-        const f = fix?.response?.[0];
-        if (!f) continue;
-        const status = f.fixture?.status?.short;
-        if (!['FT','AET','PEN'].includes(status)) continue;
-        const gC = f.goals?.home;
-        const gF = f.goals?.away;
-        if (gC == null || gF == null) continue;
-        jogo.placar = `${gC}-${gF}`;
-        jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar);
-        atualizados++;
+        // Busca placar se ainda não tem
+        if (!jogo.placar) {
+          const fix = await fetch(
+            `https://v3.football.api-sports.io/fixtures?id=${jogo.fixtureId}`,
+            { headers: { 'x-apisports-key': process.env.APIFOOTBALL_KEY } }
+          ).then(r => r.json());
+          const f = fix?.response?.[0];
+          if (!f) continue;
+          const status = f.fixture?.status?.short;
+          if (!['FT','AET','PEN'].includes(status)) continue;
+          const gC = f.goals?.home;
+          const gF = f.goals?.away;
+          if (gC == null || gF == null) continue;
+          jogo.placar = `${gC}-${gF}`;
+          atualizados++;
+        }
+
+        // Para cartões/escanteios busca stats detalhadas
+        let stats = null;
+        if (['cartoes','escanteios'].includes(jogo.mercado_engine)) {
+          stats = await buscarStatsFixture(jogo.fixtureId);
+          if (stats) jogo.stats_engine = { cartoesTotal: stats.cartoesTotal, escanteiosTotal: stats.escanteiosTotal };
+        }
+
+        jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, stats || jogo.stats_engine);
       } catch(e) { console.error(`Engine validar ${jogo.fixtureId}:`, e.message); }
     }
 
@@ -7479,22 +7492,22 @@ app.post('/engine/gerar', async (req, res) => {
 });
 
 // Valida um pick do engine dado linha + mercado + placar (sem chamar IA)
-function validarPickEngine(linha, mercado, placar) {
-  if (!placar || !linha || !mercado) return 'pendente';
-  const parts = placar.split('-').map(Number);
-  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return 'pendente';
-  const [gC, gF] = parts;
+function validarPickEngine(linha, mercado, placar, stats) {
+  if (!linha || !mercado) return 'pendente';
+  const parts = (placar || '').split('-').map(Number);
+  const placarOk = parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1]);
+  const [gC, gF] = placarOk ? parts : [0, 0];
   const total = gC + gF;
+
   if (mercado === 'gols') {
+    if (!placarOk) return 'pendente';
     const m = linha.match(/^(over|under)_([\d.]+)$/);
-    if (m) {
-      const n = parseFloat(m[2]);
-      return m[1] === 'over' ? (total > n ? 'green' : 'red') : (total < n ? 'green' : 'red');
-    }
+    if (m) { const n = parseFloat(m[2]); return m[1] === 'over' ? (total > n ? 'green' : 'red') : (total < n ? 'green' : 'red'); }
     if (linha === 'btts')    return (gC > 0 && gF > 0) ? 'green' : 'red';
     if (linha === 'no_btts') return !(gC > 0 && gF > 0) ? 'green' : 'red';
   }
   if (mercado === 'resultado') {
+    if (!placarOk) return 'pendente';
     if (linha === 'casa')   return gC > gF  ? 'green' : 'red';
     if (linha === 'fora')   return gF > gC  ? 'green' : 'red';
     if (linha === 'empate') return gC === gF ? 'green' : 'red';
@@ -7502,7 +7515,19 @@ function validarPickEngine(linha, mercado, placar) {
     if (linha === 'X2')     return gF >= gC ? 'green' : 'red';
     if (linha === '12')     return gC !== gF ? 'green' : 'red';
   }
-  return 'pendente'; // escanteios/cartoes precisam de stats — sem dados no placar
+  if (mercado === 'cartoes') {
+    if (!stats?.hasCardData) return 'pendente';
+    const totalCartoes = stats.cartoesTotal;
+    const m = linha.match(/^(over|under)_([\d.]+)$/);
+    if (m) { const n = parseFloat(m[2]); return m[1] === 'over' ? (totalCartoes > n ? 'green' : 'red') : (totalCartoes < n ? 'green' : 'red'); }
+  }
+  if (mercado === 'escanteios') {
+    if (!stats?.hasCornerData) return 'pendente';
+    const totalEsc = stats.escanteiosTotal;
+    const m = linha.match(/^(over|under)_([\d.]+)$/);
+    if (m) { const n = parseFloat(m[2]); return m[1] === 'over' ? (totalEsc > n ? 'green' : 'red') : (totalEsc < n ? 'green' : 'red'); }
+  }
+  return 'pendente';
 }
 
 // ─── FIM ENGINE DE REGRAS ────────────────────────────────────────────────────
