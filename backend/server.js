@@ -1785,6 +1785,8 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     console.log(`📊 Assertividade de ${ligaStatsMap.size} liga(s) injetada no prompt`);
   }
 
+  blocoMem = (blocoMem || '') + await blocoRoiParaPrompt();
+
   // Enriquecer complementares com assertividade real da liga (se disponível)
   const ligaIds = todasLigaIdsComp;
   const assertividadeLigas = new Map();
@@ -1974,6 +1976,13 @@ CRITÉRIO OBJETIVO para alta confiança em escanteios/cartões:
 - Nunca classifique como baixa escanteios/cartões apenas por ser mercado menos comum — avalie os dados
 
 PASSO 4 — Escolha o mercado com maior confiança E coerente com a análise.
+O objetivo da lista é ACERTAR: o cliente quer ver greens. Confiança vem sempre primeiro.
+DESEMPATE pelo bloco RETORNO REALIZADO (se disponível):
+- Só se aplica entre mercados de confiança EQUIVALENTE — nunca troque um mercado de
+  confiança alta por outro de confiança média porque o retorno é melhor
+- Empatou a confiança? Prefira o mercado/faixa com retorno realizado maior
+- Um mercado com retorno muito negativo e amostra relevante (20+ apostas) merece
+  desconfiança mesmo parecendo bom nos dados do jogo — reveja antes de escolher
 REGRA CRÍTICA: a justificativa DEVE explicar por que escolheu ESSE mercado e não outro.
 Se escrever "Under 2.5 é confiável" mas apostar Over 1.5, está ERRADO — seja coerente.
 NUNCA retorne confiança baixa como aposta principal — se o melhor disponível é baixa, pivote para o segundo melhor.
@@ -1985,7 +1994,7 @@ REGRA DE MERCADO PARA FAVORITOS ABSOLUTOS (Copa do Mundo e grandes seleções):
 
 CAMPO justificativa — REGRAS OBRIGATÓRIAS:
 - É o texto exibido ao PÚBLICO FINAL. Escreva como um especialista em apostas explicando sua análise, em português natural.
-- JAMAIS use os termos: "calibração", "assertividade", "LigaMedia", "pivotado", "nosso modelo", "histórico do sistema", "histórico mostra X%", "sistema identificou". Esses termos são internos e nunca devem aparecer no texto público.
+- JAMAIS use os termos: "calibração", "assertividade", "LigaMedia", "pivotado", "nosso modelo", "histórico do sistema", "histórico mostra X%", "sistema identificou", "retorno realizado", "ROI", "valor esperado". Esses termos são internos e nunca devem aparecer no texto público.
 - Mencione apenas fatores esportivos observáveis: forma recente, H2H, média de gols/escanteios/cartões, contexto do jogo (pressão por título/rebaixamento), qualidade dos times, padrão observado nos últimos jogos.
 - O campo justificativa DEVE ser coerente com o mercado e aposta FINAL escolhidos. Se a aposta é "Over 9.5 escanteios", a justificativa fala de escanteios — nunca de gols.
 - 2 a 3 frases, direto ao ponto.
@@ -2649,6 +2658,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     }
     blocoMem = (blocoMem||'') + blocoLigas;
   }
+  blocoMem = (blocoMem || '') + await blocoRoiParaPrompt();
 
   // Ajuste por assertividade nos DOIS pools; núcleo (pri ≤ 10) fica imune.
   for (const jogo of [...jogosMap.values(), ...jogosComp.values()]) {
@@ -7024,6 +7034,91 @@ async function carregarDesempenhoEngine(dias = 60) {
   }
 }
 
+// ─── ROI realizado da IA — dado auxiliar de escolha ──────────────────────────
+// O objetivo da lista continua sendo ACERTO: o cliente quer ver greens na tela,
+// não um green de odd 5. Isto entra como informação a mais no momento da
+// escolha — entre mercados de confiança parecida, mostra qual vem dando retorno.
+// A odd não fica no registro validado, então junta apostas.jogos[].odd_mercado
+// com resultados.apostas[] pelo jogo_id.
+async function carregarRoiIA(dias = 30) {
+  try {
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=apostas,resultados&resultados=not.is.null&order=data.desc&limit=${dias}`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+    if (!Array.isArray(rows)) return null;
+
+    const acc = {};
+    const bump = (chave, green, odd) => {
+      const b = acc[chave] || (acc[chave] = { g: 0, r: 0, retorno: 0 });
+      if (green) { b.g++; b.retorno += odd; } else { b.r++; }
+    };
+
+    for (const row of rows) {
+      const apostas    = typeof row.apostas    === 'string' ? JSON.parse(row.apostas)    : row.apostas;
+      const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
+      const validados  = resultados?.apostas || resultados?.jogos_resultado || [];
+      if (!apostas?.jogos?.length || !validados.length) continue;
+
+      const meta = {};
+      for (const j of apostas.jogos) {
+        if (j.id != null) meta[j.id] = { odd: Number(j.odd_mercado) || 0, mercado: j.mercado, ligaId: j.ligaId };
+      }
+      for (const a of validados) {
+        if (a.resultado_aposta !== 'green' && a.resultado_aposta !== 'red') continue;
+        const m = meta[a.jogo_id];
+        if (!m?.odd || !m.mercado) continue;
+        const green = a.resultado_aposta === 'green';
+        const faixa = engineFaixaOdd(m.odd);
+        bump(`${m.mercado}|${faixa}`, green, m.odd);
+        if (m.ligaId) bump(`liga${m.ligaId}|${m.mercado}`, green, m.odd);
+      }
+    }
+
+    const tabela = {};
+    for (const [chave, b] of Object.entries(acc)) {
+      const total = b.g + b.r;
+      if (total < 4) continue; // amostra pequena demais para informar escolha
+      tabela[chave] = {
+        total,
+        ass: Math.round((b.g / total) * 100),
+        roi: +(((b.retorno - total) / total) * 100).toFixed(1),
+      };
+    }
+    return tabela;
+  } catch (e) {
+    console.error('carregarRoiIA erro:', e.message);
+    return null;
+  }
+}
+
+// Formata o retorno realizado para injeção no prompt. Devolve '' quando não há
+// amostra — melhor omitir o bloco do que mostrar número sem base.
+async function blocoRoiParaPrompt() {
+  const roi = await carregarRoiIA();
+  if (!roi || !Object.keys(roi).length) return '';
+  const sinal = v => `${v > 0 ? '+' : ''}${v}%`;
+
+  const porFaixa = Object.entries(roi)
+    .filter(([k]) => !k.startsWith('liga'))
+    .sort((a, b) => b[1].total - a[1].total).slice(0, 12)
+    .map(([k, v]) => `  ${k.replace('|', ' @ odd ')}: ${v.ass}% acerto · retorno ${sinal(v.roi)} (${v.total} apostas)`);
+
+  const porLiga = Object.entries(roi)
+    .filter(([k]) => k.startsWith('liga'))
+    .sort((a, b) => b[1].total - a[1].total).slice(0, 10)
+    .map(([k, v]) => {
+      const [lg, merc] = k.replace('liga', '').split('|');
+      return `  Liga ${lg} · ${merc}: ${v.ass}% acerto · retorno ${sinal(v.roi)} (${v.total})`;
+    });
+
+  if (!porFaixa.length && !porLiga.length) return '';
+  console.log(`💰 ROI realizado: ${porFaixa.length} faixa(s) e ${porLiga.length} liga(s) injetados no prompt`);
+  return '\nRETORNO REALIZADO (dado auxiliar — use só para DESEMPATAR):\n' +
+    (porFaixa.length ? 'Por mercado e faixa de odd:\n' + porFaixa.join('\n') + '\n' : '') +
+    (porLiga.length  ? 'Por liga e mercado:\n'        + porLiga.join('\n')  + '\n' : '');
+}
+
 // Filtros de sanidade: usa médias pré-computadas (_mc*) quando disponíveis.
 // Quando não há dado (0 ou null), o filtro é relaxado — melhor incluir e pontuar baixo
 // do que excluir um jogo por falta de dados.
@@ -7203,12 +7298,16 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
       else if (geral?.total >= 20) ancora = geral.ass;
     }
 
-    // Sem nenhum histórico validado não há como estimar probabilidade: deixa
-    // ev nulo e o ranking cai de volta para o score bruto, sem veto.
+    // Probabilidade calibrada: é ela que ranqueia. O objetivo é acerto — o
+    // cliente quer ver 3 ou 4 greens em 5, não um green de odd 5. Sem histórico
+    // validado não há como calibrar: cai de volta para o score bruto.
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    const ev = ancora === null
+    const pCal = ancora === null
       ? null
-      : +((clamp(ancora + clamp((score - 70) * 0.1, -8, 8), 5, 95) / 100) * odd).toFixed(3);
+      : clamp(ancora + clamp((score - 70) * 0.1, -8, 8), 5, 95);
+
+    // EV é dado auxiliar para desempate, nunca critério principal.
+    const ev = pCal === null ? null : +((pCal / 100) * odd).toFixed(3);
 
     candidatos.push({
       aposta, mercado, odd, linha, faixa,
@@ -7220,13 +7319,17 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
       rank_diff: rankDiff,
       real_ass: realAss, real_roi: realRoi, real_total: realTotal,
       score: Math.round(score),
+      p_calibrado: pCal === null ? null : Math.round(pCal),
       ev,
     });
   }
 
-  // Ranqueia por valor esperado; score como desempate (e como critério único
-  // enquanto não houver histórico validado suficiente para estimar EV).
-  candidatos.sort((a, b) => (b.ev ?? -1) - (a.ev ?? -1) || b.score - a.score);
+  // Ranqueia por probabilidade calibrada de acerto. EV entra só como desempate
+  // entre opções de acerto equivalente — aí sim vale preferir a que paga mais.
+  candidatos.sort((a, b) =>
+    (b.p_calibrado ?? b.score) - (a.p_calibrado ?? a.score) ||
+    (b.ev ?? 0) - (a.ev ?? 0)
+  );
   return candidatos;
 }
 
@@ -7245,6 +7348,9 @@ async function dbSaveApostasEngine(data, apostasEngine) {
 
 async function gerarApostasEngine(data) {
   const MAX_JOGOS = 15;
+  // Piso de acerto calibrado. O objetivo é green na tela, não ROI:
+  // um pick de 43% não entra nem que pague odd alta.
+  const P_MINIMO = 50;
 
   // Carrega jogos da IA (que já têm odds_confirmadas) + dados históricos em paralelo
   const [rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData, desempenho] = await Promise.all([
@@ -7358,16 +7464,18 @@ async function gerarApostasEngine(data) {
       linha_inversa:  melhor.linha_inversa,
       rank_casa:      melhor.rank_casa,  rank_fora: melhor.rank_fora, rank_diff: melhor.rank_diff,
       score_engine:   melhor.score,
+      // Probabilidade calibrada de acerto — critério principal
+      p_calibrado:    melhor.p_calibrado,
+      acerto_ok:      melhor.p_calibrado == null || melhor.p_calibrado >= P_MINIMO,
+      // EV e ROI: dados auxiliares, exibidos para avaliação
       ev_engine:      melhor.ev,
-      // ev nulo = ainda sem histórico para estimar; não conta como negativo
-      ev_positivo:    melhor.ev == null || melhor.ev >= 1.0,
-      // Desempenho realizado do bucket (mercado+faixa) que embasou a calibração
       real_ass:       melhor.real_ass, real_roi: melhor.real_roi, real_total: melhor.real_total,
-      confianca_engine: melhor.ev == null
+      confianca_engine: melhor.p_calibrado == null
         ? (melhor.score >= 75 ? 'alta' : melhor.score >= 65 ? 'media' : 'baixa')
-        : (melhor.ev >= 1.15 ? 'alta' : melhor.ev >= 1.05 ? 'media' : 'baixa'),
+        : (melhor.p_calibrado >= 62 ? 'alta' : melhor.p_calibrado >= 55 ? 'media' : 'baixa'),
       alternativas_engine: candidatos.slice(1, 4).map(c => ({
-        aposta: c.aposta, mercado: c.mercado, odd: c.odd, score: c.score, ev: c.ev,
+        aposta: c.aposta, mercado: c.mercado, odd: c.odd,
+        score: c.score, p: c.p_calibrado, ev: c.ev,
       })),
       media_gols_combinada: mcGolsReal.toFixed(2),
       media_escanteios: ligasData?.[jogo.ligaId]?.media_escanteios || jogo.media_escanteios,
@@ -7378,19 +7486,22 @@ async function gerarApostasEngine(data) {
     });
   }
 
-  picks.sort((a, b) => (b.ev_engine ?? -1) - (a.ev_engine ?? -1) || b.score_engine - a.score_engine);
+  // Ordena por probabilidade de acerto; EV desempata acertos equivalentes.
+  picks.sort((a, b) =>
+    (b.p_calibrado ?? b.score_engine) - (a.p_calibrado ?? a.score_engine) ||
+    (b.ev_engine ?? 0) - (a.ev_engine ?? 0)
+  );
 
-  // Preferir picks com valor esperado positivo. Só completa com EV negativo se
-  // não houver positivos suficientes — melhor uma lista curta e lucrativa do que
-  // cheia e perdedora, mas nunca vazia (quebraria a tela).
-  const positivos = picks.filter(p => p.ev_positivo);
-  const top = positivos.length >= MAX_JOGOS
-    ? positivos.slice(0, MAX_JOGOS)
-    : [...positivos, ...picks.filter(p => !p.ev_positivo).slice(0, MAX_JOGOS - positivos.length)];
+  // Preferir picks acima do piso de acerto. Só completa com os abaixo se não
+  // houver suficientes — nunca devolve lista vazia (quebraria a tela).
+  const confiaveis = picks.filter(p => p.acerto_ok);
+  const top = confiaveis.length >= MAX_JOGOS
+    ? confiaveis.slice(0, MAX_JOGOS)
+    : [...confiaveis, ...picks.filter(p => !p.acerto_ok).slice(0, MAX_JOGOS - confiaveis.length)];
 
-  const descartadosEv = picks.length - positivos.length;
-  if (descartadosEv > 0) {
-    console.log(`📉 Engine: ${positivos.length} pick(s) com EV ≥ 1.0 · ${descartadosEv} abaixo do break-even${positivos.length < MAX_JOGOS ? ` (${MAX_JOGOS - positivos.length} usados para completar)` : ''}`);
+  const abaixoPiso = picks.length - confiaveis.length;
+  if (abaixoPiso > 0) {
+    console.log(`📉 Engine: ${confiaveis.length} pick(s) com acerto ≥ ${P_MINIMO}% · ${abaixoPiso} abaixo do piso${confiaveis.length < MAX_JOGOS ? ` (${MAX_JOGOS - confiaveis.length} usados para completar)` : ''}`);
   }
 
   const payload = {
@@ -7400,7 +7511,7 @@ async function gerarApostasEngine(data) {
     historico_base:           historicoLiga?.total || 0,
     assertividade_geral_hist: correlacao?.assertividade_geral || null,
     pool_total:               jogosAtivos.length,
-    ev_positivos:             positivos.length,
+    acerto_ok_total:          confiaveis.length,
     total:                    top.length,
     jogos:                    top,
   };
@@ -7408,6 +7519,19 @@ async function gerarApostasEngine(data) {
   await dbSaveApostasEngine(data, payload);
   return payload;
 }
+
+// Retorno realizado da lista da IA — o mesmo dado auxiliar injetado no prompt
+app.get('/ia/roi', async (req, res) => {
+  try {
+    const t = await carregarRoiIA(parseInt(req.query.dias || '30'));
+    if (!t) return res.status(500).json({ erro: 'falha ao carregar ROI' });
+    const linhas = Object.entries(t).map(([chave, v]) => ({ chave, ...v }));
+    res.json({
+      por_faixa: linhas.filter(l => !l.chave.startsWith('liga')).sort((a, b) => b.total - a.total),
+      por_liga:  linhas.filter(l =>  l.chave.startsWith('liga')).sort((a, b) => b.total - a.total),
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 // O que o engine aprendeu: desempenho realizado por mercado e por faixa de odd
 app.get('/engine/desempenho', async (req, res) => {
