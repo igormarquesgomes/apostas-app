@@ -7685,75 +7685,83 @@ app.get('/engine/:data', async (req, res) => {
 });
 
 // Valida picks do engine buscando placar via API-Football e salvando em apostas_engine.jogos[n].placar
+// Valida os picks do engine de uma data: busca placar na API-Football por
+// fixtureId, stats de cartões/escanteios quando o mercado exige, e grava
+// resultado_engine/resultado_ia no proprio apostas_engine.
+// Retorna null quando não há engine para a data.
+async function validarEngineData(data) {
+  const row = await fetch(
+    `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
+    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+  ).then(r => r.json()).then(r => r[0]);
+
+  if (!row?.apostas_engine?.jogos?.length) return null;
+
+  const engine = row.apostas_engine;
+  let atualizados = 0;
+
+  for (const jogo of engine.jogos) {
+    // Pula se já tem resultado definitivo
+    if (jogo.resultado_engine === 'green' || jogo.resultado_engine === 'red') continue;
+    if (!jogo.fixtureId) continue;
+    try {
+      // Busca placar se ainda não tem
+      if (!jogo.placar) {
+        const fix = await fetch(
+          `https://v3.football.api-sports.io/fixtures?id=${jogo.fixtureId}`,
+          { headers: { 'x-apisports-key': process.env.APIFOOTBALL_KEY } }
+        ).then(r => r.json());
+        const f = fix?.response?.[0];
+        if (!f) continue;
+        const status = f.fixture?.status?.short;
+        if (!['FT','AET','PEN'].includes(status)) continue;
+        const gC = f.goals?.home;
+        const gF = f.goals?.away;
+        if (gC == null || gF == null) continue;
+        jogo.placar = `${gC}-${gF}`;
+        atualizados++;
+      }
+
+      // Para cartões/escanteios busca stats detalhadas
+      let stats = null;
+      if (['cartoes','escanteios'].includes(jogo.mercado_engine)) {
+        stats = await buscarStatsFixture(jogo.fixtureId);
+        if (stats) jogo.stats_engine = { cartoesTotal: stats.cartoesTotal, escanteiosTotal: stats.escanteiosTotal, hasCardData: stats.hasCardData, hasCornerData: stats.hasCornerData };
+      }
+
+      const anterior = jogo.resultado_engine;
+      jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, stats || jogo.stats_engine);
+      if (jogo.resultado_engine !== anterior) atualizados++;
+
+      // Calcula resultado_ia usando parseLinha no texto da aposta_ia
+      if (!jogo.resultado_ia || jogo.resultado_ia === 'pendente') {
+        const linhaIa = parseLinha(jogo.aposta_ia, jogo.mercado_ia);
+        const statsIa = ['cartoes','escanteios'].includes(jogo.mercado_ia) ? (stats || jogo.stats_engine) : null;
+        if (linhaIa) jogo.resultado_ia = validarPickEngine(linhaIa, jogo.mercado_ia, jogo.placar, statsIa);
+      }
+    } catch(e) { console.error(`Engine validar ${jogo.fixtureId}:`, e.message); }
+  }
+
+  // Sempre salva para garantir que placar e resultado_engine persistam
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`,
+    {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ apostas_engine: engine })
+    }
+  );
+
+  const green = engine.jogos.filter(j => j.resultado_engine === 'green').length;
+  const red   = engine.jogos.filter(j => j.resultado_engine === 'red').length;
+  return { data, atualizados, green, red, pendente: engine.jogos.length - green - red };
+}
+
 app.post('/engine/validar/:data', async (req, res) => {
   try {
-    const { data } = req.params;
-    const row = await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-    ).then(r => r.json()).then(r => r[0]);
-
-    if (!row?.apostas_engine?.jogos?.length) return res.status(404).json({ erro: 'sem engine para esta data' });
-
-    const engine = row.apostas_engine;
-    let atualizados = 0;
-
-    for (const jogo of engine.jogos) {
-      // Pula se já tem resultado definitivo
-      if (jogo.resultado_engine === 'green' || jogo.resultado_engine === 'red') continue;
-      if (!jogo.fixtureId) continue;
-      try {
-        // Busca placar se ainda não tem
-        if (!jogo.placar) {
-          const fix = await fetch(
-            `https://v3.football.api-sports.io/fixtures?id=${jogo.fixtureId}`,
-            { headers: { 'x-apisports-key': process.env.APIFOOTBALL_KEY } }
-          ).then(r => r.json());
-          const f = fix?.response?.[0];
-          if (!f) continue;
-          const status = f.fixture?.status?.short;
-          if (!['FT','AET','PEN'].includes(status)) continue;
-          const gC = f.goals?.home;
-          const gF = f.goals?.away;
-          if (gC == null || gF == null) continue;
-          jogo.placar = `${gC}-${gF}`;
-          atualizados++;
-        }
-
-        // Para cartões/escanteios busca stats detalhadas
-        let stats = null;
-        if (['cartoes','escanteios'].includes(jogo.mercado_engine)) {
-          stats = await buscarStatsFixture(jogo.fixtureId);
-          if (stats) jogo.stats_engine = { cartoesTotal: stats.cartoesTotal, escanteiosTotal: stats.escanteiosTotal, hasCardData: stats.hasCardData, hasCornerData: stats.hasCornerData };
-        }
-
-        const anterior = jogo.resultado_engine;
-        jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, stats || jogo.stats_engine);
-        if (jogo.resultado_engine !== anterior) atualizados++;
-
-        // Calcula resultado_ia usando parseLinha no texto da aposta_ia
-        if (!jogo.resultado_ia || jogo.resultado_ia === 'pendente') {
-          const linhaIa = parseLinha(jogo.aposta_ia, jogo.mercado_ia);
-          const statsIa = ['cartoes'].includes(jogo.mercado_ia) ? (stats || jogo.stats_engine) :
-                          ['escanteios'].includes(jogo.mercado_ia) ? (stats || jogo.stats_engine) : null;
-          if (linhaIa) jogo.resultado_ia = validarPickEngine(linhaIa, jogo.mercado_ia, jogo.placar, statsIa);
-        }
-      } catch(e) { console.error(`Engine validar ${jogo.fixtureId}:`, e.message); }
-    }
-
-    // Sempre salva para garantir que placar e resultado_engine persistam
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`,
-      {
-        method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ apostas_engine: engine })
-      }
-    );
-
-    const green = engine.jogos.filter(j => j.resultado_engine === 'green').length;
-    const red   = engine.jogos.filter(j => j.resultado_engine === 'red').length;
-    res.json({ data, atualizados, green, red, pendente: engine.jogos.length - green - red });
+    const r = await validarEngineData(req.params.data);
+    if (!r) return res.status(404).json({ erro: 'sem engine para esta data' });
+    res.json(r);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -8402,7 +8410,27 @@ async function rotinaComplementoDiurno() {
 
 async function rotinaEngine08h() {
   const hoje = hojeStr();
-  const amanha = (() => { const d = new Date(hoje + 'T12:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+  const dOffset = n => { const d = new Date(hoje + 'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  const amanha = dOffset(1);
+
+  // ── Validação: fecha os dias anteriores antes de gerar ────────────────────
+  // Sem isto os picks ficam sem green/red para sempre e o aprendizado do engine
+  // (que lê os próprios resultados validados) nunca recebe dados novos.
+  // Varre 5 dias para trás: cobre falhas de execução e jogos que só encerram
+  // de madrugada, e é barato porque picks já resolvidos são pulados.
+  for (let i = 1; i <= 5; i++) {
+    const data = dOffset(-i);
+    try {
+      const r = await validarEngineData(data);
+      if (!r) continue;
+      if (r.atualizados > 0 || r.pendente > 0) {
+        console.log(`🔍 [Engine 08h] Validado ${data}: ${r.green}G ${r.red}R ${r.pendente}pend (${r.atualizados} atualizados)`);
+      }
+    } catch(e) {
+      console.error(`❌ [Engine 08h] Erro ao validar ${data}:`, e.message);
+    }
+  }
+
   const datas = [hoje, amanha];
   for (const data of datas) {
     try {
@@ -8494,15 +8522,15 @@ function agendarRotina() {
     setTimeout(tick12h, 24 * 60 * 60 * 1000);
   }, ms12h);
 
-  // ── 08:00 BRT (11:00 UTC) — gerar picks do engine para hoje e amanhã ──────
+  // ── 08:00 BRT (11:00 UTC) — validar dias anteriores + gerar picks do engine ─
   if (deveExecutarCatchup(11, 0)) {
-    console.log(`⚡ Catch-up 08h: gerando picks engine`);
+    console.log(`⚡ Catch-up 08h: validando dias anteriores e gerando picks engine`);
     setTimeout(() => rotinaEngine08h().catch(console.error), 5000);
   }
   const ms08h = msAteHoraUTC(11, 0);
   console.log(`⏰ Próxima rotinaEngine08h (08h) em ${Math.round(ms08h/60000)} min`);
   setTimeout(function tick08h() {
-    console.log(`⏰ [08h] Gerando picks engine`);
+    console.log(`⏰ [08h] Validando dias anteriores e gerando picks engine`);
     rotinaEngine08h().catch(console.error);
     setTimeout(tick08h, 24 * 60 * 60 * 1000);
   }, ms08h);
