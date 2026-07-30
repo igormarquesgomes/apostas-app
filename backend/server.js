@@ -4995,7 +4995,10 @@ async function rotinaNoturna() {
     }
   }
 
-  if (apiSuspensa && apiErrorMsg.includes('Limite')) {
+  // Reset diário do bloqueio por cota — a API-Football devolve a mensagem em
+  // inglês ("You have reached the request limit for the day"), então casar só
+  // com "Limite" deixava a flag travada mesmo com cota nova.
+  if (apiSuspensa && /limite|limit|requests/i.test(apiErrorMsg)) {
     apiSuspensa = false; apiErrorMsg = ''; reqHoje = 0;
     console.log('✅ Bloqueio de API resetado');
   }
