@@ -874,6 +874,65 @@ function isTimesEuropaB(timeCasa, timeFora) {
     [...TIMES_EUROPA_B].some(t => nc?.includes(t) || nf?.includes(t));
 }
 
+// Núcleo de prioridade fixa: Série A/B, Copa do Mundo, copas internacionais e
+// grandes ligas europeias. Nunca é rebaixado por assertividade — é decisão de
+// produto, não estatística. Mesmo limiar já usado no pré-filtro de odds.
+const PRI_NUCLEO = 10;
+
+// Times reserva/B/sub: escalação rotativa puxada pelo elenco principal, então a
+// forma e o H2H que alimentam o prompt têm pouco poder preditivo.
+function isTimeReserva(nome) {
+  if (!nome) return false;
+  return /[\s-](ii|iii|b|u\s?1[6-9]|u\s?2[0-3]|sub\s?-?\d{2}|res|reserves?)$/i.test(nome.trim());
+}
+
+// Une os pools prioritário e complementar num único ranking por `pri` e aplica
+// teto de jogos por liga, para nenhuma competição dominar a lista do dia.
+// O teto relaxa progressivamente quando não há jogos suficientes para a meta.
+// `limite` é o teto do pool de candidatos; `minimo` é quantos precisam sobrar para
+// montar a lista final. O teto por liga só é relaxado se nem o mínimo for atingido —
+// encher o pool inteiro não justifica deixar uma competição dominar.
+function selecionarCandidatos(jogosMap, jogosComp, limite, opts = {}) {
+  const {
+    timesIgnorar = new Set(),
+    max13h = 4,
+    tetos = [3, 4, 6, Infinity],
+    desempate = null,
+    minimo = limite,
+  } = opts;
+
+  const todos = [...jogosMap.values(), ...jogosComp.values()]
+    .filter(j => {
+      if (isTimeReserva(j.timeCasa) || isTimeReserva(j.timeFora)) return false;
+      if (!timesIgnorar.size) return true;
+      return !timesIgnorar.has(j.timeCasa?.toLowerCase())
+          && !timesIgnorar.has(j.timeFora?.toLowerCase());
+    })
+    .sort((a, b) => {
+      if (a.pri !== b.pri) return a.pri - b.pri;
+      if (desempate) { const d = desempate(a, b); if (d) return d; }
+      return (a.horario || '').localeCompare(b.horario || '');
+    });
+
+  let melhor = [];
+  for (const teto of tetos) {
+    const porLiga = new Map();
+    let c13 = 0;
+    const out = [];
+    for (const j of todos) {
+      if (out.length >= limite) break;
+      const n = porLiga.get(j.ligaId) || 0;
+      if (n >= teto) continue;
+      if (j.horario === '13:00') { if (c13 >= max13h) continue; c13++; }
+      porLiga.set(j.ligaId, n + 1);
+      out.push(j);
+    }
+    melhor = out;
+    if (out.length >= Math.min(minimo, limite)) break;
+  }
+  return melhor;
+}
+
 // Sem NOMES_PRIORITY — usamos apenas IDs para máxima precisão
 const NOMES_PRIORITY = [];
 
@@ -1746,54 +1805,25 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     } catch(e) { /* silencioso — fallback para pri fixa */ }
   }
 
-  // Ajustar pri dos complementares com base na assertividade real
-  for (const [key, jogo] of jogosComp) {
+  // Ajustar pri com base na assertividade real — aplica aos DOIS pools.
+  // Antes só complementares eram ajustados, então ligas fixas em LIGAS_PRIORITY
+  // ficavam imunes à calibração mesmo convertendo mal.
+  for (const jogo of [...jogosMap.values(), ...jogosComp.values()]) {
+    if (jogo.pri <= PRI_NUCLEO) continue; // núcleo tem prioridade fixa
     const st = ligaStatsMap.get(jogo.ligaId);
-    if (st) {
-      const assert = st.assertividade;
-      if (assert >= 80)      jogo.pri = Math.min(jogo.pri, 60);
-      else if (assert >= 70) jogo.pri = Math.min(jogo.pri, 70);
-      else if (assert >= 60) jogo.pri = Math.min(jogo.pri, 80);
-      else if (assert < 40 && st.total >= 5) jogo.pri = Math.max(jogo.pri, 180); // rebaixar ligas fracas
-    }
+    if (!st) continue;
+    const assert = st.assertividade;
+    if (assert >= 80)      jogo.pri = Math.min(jogo.pri, 60);
+    else if (assert >= 70) jogo.pri = Math.min(jogo.pri, 70);
+    else if (assert >= 60) jogo.pri = Math.min(jogo.pri, 80);
+    else if (assert < 40 && st.total >= 5) jogo.pri = Math.max(jogo.pri, 180); // rebaixar ligas fracas
   }
 
-  // 1. Prioritários ordenados por prioridade
-  let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
-
-  // 2. Filtrar times já selecionados ANTES de decidir se precisamos de complementares
-  if (timesIgnorar.size > 0) {
-    const antes = jogos.length;
-    jogos = jogos.filter(j => {
-      const casa = j.timeCasa?.toLowerCase();
-      const fora = j.timeFora?.toLowerCase();
-      return !timesIgnorar.has(casa) && !timesIgnorar.has(fora);
-    });
-    const filtrados = antes - jogos.length;
-    if (filtrados > 0) console.log(`🚫 ${filtrados} jogos filtrados (duplicatas) da lista prioritária`);
-  }
-
-  // 3. Se ainda falta, buscar em complementares (já excluindo times ignorados)
-  if (jogos.length < metaJogos) {
-    const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
-    let cont13h = 0;
-    const compFiltrado = [];
-    for (const j of compOrdenado) {
-      const casa = j.timeCasa?.toLowerCase();
-      const fora = j.timeFora?.toLowerCase();
-      // Ignorar duplicatas também nos complementares
-      if (timesIgnorar.size > 0 && (timesIgnorar.has(casa) || timesIgnorar.has(fora))) continue;
-      if (j.horario === '13:00') {
-        cont13h++;
-        if (cont13h <= 4) compFiltrado.push(j);
-      } else {
-        compFiltrado.push(j);
-      }
-    }
-    const faltam = metaJogos - jogos.length;
-    console.log(`📋 Buscando ${faltam} jogo(s) em ligas complementares → ${compFiltrado.length} candidatos disponíveis`);
-    jogos = [...jogos, ...compFiltrado.slice(0, faltam * 3)];
-  }
+  // Pools unificados num único ranking por `pri` + teto de jogos por liga.
+  // Antes os prioritários esgotavam a cota antes de os complementares serem
+  // sequer olhados, o que promovia ligas de pri alto (ex.: 2ª divisão irlandesa,
+  // pri 69) acima de toda liga europeia genérica (pri 90) de forma categórica.
+  let jogos = selecionarCandidatos(jogosMap, jogosComp, metaJogos * 3, { timesIgnorar, minimo: metaJogos });
 
   if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis após todos os filtros`);
 
@@ -2620,44 +2650,39 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     blocoMem = (blocoMem||'') + blocoLigas;
   }
 
-  for (const [, jogo] of jogosComp) {
+  // Ajuste por assertividade nos DOIS pools; núcleo (pri ≤ 10) fica imune.
+  for (const jogo of [...jogosMap.values(), ...jogosComp.values()]) {
+    if (jogo.pri <= PRI_NUCLEO) continue;
     const st = ligaStatsMap.get(jogo.ligaId);
-    if (st) {
-      if (st.assertividade >= 80) jogo.pri = Math.min(jogo.pri, 60);
-      else if (st.assertividade >= 70) jogo.pri = Math.min(jogo.pri, 70);
-      else if (st.assertividade >= 60) jogo.pri = Math.min(jogo.pri, 80);
-      else if (st.assertividade < 40 && st.total >= 5) jogo.pri = Math.max(jogo.pri, 180);
-    }
+    if (!st) continue;
+    if (st.assertividade >= 80) jogo.pri = Math.min(jogo.pri, 60);
+    else if (st.assertividade >= 70) jogo.pri = Math.min(jogo.pri, 70);
+    else if (st.assertividade >= 60) jogo.pri = Math.min(jogo.pri, 80);
+    else if (st.assertividade < 40 && st.total >= 5) jogo.pri = Math.max(jogo.pri, 180);
   }
 
-  let jogos = Array.from(jogosMap.values()).sort((a,b) => a.pri - b.pri || a.horario.localeCompare(b.horario));
-  if (timesIgnorar.size > 0) jogos = jogos.filter(j => !timesIgnorar.has(j.timeCasa?.toLowerCase()) && !timesIgnorar.has(j.timeFora?.toLowerCase()));
-  if (jogos.length < metaJogos) {
-    const dowHoje = new Date().getDay(); // 0=Dom ... 6=Sáb
-    const cobScore = j => {
-      const st = ligaStatsMap.get(j.ligaId);
-      const cob = st?.cobertura_por_dia?.[String(dowHoje)];
-      return typeof cob === 'number' ? cob : -1;
-    };
-    const compOrdenado = Array.from(jogosComp.values()).sort((a,b) => {
-      if (a.pri !== b.pri) return a.pri - b.pri;
+  // Pools unificados + teto por liga. Desempate por cobertura de odds no dia da
+  // semana é preservado: entre ligas de mesma prioridade, prefere a que
+  // historicamente tem mercados disponíveis nesse dia.
+  const dowHoje = new Date().getDay(); // 0=Dom ... 6=Sáb
+  const cobScore = j => {
+    const st = ligaStatsMap.get(j.ligaId);
+    const cob = st?.cobertura_por_dia?.[String(dowHoje)];
+    return typeof cob === 'number' ? cob : -1;
+  };
+  const MARGEM = 8;
+  let jogos = selecionarCandidatos(jogosMap, jogosComp, metaJogos + MARGEM, {
+    timesIgnorar,
+    minimo: metaJogos,
+    desempate: (a, b) => {
       const ca = cobScore(a), cb = cobScore(b);
       if (ca >= 0 && cb >= 0) return cb - ca;
       if (ca >= 0) return ca > 0 ? -1 : 1;
       if (cb >= 0) return cb > 0 ? 1 : -1;
-      return a.horario.localeCompare(b.horario);
-    });
-    const compFiltrado = []; let cont13h = 0;
-    for (const j of compOrdenado) {
-      if (timesIgnorar.size > 0 && (timesIgnorar.has(j.timeCasa?.toLowerCase()) || timesIgnorar.has(j.timeFora?.toLowerCase()))) continue;
-      if (j.horario === '13:00') { cont13h++; if (cont13h <= 4) compFiltrado.push(j); } else compFiltrado.push(j);
-    }
-    jogos = [...jogos, ...compFiltrado.slice(0, Math.max(15, (metaJogos - jogos.length) * 3))];
-  }
+      return 0;
+    },
+  });
   if (!jogos.length) return null;
-
-  const MARGEM = 8;
-  jogos = jogos.slice(0, Math.min(metaJogos + MARGEM, jogos.length));
 
   // ── Pré-filtro de odds: só descartar complementares sem cobertura na Odds API ───────
   // Ligas prioritárias (pri ≤ 10: Série A/B, Copas) NUNCA são descartadas por falta de odds
@@ -6944,6 +6969,61 @@ function engineFaixaOdd(odd) {
   return '2.00+';
 }
 
+// ─── Aprendizado diário do engine ────────────────────────────────────────────
+// Lê os próprios picks já validados e mede o que REALMENTE aconteceu por
+// (mercado, faixa de odd). O score do engine é uma previsão de taxa de acerto;
+// isto é o resultado observado, usado para encolher a previsão em direção à
+// realidade e para vetar combinações comprovadamente perdedoras.
+//
+// ROI é o critério, não taxa de acerto: 43% a odd 2.50 lucra (+7,5%), enquanto
+// 58% a odd 1.51 perde (−12,4%). Ranquear por acerto ignora isso.
+async function carregarDesempenhoEngine(dias = 60) {
+  try {
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=apostas_engine&apostas_engine=not.is.null&order=data.desc&limit=${dias}`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+    if (!Array.isArray(rows)) return null;
+
+    const acc = {};
+    const bump = (chave, green, odd) => {
+      const b = acc[chave] || (acc[chave] = { g: 0, r: 0, retorno: 0 });
+      if (green) { b.g++; b.retorno += odd; } else { b.r++; }
+    };
+
+    for (const row of rows) {
+      const engine = typeof row.apostas_engine === 'string'
+        ? JSON.parse(row.apostas_engine) : row.apostas_engine;
+      for (const j of (engine?.jogos || [])) {
+        if (j.resultado_engine !== 'green' && j.resultado_engine !== 'red') continue;
+        const odd = Number(j.odd_engine);
+        if (!odd || !j.mercado_engine) continue;
+        const faixa = engineFaixaOdd(odd);
+        const green = j.resultado_engine === 'green';
+        bump(`${j.mercado_engine}|${faixa}`, green, odd);
+        bump(j.mercado_engine, green, odd);
+        bump('__geral', green, odd);
+      }
+    }
+
+    const tabela = {};
+    for (const [chave, b] of Object.entries(acc)) {
+      const total = b.g + b.r;
+      if (!total) continue;
+      tabela[chave] = {
+        total,
+        ass: Math.round((b.g / total) * 100),
+        // ROI de stake fixa: (retorno − apostado) / apostado
+        roi: +(((b.retorno - total) / total) * 100).toFixed(1),
+      };
+    }
+    return tabela;
+  } catch (e) {
+    console.error('carregarDesempenhoEngine erro:', e.message);
+    return null;
+  }
+}
+
 // Filtros de sanidade: usa médias pré-computadas (_mc*) quando disponíveis.
 // Quando não há dado (0 ou null), o filtro é relaxado — melhor incluir e pontuar baixo
 // do que excluir um jogo por falta de dados.
@@ -6984,7 +7064,7 @@ function engineSanityOk(linha, mercado, jogo) {
 }
 
 // oddsExternas: [{aposta, mercado, odd, linha}] vindas da API-Football /odds
-function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsTimeCasa, statsTimeFora, standings, oddsExternas) {
+function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsTimeCasa, statsTimeFora, standings, oddsExternas, desempenho) {
   const ligaId  = jogo.ligaId || jogo.liga_id;
   const ligaInfo = ligasData?.[ligaId];
 
@@ -7014,7 +7094,7 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
   const jogoMedidas = { ...jogo, _mcGols, _mcEsc, _mcCart, _winHome, _winAway };
 
   const candidatos = [];
-  const AMIN_CALIB = 5, AMIN_HIST = 3;
+  const AMIN_CALIB = 5, AMIN_HIST = 3, AMIN_REAL = 8;
 
   // Usa apenas odds reais da API-Football — sem invenção
   for (const o of (oddsExternas || [])) {
@@ -7104,6 +7184,32 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     const eProprio = histLinhaLiga?.[`${ligaId}|${mercado}|${linha}`];
     if (eProprio?.total >= 5 && eProprio.ass < 40) score -= 15;
 
+    // ── Aprendizado: probabilidade ancorada no desempenho REALIZADO ──────────
+    // O `score` acima é heurístico e não calibrado — não é uma probabilidade.
+    // Quando existe amostra medida para o bucket (mercado, faixa), é ela que
+    // define o NÍVEL; o score apenas desloca alguns pontos dentro dele. Deixar
+    // um score alto sobrepor uma taxa medida é o que mantinha o engine apostando
+    // em cartões com 43% de acerto a odds que exigem 48%.
+    // Âncora, do mais específico ao mais geral: bucket exato → mercado → global.
+    let realAss = null, realRoi = null, realTotal = 0, ancora = null;
+    if (desempenho) {
+      const exato = desempenho[`${mercado}|${faixa}`];
+      const porMerc = desempenho[mercado];
+      const geral = desempenho.__geral;
+      const real = (exato?.total >= AMIN_REAL) ? exato
+                 : (porMerc?.total >= AMIN_REAL) ? porMerc
+                 : null;
+      if (real) { realAss = real.ass; realRoi = real.roi; realTotal = real.total; ancora = real.ass; }
+      else if (geral?.total >= 20) ancora = geral.ass;
+    }
+
+    // Sem nenhum histórico validado não há como estimar probabilidade: deixa
+    // ev nulo e o ranking cai de volta para o score bruto, sem veto.
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const ev = ancora === null
+      ? null
+      : +((clamp(ancora + clamp((score - 70) * 0.1, -8, 8), 5, 95) / 100) * odd).toFixed(3);
+
     candidatos.push({
       aposta, mercado, odd, linha, faixa,
       ass_calib: assCalib, total_calib: totalCalib,
@@ -7112,11 +7218,15 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
       ass_inversa: assInversa, total_inversa: totalInversa, linha_inversa: linhaInv,
       rank_casa: stCasa?.rank ?? null, rank_fora: stFora?.rank ?? null,
       rank_diff: rankDiff,
+      real_ass: realAss, real_roi: realRoi, real_total: realTotal,
       score: Math.round(score),
+      ev,
     });
   }
 
-  candidatos.sort((a, b) => b.score - a.score);
+  // Ranqueia por valor esperado; score como desempate (e como critério único
+  // enquanto não houver histórico validado suficiente para estimar EV).
+  candidatos.sort((a, b) => (b.ev ?? -1) - (a.ev ?? -1) || b.score - a.score);
   return candidatos;
 }
 
@@ -7137,7 +7247,7 @@ async function gerarApostasEngine(data) {
   const MAX_JOGOS = 15;
 
   // Carrega jogos da IA (que já têm odds_confirmadas) + dados históricos em paralelo
-  const [rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData] = await Promise.all([
+  const [rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData, desempenho] = await Promise.all([
     fetch(
       `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
@@ -7146,6 +7256,7 @@ async function gerarApostasEngine(data) {
     carregarHistoricoLiga(),
     carregarHistoricoLinhaLiga(),
     carregarLigasEngine(),
+    carregarDesempenhoEngine(),
   ]);
 
   const row = rowArr[0];
@@ -7157,6 +7268,14 @@ async function gerarApostasEngine(data) {
   const jogosAtivos = row.apostas.jogos.filter(j => !j.descartado);
 
   console.log(`🤖 Engine: calib=${correlacao?.total_apostas||0} · hist=${historicoLiga?.total||0} · ligas=${Object.keys(ligasData||{}).length} · pool=${jogosAtivos.length} jogos`);
+
+  if (desempenho) {
+    const porMerc = Object.entries(desempenho)
+      .filter(([k]) => !k.includes('|'))
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([m, v]) => `${m} ${v.ass}%/ROI ${v.roi > 0 ? '+' : ''}${v.roi}% (${v.total})`);
+    if (porMerc.length) console.log(`📉 Desempenho realizado: ${porMerc.join(' · ')}`);
+  }
 
   const ligasUnicas = [...new Set(jogosAtivos.map(j => j.ligaId).filter(Boolean))];
   const teamStatsMap = new Map();
@@ -7207,7 +7326,7 @@ async function gerarApostasEngine(data) {
     const { casa: statsCasa, fora: statsFora } = teamStatsMap.get(jogo.fixtureId) || {};
     const standings = standingsMap.get(jogo.ligaId) || null;
 
-    const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings, oddsEngine);
+    const candidatos = engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasData, statsCasa, statsFora, standings, oddsEngine, desempenho);
     const melhor = candidatos[0];
     if (!melhor) continue;
 
@@ -7239,9 +7358,16 @@ async function gerarApostasEngine(data) {
       linha_inversa:  melhor.linha_inversa,
       rank_casa:      melhor.rank_casa,  rank_fora: melhor.rank_fora, rank_diff: melhor.rank_diff,
       score_engine:   melhor.score,
-      confianca_engine: melhor.score >= 75 ? 'alta' : melhor.score >= 65 ? 'media' : 'baixa',
+      ev_engine:      melhor.ev,
+      // ev nulo = ainda sem histórico para estimar; não conta como negativo
+      ev_positivo:    melhor.ev == null || melhor.ev >= 1.0,
+      // Desempenho realizado do bucket (mercado+faixa) que embasou a calibração
+      real_ass:       melhor.real_ass, real_roi: melhor.real_roi, real_total: melhor.real_total,
+      confianca_engine: melhor.ev == null
+        ? (melhor.score >= 75 ? 'alta' : melhor.score >= 65 ? 'media' : 'baixa')
+        : (melhor.ev >= 1.15 ? 'alta' : melhor.ev >= 1.05 ? 'media' : 'baixa'),
       alternativas_engine: candidatos.slice(1, 4).map(c => ({
-        aposta: c.aposta, mercado: c.mercado, odd: c.odd, score: c.score,
+        aposta: c.aposta, mercado: c.mercado, odd: c.odd, score: c.score, ev: c.ev,
       })),
       media_gols_combinada: mcGolsReal.toFixed(2),
       media_escanteios: ligasData?.[jogo.ligaId]?.media_escanteios || jogo.media_escanteios,
@@ -7252,8 +7378,20 @@ async function gerarApostasEngine(data) {
     });
   }
 
-  picks.sort((a, b) => b.score_engine - a.score_engine);
-  const top = picks.slice(0, MAX_JOGOS);
+  picks.sort((a, b) => (b.ev_engine ?? -1) - (a.ev_engine ?? -1) || b.score_engine - a.score_engine);
+
+  // Preferir picks com valor esperado positivo. Só completa com EV negativo se
+  // não houver positivos suficientes — melhor uma lista curta e lucrativa do que
+  // cheia e perdedora, mas nunca vazia (quebraria a tela).
+  const positivos = picks.filter(p => p.ev_positivo);
+  const top = positivos.length >= MAX_JOGOS
+    ? positivos.slice(0, MAX_JOGOS)
+    : [...positivos, ...picks.filter(p => !p.ev_positivo).slice(0, MAX_JOGOS - positivos.length)];
+
+  const descartadosEv = picks.length - positivos.length;
+  if (descartadosEv > 0) {
+    console.log(`📉 Engine: ${positivos.length} pick(s) com EV ≥ 1.0 · ${descartadosEv} abaixo do break-even${positivos.length < MAX_JOGOS ? ` (${MAX_JOGOS - positivos.length} usados para completar)` : ''}`);
+  }
 
   const payload = {
     gerado_em:                new Date().toISOString(),
@@ -7262,6 +7400,7 @@ async function gerarApostasEngine(data) {
     historico_base:           historicoLiga?.total || 0,
     assertividade_geral_hist: correlacao?.assertividade_geral || null,
     pool_total:               jogosAtivos.length,
+    ev_positivos:             positivos.length,
     total:                    top.length,
     jogos:                    top,
   };
@@ -7269,6 +7408,21 @@ async function gerarApostasEngine(data) {
   await dbSaveApostasEngine(data, payload);
   return payload;
 }
+
+// O que o engine aprendeu: desempenho realizado por mercado e por faixa de odd
+app.get('/engine/desempenho', async (req, res) => {
+  try {
+    const tabela = await carregarDesempenhoEngine(parseInt(req.query.dias || '60'));
+    if (!tabela) return res.status(500).json({ erro: 'falha ao carregar desempenho' });
+    const linhas = Object.entries(tabela)
+      .map(([chave, v]) => ({ chave, ...v, tipo: chave.includes('|') ? 'faixa' : 'mercado' }))
+      .sort((a, b) => b.total - a.total);
+    res.json({
+      por_mercado: linhas.filter(l => l.tipo === 'mercado'),
+      por_faixa:   linhas.filter(l => l.tipo === 'faixa'),
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 // Debug: retorna dados brutos para diagnóstico
 app.get('/engine/debug-raw', async (req, res) => {
