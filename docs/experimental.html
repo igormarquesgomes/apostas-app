@@ -691,7 +691,7 @@ function abrirInputStats(data, fixtureId, jogo, mercado){
         ` : ''}
         <div style="display:flex;gap:8px;margin-top:4px">
           <button onclick="fecharModalStats()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-weight:600">Cancelar</button>
-          <button onclick="salvarInputStats('${data}','${fixtureId}','${mercado}')" style="flex:2;padding:10px;border-radius:8px;border:none;background:#7C3AED;color:#fff;cursor:pointer;font-weight:700">Salvar</button>
+          <button id="btn-salvar-stats" onclick="salvarInputStats('${data}','${fixtureId}','${mercado}')" style="flex:2;padding:10px;border-radius:8px;border:none;background:#7C3AED;color:#fff;cursor:pointer;font-weight:700">Salvar</button>
         </div>
       </div>
     </div>`;
@@ -704,20 +704,36 @@ function fecharModalStats(){
 }
 
 async function salvarInputStats(data, fixtureId, mercado){
-  const cartoes    = document.getElementById('inp-cartoes')?.value;
-  const escanteios = document.getElementById('inp-esc')?.value;
-  if(cartoes === '' && escanteios === '') return alert('Informe ao menos um valor.');
+  // Só existe no DOM o campo do mercado em questão; o outro vem undefined.
+  const num = id => {
+    const v = document.getElementById(id)?.value;
+    if(v == null || v.trim() === '') return null;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 ? n : NaN;
+  };
+  const cartoes = num('inp-cartoes'), escanteios = num('inp-esc');
+  if(Number.isNaN(cartoes) || Number.isNaN(escanteios)) return alert('Informe um número inteiro válido.');
+  if(cartoes === null && escanteios === null) return alert('Informe ao menos um valor.');
+
   const body = { data, fixtureId: parseInt(fixtureId) };
-  if(cartoes    !== '' && cartoes    != null) body.cartoesTotal    = parseInt(cartoes);
-  if(escanteios !== '' && escanteios != null) body.escanteiosTotal = parseInt(escanteios);
+  if(cartoes    !== null) body.cartoesTotal    = cartoes;
+  if(escanteios !== null) body.escanteiosTotal = escanteios;
+
+  const btn = document.getElementById('btn-salvar-stats');
+  if(btn){ btn.disabled = true; btn.textContent = 'Salvando...'; }
   try {
-    const r = await fetch('/engine/input-stats', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    const j = await r.json();
-    if(j.error) return alert('Erro: ' + j.error);
+    const r = await fetch(`${BACKEND_URL}/engine/input-stats`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const txt = await r.text();
+    let j;
+    try { j = JSON.parse(txt); }
+    catch(e){ throw new Error(`resposta inválida do servidor (HTTP ${r.status})`); }
+    if(j.error || j.erro) throw new Error(j.error || j.erro);
     fecharModalStats();
-    alert(`Salvo! Resultado: ${j.resultado_engine}`);
     carregarAssertividade();
-  } catch(e) { alert('Erro: ' + e.message); }
+  } catch(e) {
+    alert('Erro: ' + e.message);
+    if(btn){ btn.disabled = false; btn.textContent = 'Salvar'; }
+  }
 }
 
 function toggleEngine(){
