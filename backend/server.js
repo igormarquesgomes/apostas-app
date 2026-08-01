@@ -7560,6 +7560,63 @@ async function gerarApostasEngine(data) {
   return payload;
 }
 
+// Resumo diário de TODO o histórico, já agregado no servidor.
+// O dashboard fazia uma requisição por dia (60 fixas), o que limitava a visão a
+// 60 dias e disparava ~120 chamadas por carga. Aqui é uma consulta só, e o
+// cliente recebe apenas os contadores — a agregação espelha agregaResultados().
+app.get('/historico-dias', async (req, res) => {
+  try {
+    const rows = await fetch(
+      `${SUPABASE_URL}/rest/v1/apostas_dia?select=data,apostas,resultados&order=data.asc&limit=2000`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    ).then(r => r.json());
+    if (!Array.isArray(rows)) throw new Error('Supabase retornou: ' + JSON.stringify(rows).slice(0, 200));
+
+    const MERCADOS = ['gols', 'escanteios', 'resultado', 'cartoes'];
+    const CONFS    = ['alta', 'media', 'baixa'];
+    const dias = [];
+
+    for (const row of rows) {
+      const apostas    = typeof row.apostas    === 'string' ? JSON.parse(row.apostas)    : row.apostas;
+      const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
+
+      // Mesmo recorte do dashboard: só jogos ativos e com odd confirmada
+      const jogos = (apostas?.jogos || []).filter(j => !j.descartado && j.odd_mercado);
+      if (!jogos.length) continue;
+
+      const validados = resultados?.apostas || resultados?.jogos_resultado || [];
+      const porId = {};
+      for (const v of validados) if (v.jogo_id != null) porId[v.jogo_id] = v.resultado_aposta;
+
+      const mercados = {}; MERCADOS.forEach(m => mercados[m] = { g: 0, r: 0 });
+      const conf     = {}; CONFS.forEach(c => conf[c]     = { g: 0, r: 0 });
+      let total = 0, green = 0, red = 0, anulados = 0, pendente = 0;
+
+      for (const a of jogos) {
+        total++;
+        const rv = porId[a.id] || 'pendente';
+        if (rv === 'cancelado' || rv === 'void') { anulados++; continue; }
+        if (rv !== 'green' && rv !== 'red') { pendente++; continue; }
+        if (rv === 'green') green++; else red++;
+
+        const m = (a.mercado || '').toLowerCase();
+        if (mercados[m]) mercados[m][rv === 'green' ? 'g' : 'r']++;
+        const c = (a.confianca || 'media').toLowerCase();
+        if (conf[c]) conf[c][rv === 'green' ? 'g' : 'r']++;
+      }
+
+      dias.push({ data: row.data, total, green, red, anulados, pendente, mercados, conf });
+    }
+
+    res.json({
+      primeiro_dia: dias[0]?.data || null,
+      ultimo_dia:   dias[dias.length - 1]?.data || null,
+      total_dias:   dias.length,
+      dias,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Retorno realizado da lista da IA — o mesmo dado auxiliar injetado no prompt
 app.get('/ia/roi', async (req, res) => {
   try {
