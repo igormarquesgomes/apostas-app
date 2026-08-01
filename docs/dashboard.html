@@ -199,9 +199,10 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
   </div>
   <div class="nav-right">
     <div class="nav-period">
-      <button class="nav-period-btn active" onclick="mudarPeriodo('mes',this)">Mês</button>
       <button class="nav-period-btn" onclick="mudarPeriodo('semana',this)">Semana</button>
+      <button class="nav-period-btn" onclick="mudarPeriodo('mes',this)">Mês</button>
       <button class="nav-period-btn" onclick="mudarPeriodo('anual',this)">Anual</button>
+      <button class="nav-period-btn active" onclick="mudarPeriodo('tudo',this)">Tudo</button>
     </div>
   </div>
 </nav>
@@ -307,8 +308,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 
 <script>
 const B = 'https://apostas-app.onrender.com';
-let _periodo = 'mes';
+let _periodo = 'tudo';
 let _diasCache = [];
+let _primeiroDia = null;
 let _multiplasDias = [];
 
 function hoje(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -321,23 +323,40 @@ const MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','
 function nomeMes(iso){ const[y,m]=iso.split('-'); return `${MESES[parseInt(m)-1]} ${y}`; }
 
 async function load(){
-  const h=hoje(), ps=[];
-  for(let i=0;i<60;i++) ps.push(
-    fetch(`${B}/apostas-resultado/${off(h,-i)}`).then(r=>r.ok?r.json():null).catch(()=>null)
-    .then(async d=>{
-      if(!d?.apostas) return null;
-      d._data = off(h,-i);
-      try{ const m=await fetch(`${B}/multiplas/${off(h,-i)}`).then(r=>r.ok?r.json():null); if(m){d.multiplas=m.multiplas;d.resultados_multiplas=m.resultados_multiplas;} }catch(e){}
-      return d;
-    })
-  );
-  const dias = (await Promise.all(ps)).filter(d=>d&&d.apostas);
-  _diasCache = dias;
-  _multiplasDias = dias.filter(d=>d.multiplas).map(d=>({
-    data: d._data,
-    multiplas: d.multiplas,
-    res: d.resultados_multiplas
-  }));
+  const h = hoje();
+
+  // Uma requisição só, já agregada no servidor, cobrindo todo o histórico.
+  // Antes era uma por dia numa janela fixa de 60, o que limitava a visão e
+  // fazia dia com falha sumir sem aviso.
+  let hist = null;
+  try {
+    const r = await fetch(`${B}/historico-dias`);
+    hist = r.ok ? await r.json() : null;
+  } catch(e){ hist = null; }
+
+  if(!hist?.dias?.length){
+    _diasCache = []; _multiplasDias = [];
+    renderTudo();
+    const el = document.getElementById('page-sub');
+    if(el) el.textContent = 'Falha ao carregar o histórico — recarregue a página';
+    return;
+  }
+
+  _diasCache = hist.dias.map(d => ({ ...d, _data: d.data }));
+  _primeiroDia = hist.primeiro_dia;
+
+  // Múltiplas continuam por dia: a tabela mostra o mês atual ou o anterior,
+  // então bastam ~2 meses em vez do histórico inteiro.
+  const ps = [];
+  for(let i=0;i<62;i++){
+    const d = off(h,-i);
+    ps.push(
+      fetch(`${B}/multiplas/${d}`).then(r=>r.ok?r.json():null).catch(()=>null)
+        .then(m => m?.multiplas ? { data:d, multiplas:m.multiplas, res:m.resultados_multiplas } : null)
+    );
+  }
+  _multiplasDias = (await Promise.all(ps)).filter(Boolean);
+
   renderTudo();
 }
 
@@ -349,6 +368,7 @@ function mudarPeriodo(p, btn){
 }
 
 function filtrarDias(){
+  if(_periodo==='tudo') return _diasCache;
   const h = hoje();
   const sm = h.substring(0,7)+'-01';
   const diaSem = new Date(h+'T12:00:00').getDay();
@@ -359,23 +379,20 @@ function filtrarDias(){
   return _diasCache.filter(d=>d._data>=sy);
 }
 
+// Os dias já vêm agregados de /historico-dias; aqui é só somar os períodos.
 function agregaResultados(dias){
   let total=0, green=0, red=0, anulados=0;
   const mercados = {gols:{g:0,r:0}, escanteios:{g:0,r:0}, resultado:{g:0,r:0}, cartoes:{g:0,r:0}};
   const conf = {alta:{g:0,r:0}, media:{g:0,r:0}, baixa:{g:0,r:0}};
-  for(const dia of dias){
-    const ap = (dia.apostas?.jogos||[]).filter(j=>!j.descartado && j.odd_mercado), res = dia.resultados?.apostas||[];
-    for(const a of ap){
-      const rv = res.find(x=>x.jogo_id===a.id)?.resultado_aposta||'pendente';
-      total++;
-      if(rv==='green'){ green++; }
-      else if(rv==='red'){ red++; }
-      else if(rv==='cancelado'||rv==='void'){ anulados++; continue; }
-      else { continue; } // pendente não conta
-      const m = (a.mercado||'').toLowerCase();
-      if(mercados[m]){ if(rv==='green')mercados[m].g++; else mercados[m].r++; }
-      const c = (a.confianca||'media').toLowerCase();
-      if(conf[c]){ if(rv==='green')conf[c].g++; else conf[c].r++; }
+  for(const dia of (dias||[])){
+    total += dia.total||0; green += dia.green||0; red += dia.red||0; anulados += dia.anulados||0;
+    for(const k in mercados){
+      const v = dia.mercados?.[k]; if(!v) continue;
+      mercados[k].g += v.g||0; mercados[k].r += v.r||0;
+    }
+    for(const k in conf){
+      const v = dia.conf?.[k]; if(!v) continue;
+      conf[k].g += v.g||0; conf[k].r += v.r||0;
     }
   }
   return {total, green, red, anulados, mercados, conf};
@@ -399,10 +416,12 @@ function renderTudo(){
   const assertPeriodo = pctFmt(stats.green, stats.red);
   const assertMes = pctFmt(statsMes.green, statsMes.red);
   const assertAnual = pctFmt(statsAnuais.green, statsAnuais.red);
-  const periodoLabel = _periodo==='mes'?'mês atual':_periodo==='semana'?'semana':h.substring(0,4);
+  const periodoLabel = _periodo==='tudo'?'todo o período':_periodo==='mes'?'mês atual':_periodo==='semana'?'semana':h.substring(0,4);
 
   // Page subtitle
-  const sub = _periodo==='mes'
+  const sub = _periodo==='tudo'
+    ? `Todo o período${_primeiroDia?` · desde ${fmtD(_primeiroDia)}`:''} · ${_diasCache.length} dia(s) · só apostas principais`
+    : _periodo==='mes'
     ? `${nomeMes(h.substring(0,7))} · assertividade desde ${fmtD(sm)} · só apostas principais`
     : _periodo==='semana'
     ? `Esta semana · assertividade · só apostas principais`
@@ -434,7 +453,7 @@ function renderTopStats(s, assertMes, assertAnual){
 function mktNote(mercado, pct){
   if(pct===null) return 'Sem dados suficientes ainda';
   const notas = {
-    escanteios: pct>=70 ? 'Melhor mercado do mês — prioridade alta em jogos com média ≥ 9.5' : pct>=55 ? 'Mercado estável — manter frequência' : 'Abaixo da meta — revisar critérios de seleção',
+    escanteios: pct>=70 ? 'Forte no período — prioridade alta em jogos com média ≥ 9.5' : pct>=55 ? 'Mercado estável — manter frequência' : 'Abaixo da meta — revisar critérios de seleção',
     gols: pct>=70 ? 'Maior volume de apostas — estável acima de 70%' : pct>=55 ? 'Mercado consistente — continuar monitorando' : 'Abaixo da meta — reduzir frequência',
     resultado: pct>=70 ? 'Mercado de resultado forte — continuar priorizando' : pct>=55 ? 'Abaixo da meta — relatório diário recomendou reduzir frequência' : 'Evitar como aposta principal — alto risco',
     cartoes: pct>=60 ? 'Mercado de cartões estável' : pct>=45 ? 'Evitar como aposta principal — usar só como alternativa em rivalidades' : 'Mercado difícil — só em jogos com histórico claro',
@@ -522,10 +541,11 @@ function renderPorPeriodo(){
     }
 
   } else {
-    // Anual → meses do ano, cada um expande para dias
+    // Anual e Tudo → meses, cada um expande para dias.
+    // Em "Tudo" não filtra por ano: mostra todos os meses com dado.
     const year=h.substring(0,4);
     const mesMap={};
-    for(const d of _diasCache.filter(x=>x._data.startsWith(year))){
+    for(const d of (_periodo==='tudo' ? _diasCache : _diasCache.filter(x=>x._data.startsWith(year)))){
       const m=d._data.substring(0,7);
       if(!mesMap[m]) mesMap[m]=[];
       mesMap[m].push(d);
