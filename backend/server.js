@@ -879,6 +879,55 @@ function isTimesEuropaB(timeCasa, timeFora) {
 // produto, não estatística. Mesmo limiar já usado no pré-filtro de odds.
 const PRI_NUCLEO = 10;
 
+// ─── Prioridade de competições brasileiras fora de LIGAS_PRIORITY ────────────
+// Copa do Brasil, estaduais e regionais não estão no mapa de prioridade, então
+// caem no pool complementar. O que decide se valem é quem está jogando: uma
+// Copa do Brasil com Palmeiras é primeira linha; uma copa regional sem time
+// relevante, não. Vive em escopo de módulo porque os DOIS caminhos de geração
+// precisam — antes só gerarApostas tinha, e o multi-agente (que é o que roda)
+// dava pri 60 fixo para tudo, reprovando no teste `pri < 60` por um ponto.
+const BIG_CLUBS_BR = ['flamengo','palmeiras','corinthians','santos','são paulo','sao paulo',
+  'botafogo','vasco','fluminense','atlético','atletico','grêmio','gremio','internacional',
+  'cruzeiro','bahia','fortaleza','athletico','bragantino','goiás','goias','sport recife',
+  'ceará','ceara','america mineiro','cuiabá','cuiaba','juventude','avaí','avai',
+  'coritiba','chapecoense','criciúma','criciuma','guarani','ponte preta','londrina',
+  'sampaio corrêa','tombense','novorizontino','ituano','abc','csa','guaratinguetá'];
+
+// A comparação é por substring, então "Cruzeiro W" casaria com "cruzeiro" e o
+// time feminino herdaria a prioridade do masculino. São competições distintas,
+// com cobertura de odds bem menor — promovê-las só as manteria na lista sem odd
+// confirmada. A API-Football sufixa com " W".
+const RE_TIME_FEMININO = /(\sw|\swomen|\sfeminino|\sfem)$/i;
+
+function isTimeBigBR(casa, fora) {
+  const c = (casa || '').trim(), f = (fora || '').trim();
+  if (RE_TIME_FEMININO.test(c) || RE_TIME_FEMININO.test(f)) return false;
+  const cl = c.toLowerCase(), fl = f.toLowerCase();
+  return BIG_CLUBS_BR.some(t => cl.includes(t) || fl.includes(t));
+}
+
+// Times de Série A (71) e B (72) presentes nos fixtures do dia. Cobre o caso de
+// um clube grande entrar numa copa sem que a liga dele jogue naquela data.
+function montarTeamsSerieAB(fixtures) {
+  const s = new Set();
+  for (const f of (fixtures || [])) {
+    if (f.league?.id === 71 || f.league?.id === 72) {
+      if (f.teams?.home?.id) s.add(f.teams.home.id);
+      if (f.teams?.away?.id) s.add(f.teams.away.id);
+    }
+  }
+  return s;
+}
+
+function priBrasileira(ligaId, teamCasaId, teamForaId, timeCasa, timeFora, teamsSerieAB) {
+  if (ligaId === 75) return 60;  // Série C
+  if (ligaId === 76) return 82;  // Série D
+  // Copa/estadual com time de Série A ou B — trata como prioritária (pri < 60),
+  // para não ser descartada quando a API não tem o mercado escolhido.
+  if (teamsSerieAB?.has(teamCasaId) || teamsSerieAB?.has(teamForaId) || isTimeBigBR(timeCasa, timeFora)) return 55;
+  return 200; // regional sem time relevante — fica por último
+}
+
 // Times reserva/B/sub: escalação rotativa puxada pelo elenco principal, então a
 // forma e o H2H que alimentam o prompt têm pouco poder preditivo.
 function isTimeReserva(nome) {
@@ -888,10 +937,16 @@ function isTimeReserva(nome) {
 
 // Une os pools prioritário e complementar num único ranking por `pri` e aplica
 // teto de jogos por liga, para nenhuma competição dominar a lista do dia.
-// O teto relaxa progressivamente quando não há jogos suficientes para a meta.
-// `limite` é o teto do pool de candidatos; `minimo` é quantos precisam sobrar para
-// montar a lista final. O teto por liga só é relaxado se nem o mínimo for atingido —
-// encher o pool inteiro não justifica deixar uma competição dominar.
+//
+// `limite` é o tamanho do pool de candidatos, e ele inclui a reserva que absorve
+// os jogos descartados adiante por falta de odd confirmada. Por isso o teto por
+// liga relaxa até encher o pool: devolver menos que `limite` significa entregar
+// a lista sem reserva. Num dia com oferta variada o teto nem chega a apertar —
+// com 23 vagas e teto 3, bastam 8 ligas distintas.
+//
+// `minimo` permite parar de relaxar antes de encher, priorizando diversidade
+// sobre reserva. Nenhum chamador usa hoje; existe para quem precisar do
+// trade-off inverso.
 function selecionarCandidatos(jogosMap, jogosComp, limite, opts = {}) {
   const {
     timesIgnorar = new Set(),
@@ -1592,25 +1647,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   const jogosMap = new Map();
   const jogosComp = new Map();
 
-  // Times do Série A (71) e Série B (72) presentes nos fixtures do dia
-  const teamsSerieAB = new Set();
-  for (const f of fixtures) {
-    if (f.league?.id === 71 || f.league?.id === 72) {
-      if (f.teams?.home?.id) teamsSerieAB.add(f.teams.home.id);
-      if (f.teams?.away?.id) teamsSerieAB.add(f.teams.away.id);
-    }
-  }
-  // Grandes clubes BR por nome (cobre off-season quando Série A/B não está nos fixtures do dia)
-  const BIG_CLUBS_BR = ['flamengo','palmeiras','corinthians','santos','são paulo','sao paulo',
-    'botafogo','vasco','fluminense','atlético','atletico','grêmio','gremio','internacional',
-    'cruzeiro','bahia','fortaleza','athletico','bragantino','goiás','goias','sport recife',
-    'ceará','ceara','america mineiro','cuiabá','cuiaba','juventude','avaí','avai',
-    'coritiba','chapecoense','criciúma','criciuma','guarani','ponte preta','londrina',
-    'sampaio corrêa','tombense','novorizontino','ituano','abc','csa','guaratinguetá'];
-  const isTimeBigBR = (casa, fora) => {
-    const c = (casa||'').toLowerCase(), f2 = (fora||'').toLowerCase();
-    return BIG_CLUBS_BR.some(t => c.includes(t) || f2.includes(t));
-  };
+  const teamsSerieAB = montarTeamsSerieAB(fixtures);
 
   for (const f of fixtures) {
     const ts = f.fixture?.timestamp;
@@ -1720,13 +1757,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
         priComp = 80;
       } else if (paisLower === 'brazil' || paisLower === 'brasil') {
         tipoComp = 'b';
-        if (ligaId === 75) priComp = 60;       // Série C
-        else if (ligaId === 76) priComp = 82;  // Série D
-        else if (teamsSerieAB.has(f.teams?.home?.id) || teamsSerieAB.has(f.teams?.away?.id) || isTimeBigBR(timeCasa, timeFora)) {
-          priComp = 55; // Estadual/copa com time de Série A ou B — alta prioridade
-        } else {
-          priComp = 200; // Copa regional sem times relevantes — ignora
-        }
+        priComp = priBrasileira(ligaId, f.teams?.home?.id, f.teams?.away?.id, timeCasa, timeFora, teamsSerieAB);
       } else {
         // Todo o resto — menor prioridade possível
         priComp = 200;
@@ -1825,7 +1856,10 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
   // Antes os prioritários esgotavam a cota antes de os complementares serem
   // sequer olhados, o que promovia ligas de pri alto (ex.: 2ª divisão irlandesa,
   // pri 69) acima de toda liga europeia genérica (pri 90) de forma categórica.
-  let jogos = selecionarCandidatos(jogosMap, jogosComp, metaJogos * 3, { timesIgnorar, minimo: metaJogos });
+  // Sem `minimo`: relaxa o teto por liga até encher o pool, não até bater a meta.
+  // A folga acima da meta é reserva para absorver jogos descartados adiante na
+  // etapa de odds — parar na meta deixava a lista curta ao primeiro descarte.
+  let jogos = selecionarCandidatos(jogosMap, jogosComp, metaJogos * 3, { timesIgnorar });
 
   if (jogos.length < metaJogos) console.log(`⚠️ Apenas ${jogos.length} jogos únicos disponíveis após todos os filtros`);
 
@@ -2596,6 +2630,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
   const minMinutos = hM * 60 + mM;
   const fixtures = await buscarFixturesPorData(data);
   const jogosMap = new Map(), jogosComp = new Map();
+  const teamsSerieAB = montarTeamsSerieAB(fixtures);
 
   for (const f of fixtures) {
     const ts = f.fixture?.timestamp, status = f.fixture?.status?.short, ligaId = f.league?.id;
@@ -2634,7 +2669,10 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
       else if (SUL_AMERICANOS.includes(paisLower)) { tipoComp = 'sul'; priComp = 70; }
       else if (CONCACAF.includes(paisLower)) { tipoComp = 'concacaf'; priComp = 75; }
       else if (AFRICA_ORIENTE.includes(paisLower)) { tipoComp = 'af'; priComp = 80; }
-      else if (paisLower === 'brazil' || paisLower === 'brasil') { tipoComp = 'b'; priComp = 60; }
+      else if (paisLower === 'brazil' || paisLower === 'brasil') {
+        tipoComp = 'b';
+        priComp = priBrasileira(ligaId, f.teams?.home?.id, f.teams?.away?.id, timeCasa, timeFora, teamsSerieAB);
+      }
       if (!jogosComp.has(key)) { dbSaveLiga(`${ligaNome} (${pais})`, ligaId, pais).catch(()=>{}); jogosComp.set(key, { liga: `${ligaNome} (${pais})`, tipo: tipoComp, pri: priComp, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); }
     }
   }
@@ -2680,10 +2718,12 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     const cob = st?.cobertura_por_dia?.[String(dowHoje)];
     return typeof cob === 'number' ? cob : -1;
   };
+  // MARGEM é reserva, não enchimento: absorve os jogos que caem depois por falta
+  // de odd confirmada. Por isso o teto por liga relaxa até encher o pool inteiro
+  // (sem `minimo`) — parar na meta deixava 15 candidatos para 15 vagas.
   const MARGEM = 8;
   let jogos = selecionarCandidatos(jogosMap, jogosComp, metaJogos + MARGEM, {
     timesIgnorar,
-    minimo: metaJogos,
     desempate: (a, b) => {
       const ca = cobScore(a), cb = cobScore(b);
       if (ca >= 0 && cb >= 0) return cb - ca;
