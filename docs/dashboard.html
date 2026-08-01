@@ -381,11 +381,12 @@ function filtrarDias(){
 
 // Os dias já vêm agregados de /historico-dias; aqui é só somar os períodos.
 function agregaResultados(dias){
-  let total=0, green=0, red=0, anulados=0;
+  let total=0, green=0, red=0, anulados=0, semOdd=0;
   const mercados = {gols:{g:0,r:0}, escanteios:{g:0,r:0}, resultado:{g:0,r:0}, cartoes:{g:0,r:0}};
   const conf = {alta:{g:0,r:0}, media:{g:0,r:0}, baixa:{g:0,r:0}};
   for(const dia of (dias||[])){
     total += dia.total||0; green += dia.green||0; red += dia.red||0; anulados += dia.anulados||0;
+    semOdd += dia.sem_odd||0;
     for(const k in mercados){
       const v = dia.mercados?.[k]; if(!v) continue;
       mercados[k].g += v.g||0; mercados[k].r += v.r||0;
@@ -395,7 +396,7 @@ function agregaResultados(dias){
       conf[k].g += v.g||0; conf[k].r += v.r||0;
     }
   }
-  return {total, green, red, anulados, mercados, conf};
+  return {total, green, red, anulados, semOdd, mercados, conf};
 }
 
 function renderTudo(){
@@ -419,8 +420,9 @@ function renderTudo(){
   const periodoLabel = _periodo==='tudo'?'todo o período':_periodo==='mes'?'mês atual':_periodo==='semana'?'semana':h.substring(0,4);
 
   // Page subtitle
+  const notaOdd = stats.semOdd ? ` · ${stats.semOdd} sem odd registrada` : '';
   const sub = _periodo==='tudo'
-    ? `Todo o período${_primeiroDia?` · desde ${fmtD(_primeiroDia)}`:''} · ${_diasCache.length} dia(s) · só apostas principais`
+    ? `Todo o período${_primeiroDia?` · desde ${fmtD(_primeiroDia)}`:''} · ${_diasCache.length} dia(s) · só apostas principais${notaOdd}`
     : _periodo==='mes'
     ? `${nomeMes(h.substring(0,7))} · assertividade desde ${fmtD(sm)} · só apostas principais`
     : _periodo==='semana'

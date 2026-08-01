@@ -7580,8 +7580,11 @@ app.get('/historico-dias', async (req, res) => {
       const apostas    = typeof row.apostas    === 'string' ? JSON.parse(row.apostas)    : row.apostas;
       const resultados = typeof row.resultados === 'string' ? JSON.parse(row.resultados) : row.resultados;
 
-      // Mesmo recorte do dashboard: só jogos ativos e com odd confirmada
-      const jogos = (apostas?.jogos || []).filter(j => !j.descartado && j.odd_mercado);
+      // Assertividade é taxa de acerto, e acerto independe de haver odd gravada.
+      // Filtrar por odd_mercado descartava 327 apostas de junho e 48 de maio que
+      // já estavam validadas — o campo só passou a ser preenchido de forma
+      // consistente em julho. O recorte aqui é só "aposta principal ativa".
+      const jogos = (apostas?.jogos || []).filter(j => !j.descartado);
       if (!jogos.length) continue;
 
       const validados = resultados?.apostas || resultados?.jogos_resultado || [];
@@ -7591,13 +7594,23 @@ app.get('/historico-dias', async (req, res) => {
       const mercados = {}; MERCADOS.forEach(m => mercados[m] = { g: 0, r: 0 });
       const conf     = {}; CONFS.forEach(c => conf[c]     = { g: 0, r: 0 });
       let total = 0, green = 0, red = 0, anulados = 0, pendente = 0;
+      // Subconjunto com odd confirmada — é sobre ele que ROI faz sentido
+      let odd_total = 0, odd_green = 0, odd_red = 0, sem_odd = 0;
 
       for (const a of jogos) {
         total++;
+        const temOdd = !!a.odd_mercado;
+        if (!temOdd) sem_odd++;
+
         const rv = porId[a.id] || 'pendente';
         if (rv === 'cancelado' || rv === 'void') { anulados++; continue; }
         if (rv !== 'green' && rv !== 'red') { pendente++; continue; }
         if (rv === 'green') green++; else red++;
+
+        if (temOdd) {
+          odd_total++;
+          if (rv === 'green') odd_green++; else odd_red++;
+        }
 
         const m = (a.mercado || '').toLowerCase();
         if (mercados[m]) mercados[m][rv === 'green' ? 'g' : 'r']++;
@@ -7605,7 +7618,11 @@ app.get('/historico-dias', async (req, res) => {
         if (conf[c]) conf[c][rv === 'green' ? 'g' : 'r']++;
       }
 
-      dias.push({ data: row.data, total, green, red, anulados, pendente, mercados, conf });
+      dias.push({
+        data: row.data, total, green, red, anulados, pendente, sem_odd,
+        com_odd: { total: odd_total, green: odd_green, red: odd_red },
+        mercados, conf,
+      });
     }
 
     res.json({
