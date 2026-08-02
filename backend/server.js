@@ -7708,29 +7708,39 @@ app.get('/engine/assertividade', async (req, res) => {
       const resultados = typeof row.resultados     === 'string' ? JSON.parse(row.resultados)     : row.resultados;
       if (!engine?.jogos?.length) continue;
 
-      // IA stats: performance geral da IA naquele dia (resultados.apostas[])
-      let dIaGreen = 0, dIaRed = 0;
-      for (const r of (resultados?.apostas || resultados?.jogos_resultado || [])) {
-        if (r.resultado_aposta === 'green') dIaGreen++;
-        else if (r.resultado_aposta === 'red') dIaRed++;
+      // Comparação só vale entre os MESMOS jogos: o engine parte da lista da IA
+      // e sempre perde alguns (falta de cobertura de mercados, sanity check).
+      // Somar a IA inteira contra o subconjunto do engine inflava um dos lados.
+      // Aqui só entram pares em que os DOIS têm resultado definitivo.
+      const apostas = typeof row.apostas === 'string' ? JSON.parse(row.apostas) : row.apostas;
+      const fixtureToJogoId = {};
+      for (const a of (apostas?.jogos || [])) {
+        if (a.fixtureId && a.id != null) fixtureToJogoId[String(a.fixtureId)] = a.id;
       }
-      totalIaGreen += dIaGreen;
-      totalIaRed   += dIaRed;
+      const iaPorJogoId = {};
+      for (const r of (resultados?.apostas || resultados?.jogos_resultado || [])) {
+        if (r.jogo_id != null) iaPorJogoId[r.jogo_id] = r.resultado_aposta;
+      }
 
       const jogosComResultado = [];
-      let dGreen = 0, dRed = 0, dPend = 0;
+      let dGreen = 0, dRed = 0, dPend = 0, dIaGreen = 0, dIaRed = 0;
 
       for (const j of engine.jogos) {
         const placar    = j.placar || null;
         const resultado = j.resultado_engine || validarPickEngine(j.linha_engine, j.mercado_engine, placar);
 
-        if (resultado === 'green') { dGreen++; totalGreen++; }
-        else if (resultado === 'red') { dRed++; totalRed++; }
-        else { dPend++; totalPendente++; }
+        const jogoId = fixtureToJogoId[String(j.fixtureId)];
+        const rIa = jogoId != null ? iaPorJogoId[jogoId] : null;
+        const resultado_ia = (rIa === 'green' || rIa === 'red') ? rIa : null;
 
-        const resultado_ia = null; // IA é agregado do dia, não por jogo
+        // Par comparável: os dois lados resolvidos para o mesmo jogo
+        const parValido = (resultado === 'green' || resultado === 'red') && resultado_ia !== null;
 
-        if (resultado !== 'pendente') {
+        if (!parValido) { dPend++; totalPendente++; }
+        else {
+          if (resultado === 'green') { dGreen++; totalGreen++; } else { dRed++; totalRed++; }
+          if (resultado_ia === 'green') { dIaGreen++; totalIaGreen++; } else { dIaRed++; totalIaRed++; }
+
           const m = j.mercado_engine || 'outros';
           if (!porMercado[m]) porMercado[m] = { green: 0, red: 0 };
           if (resultado === 'green') porMercado[m].green++;
