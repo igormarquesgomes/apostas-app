@@ -919,6 +919,25 @@ function montarTeamsSerieAB(fixtures) {
   return s;
 }
 
+// Refina a prioridade dentro do núcleo, para a lista abrir pelos jogos que o
+// apostador já acompanha. Ordem: Série A/B (1-2) > Copa do Mundo (3) > copa
+// internacional com time BR (3.5) > demais copas (4) > grande liga europeia com
+// clube de Champions (5) > mesma liga sem esses clubes (6).
+function priPrioritaria(ligaMatch, timeCasa, timeFora, teamCasaId, teamForaId, teamsSerieAB) {
+  const p = ligaMatch.pri;
+  // Libertadores/Sul-Americana com brasileiro na campo entra antes das ligas
+  // europeias: é o jogo que o público daqui já vai apostar.
+  if (p === 4) {
+    const temBR = teamsSerieAB?.has(teamCasaId) || teamsSerieAB?.has(teamForaId)
+               || isTimeBigBR(timeCasa, timeFora);
+    return temBR ? 3.5 : 4;
+  }
+  // Grande liga europeia: com Real, Barça, Milan, Juve, Inter, PSG, Bayern,
+  // Porto, Sporting, Benfica e afins vem primeiro.
+  if (p === 5) return isTimesChampions(timeCasa, timeFora) ? 5 : 6;
+  return p;
+}
+
 function priBrasileira(ligaId, teamCasaId, teamForaId, timeCasa, timeFora, teamsSerieAB) {
   if (ligaId === 75) return 60;  // Série C
   if (ligaId === 76) return 82;  // Série D
@@ -938,11 +957,16 @@ function isTimeReserva(nome) {
 // Une os pools prioritário e complementar num único ranking por `pri` e aplica
 // teto de jogos por liga, para nenhuma competição dominar a lista do dia.
 //
+// O teto NÃO vale para o núcleo (pri ≤ PRI_NUCLEO): Série A/B, copas
+// internacionais e grandes ligas europeias entram todas, sempre. São os jogos
+// que o apostador já vai apostar de qualquer forma — se a lista não os cobre,
+// ele procura outro produto. O teto existe só para impedir que uma liga menor
+// tome as vagas restantes, e é ali que ele deve morder.
+//
 // `limite` é o tamanho do pool de candidatos, e ele inclui a reserva que absorve
 // os jogos descartados adiante por falta de odd confirmada. Por isso o teto por
 // liga relaxa até encher o pool: devolver menos que `limite` significa entregar
-// a lista sem reserva. Num dia com oferta variada o teto nem chega a apertar —
-// com 23 vagas e teto 3, bastam 8 ligas distintas.
+// a lista sem reserva.
 //
 // `minimo` permite parar de relaxar antes de encher, priorizando diversidade
 // sobre reserva. Nenhum chamador usa hoje; existe para quem precisar do
@@ -955,6 +979,9 @@ function selecionarCandidatos(jogosMap, jogosComp, limite, opts = {}) {
     desempate = null,
     minimo = limite,
   } = opts;
+
+  // Núcleo: sem teto por liga e sem teto de horário
+  const semTeto = j => j.pri != null && j.pri <= PRI_NUCLEO;
 
   const todos = [...jogosMap.values(), ...jogosComp.values()]
     .filter(j => {
@@ -976,10 +1003,12 @@ function selecionarCandidatos(jogosMap, jogosComp, limite, opts = {}) {
     const out = [];
     for (const j of todos) {
       if (out.length >= limite) break;
-      const n = porLiga.get(j.ligaId) || 0;
-      if (n >= teto) continue;
-      if (j.horario === '13:00') { if (c13 >= max13h) continue; c13++; }
-      porLiga.set(j.ligaId, n + 1);
+      if (!semTeto(j)) {
+        const n = porLiga.get(j.ligaId) || 0;
+        if (n >= teto) continue;
+        if (j.horario === '13:00') { if (c13 >= max13h) continue; c13++; }
+        porLiga.set(j.ligaId, n + 1);
+      }
       out.push(j);
     }
     melhor = out;
@@ -1695,19 +1724,12 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     const ligaMatch = LIGAS_PRIORITY[ligaId];
 
     if (ligaMatch) {
-      let priFinal = ligaMatch.pri;
-
-      // Copa do Mundo — sempre pri 3
-      if (ligaMatch.pri === 3) priFinal = 3;
-
-      // Grandes ligas: times Champions pri 5, outros pri 6
-      else if (ligaMatch.pri === 5 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
-
       // Eliminatórias e Amistosos: só seleções campeãs
-      else if (ligaMatch.selecaoCampea) {
-        if (!isSelecaoCampea(timeCasa, timeFora)) continue; // Ignorar se não for seleção campeã
-        priFinal = ligaMatch.pri; // 7=eliminatórias, 8=amistosos
-      }
+      if (ligaMatch.selecaoCampea && !isSelecaoCampea(timeCasa, timeFora)) continue;
+      const priFinal = priPrioritaria(
+        ligaMatch, timeCasa, timeFora,
+        f.teams?.home?.id, f.teams?.away?.id, teamsSerieAB
+      );
 
       if (!jogosMap.has(key)) {
         // Salvar liga no banco automaticamente
@@ -2651,10 +2673,11 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     if (LIGAS_IGNORAR.has(ligaId) || ligaBrasileiraNaoRelevante(ligaNome, pais)) continue;
     const ligaMatch = LIGAS_PRIORITY[ligaId];
     if (ligaMatch) {
-      let priFinal = ligaMatch.pri;
-      if (ligaMatch.pri === 3) priFinal = 3;
-      else if (ligaMatch.pri === 5 && !isTimesChampions(timeCasa, timeFora)) priFinal = 6;
-      else if (ligaMatch.selecaoCampea) { if (!isSelecaoCampea(timeCasa, timeFora)) continue; }
+      if (ligaMatch.selecaoCampea && !isSelecaoCampea(timeCasa, timeFora)) continue;
+      const priFinal = priPrioritaria(
+        ligaMatch, timeCasa, timeFora,
+        f.teams?.home?.id, f.teams?.away?.id, teamsSerieAB
+      );
       if (!jogosMap.has(key)) { dbSaveLiga(ligaMatch.nome, ligaId, pais).catch(()=>{}); jogosMap.set(key, { liga: ligaMatch.nome, tipo: ligaMatch.tipo, pri: priFinal, timeCasa, timeFora, horario: hStr, fixtureId: f.fixture?.id, ligaId, teamCasaId: f.teams?.home?.id, teamForaId: f.teams?.away?.id }); }
     } else {
       const paisLower = pais.toLowerCase(), isWorldLeague = paisLower === 'world';
