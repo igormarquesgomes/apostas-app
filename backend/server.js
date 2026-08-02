@@ -7606,6 +7606,8 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
     picks.push({
       fixtureId:    jogo.fixtureId,
       liga:         jogo.liga,
+      // Prioridade da liga — decide a ordem de preenchimento das 15 vagas
+      pri:          jogo.pri ?? 99,
       time_casa:    jogo.time_casa,
       time_fora:    jogo.time_fora,
       horario:      jogo.horario || '',
@@ -7654,23 +7656,29 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
     });
   }
 
-  // Ordena por probabilidade de acerto; EV desempata acertos equivalentes.
-  picks.sort((a, b) =>
+  // Melhor pick primeiro dentro de cada nível: probabilidade de acerto, EV desempata.
+  const porQualidade = (a, b) =>
     (b.p_calibrado ?? b.score_engine) - (a.p_calibrado ?? a.score_engine) ||
-    (b.ev_engine ?? 0) - (a.ev_engine ?? 0)
-  );
+    (b.ev_engine ?? 0) - (a.ev_engine ?? 0);
 
-  // Preferir picks acima do piso de acerto. Só completa com os abaixo se não
-  // houver suficientes — nunca devolve lista vazia (quebraria a tela).
-  const confiaveis = picks.filter(p => p.acerto_ok);
-  const top = confiaveis.length >= MAX_JOGOS
-    ? confiaveis.slice(0, MAX_JOGOS)
-    : [...confiaveis, ...picks.filter(p => !p.acerto_ok).slice(0, MAX_JOGOS - confiaveis.length)];
+  // As 15 vagas são preenchidas por PRIORIDADE, não por probabilidade.
+  // Com 10 jogos de Série A e 10 de Série B, entram os 10 de A e 5 de B — são
+  // os jogos que o apostador já vai apostar, e a lista precisa cobri-los mesmo
+  // que um jogo de liga menor tenha pick melhor pontuado. Dentro do mesmo nível
+  // de prioridade é a qualidade do pick que ordena.
+  const nucleo = picks.filter(p => p.pri <= PRI_NUCLEO).sort((a, b) => a.pri - b.pri || porQualidade(a, b));
+  const resto  = picks.filter(p => p.pri >  PRI_NUCLEO);
 
-  const abaixoPiso = picks.length - confiaveis.length;
-  if (abaixoPiso > 0) {
-    console.log(`📉 Engine: ${confiaveis.length} pick(s) com acerto ≥ ${P_MINIMO}% · ${abaixoPiso} abaixo do piso${confiaveis.length < MAX_JOGOS ? ` (${MAX_JOGOS - confiaveis.length} usados para completar)` : ''}`);
-  }
+  // Fora do núcleo o piso de acerto vale: liga menor só entra com pick decente.
+  const restoOk    = resto.filter(p =>  p.acerto_ok).sort(porQualidade);
+  const restoFraco = resto.filter(p => !p.acerto_ok).sort(porQualidade);
+
+  const top = [...nucleo, ...restoOk, ...restoFraco].slice(0, MAX_JOGOS);
+  picks.sort((a, b) => a.pri - b.pri || porQualidade(a, b));
+
+  const nucleoDentro = top.filter(p => p.pri <= PRI_NUCLEO).length;
+  const fracosUsados = top.filter(p => p.pri > PRI_NUCLEO && !p.acerto_ok).length;
+  console.log(`🎯 Engine: ${top.length}/${MAX_JOGOS} vagas · ${nucleoDentro} de liga prioritária${nucleo.length > nucleoDentro ? ` (${nucleo.length - nucleoDentro} prioritários ficaram de fora por falta de vaga)` : ''}${fracosUsados ? ` · ${fracosUsados} abaixo do piso de ${P_MINIMO}% para completar` : ''}`);
 
   const payload = {
     gerado_em:                new Date().toISOString(),
@@ -7679,7 +7687,8 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
     historico_base:           historicoLiga?.total || 0,
     assertividade_geral_hist: correlacao?.assertividade_geral || null,
     pool_total:               jogosAtivos.length,
-    acerto_ok_total:          confiaveis.length,
+    nucleo_na_lista:          nucleoDentro,
+    acerto_ok_total:          top.filter(p => p.acerto_ok).length,
     total:                    top.length,
     jogos:                    top,
   };
