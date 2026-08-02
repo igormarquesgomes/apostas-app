@@ -403,6 +403,12 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 <script>
 const BACKEND_URL='https://apostas-app.onrender.com';
 
+// Fonte da lista oficial. 'engine' = picks do motor de regras (sem custo de IA);
+// 'ia' = geracao via Anthropic. Em teste com o engine — trocar aqui reverte.
+// So esta pagina usa o parametro: as demais telas seguem medindo a IA.
+const FONTE_LISTA='engine';
+const urlApostas=d=>`${BACKEND_URL}/apostas-resultado/${d}?fonte=${FONTE_LISTA}`;
+
 function hoje(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function offsetData(base,n){const d=new Date(base+'T12:00:00');d.setDate(d.getDate()+n);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function fmtD(iso){const[a,m,d]=iso.split('-');return`${d}/${m}`;}
@@ -463,7 +469,7 @@ async function carregarDia(data,label){
   document.getElementById('btn-b').disabled=true;
   document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando apostas de ${label}...</div></div>`;
   try{
-    const r=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const r=await fetch(urlApostas(data));
     const j=await r.json();
     if(j.apostas?.jogos?.length>0){
       const resultados=j.resultados?.apostas||[];
@@ -493,7 +499,7 @@ async function buscar(){
   document.getElementById('stats-bar').style.display='none';
   document.getElementById('tw').innerHTML=`<div class="loading-state"><div class="spin"></div><div class="loading-txt">Buscando apostas de ${fmtDL(dv)}...</div></div>`;
   try{
-    const r=await fetch(`${BACKEND_URL}/apostas-resultado/${dv}`);
+    const r=await fetch(urlApostas(dv));
     const j=await r.json();
     if(j.apostas?.jogos?.length>0){
       const resultados=j.resultados?.apostas||[];
@@ -516,7 +522,7 @@ async function buscar(){
     clearInterval(iv);
     if(p.aviso){document.getElementById('tw').innerHTML=`<div class="aviso">⚠ ${p.aviso}</div>`;return;}
     try{
-      const rv=await fetch(`${BACKEND_URL}/apostas-resultado/${dv}`);
+      const rv=await fetch(urlApostas(dv));
       const jv=await rv.json();
       if(jv.resultados?.apostas?.length){
         const resultados=jv.resultados.apostas;
@@ -551,7 +557,7 @@ async function carregarMultiplas(data,label){
     const j=await r.json();
     if(!j.multiplas){
       try{
-        const ra=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+        const ra=await fetch(urlApostas(data));
         const ja=await ra.json();
         if(!ja.apostas?.jogos?.length){
           document.getElementById('mult-content').innerHTML=`<div class="empty-state" style="padding:1.5rem 0"><p>Sem apostas para ${fmtDL(data)}</p></div>`;
@@ -901,17 +907,31 @@ async function _salvarCorrecao(data,jogoId){
       if(!j.ok){alert('Erro stats: '+(j.error||'desconhecido'));return;}
     }
     document.getElementById('modal-corrigir')?.remove();
-    const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const r2=await fetch(urlApostas(data));
     const d2=await r2.json();
     if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
   }catch(e){alert('Erro: '+e.message);}
 }
 
+// Estas acoes gravam em resultados.apostas[] pelo jogo_id da IA. Com a lista
+// vinda do engine os ids sao outros, entao gravariam no jogo errado. O engine
+// tem caminho proprio de validacao (/engine/validar e /engine/input-stats).
+function adminBloqueado(){
+  if(FONTE_LISTA!=='engine') return false;
+  alert('Lista exibindo picks do Engine.
+
+Correcoes manuais valem para a lista da IA e ficam desabilitadas aqui.
+Use a aba Experimental para ajustar o Engine.');
+  return true;
+}
+
 async function editarResultado(event,idx,data,jogoId,resultadoAtual){
+  if(adminBloqueado()) return;
   abrirModalCorrigir(event,data,jogoId,'Corrigir resultado');
 }
 
 async function excluirJogo(event,data,jogoId){
+  if(adminBloqueado()) return;
   event.stopPropagation();
   if(!confirm('Excluir este jogo da lista? A ação não pode ser desfeita.')) return;
   try{
@@ -919,7 +939,7 @@ async function excluirJogo(event,data,jogoId){
     const j=await r.json();
     if(j.ok){
       // Recarregar a lista do dia
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const r2=await fetch(urlApostas(data));
       const d2=await r2.json();
       const jogos=d2.apostas?.jogos||[];
       const resultados=d2.resultados?.apostas||[];
@@ -930,13 +950,14 @@ async function excluirJogo(event,data,jogoId){
 }
 
 async function anularJogo(event,data,jogoId){
+  if(adminBloqueado()) return;
   event.stopPropagation();
   if(!confirm('Anular este jogo? Ele será marcado como cancelado/reembolso.')) return;
   try{
     const r=await fetch(`${BACKEND_URL}/anular-jogo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId})});
     const j=await r.json();
     if(j.ok){
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const r2=await fetch(urlApostas(data));
       const d2=await r2.json();
       if(d2.apostas?.jogos?.length>0){
         const resultados=d2.resultados?.apostas||[];
@@ -948,6 +969,7 @@ async function anularJogo(event,data,jogoId){
 }
 
 async function informarStats(event,data,jogoId,aposta,mercado){
+  if(adminBloqueado()) return;
   event.stopPropagation();
   const isEsc=mercado==='escanteios'||aposta.toLowerCase().includes('escanteio')||aposta.toLowerCase().includes('corner');
   const isCart=mercado==='cartoes'||aposta.toLowerCase().includes('cartao')||aposta.toLowerCase().includes('cartão');
@@ -959,7 +981,7 @@ async function informarStats(event,data,jogoId,aposta,mercado){
     const j=await r.json();
     if(j.ok){
       alert(`✅ ${j.resultado?.toUpperCase()} — resultado atualizado!`);
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const r2=await fetch(urlApostas(data));
       const d2=await r2.json();
       if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
     }else{alert('Erro: '+(j.error||'desconhecido'));}
@@ -967,6 +989,7 @@ async function informarStats(event,data,jogoId,aposta,mercado){
 }
 
 async function informarAnalise(event,data,jogoId){
+  if(adminBloqueado()) return;
   event.stopPropagation();
   const vEsc=prompt(`Total de ESCANTEIOS no jogo (vazio = pular):`);if(vEsc===null)return;
   const vAmarelos=prompt(`Total de CARTÕES AMARELOS (vazio = pular):`);if(vAmarelos===null)return;
@@ -982,7 +1005,7 @@ async function informarAnalise(event,data,jogoId){
     const j=await r.json();
     if(j.ok){
       alert(`✅ Análise atualizada!`);
-      const r2=await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+      const r2=await fetch(urlApostas(data));
       const d2=await r2.json();
       if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
     }else{alert('Erro: '+(j.error||'desconhecido'));}
@@ -1122,7 +1145,7 @@ async function analisarJogoManual(){
 
   // Verificar se jogo já existe na lista do dia (checagem robusta via API)
   try{
-    const checkR = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const checkR = await fetch(urlApostas(data));
     const checkD = await checkR.json();
     const jogosHoje = checkD.apostas?.jogos || [];
     const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,' ').trim();
@@ -1230,7 +1253,7 @@ async function confirmarJogoManual(data){
     const j = await r.json();
     if(!j.ok) throw new Error(j.error || 'Erro desconhecido');
     fecharModal();
-    const rv = await fetch(`${BACKEND_URL}/apostas-resultado/${data}`);
+    const rv = await fetch(urlApostas(data));
     const dv = await rv.json();
     if(dv.apostas?.jogos?.length > 0){
       const resultados = dv.resultados?.apostas || [];
