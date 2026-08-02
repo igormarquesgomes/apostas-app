@@ -8333,13 +8333,121 @@ app.get('/multiplas/:data', async (req, res) => {
 });
 
 // Endpoint para o dashboard buscar apostas + resultados por data
+// Fonte padrão de /apostas-resultado. Fica em 'ia' porque o endpoint alimenta
+// várias telas (ligas, público, experimental) que devem seguir medindo a IA.
+// A lista oficial pede ?fonte=engine explicitamente — assim o teste do engine
+// não vaza para as outras páginas.
+const LISTA_OFICIAL = process.env.LISTA_OFICIAL || 'ia';
+
+// Texto público do pick do engine. Ele não escreve prosa como a IA, então a
+// justificativa é montada a partir dos sinais que ele de fato usou. Vale a
+// mesma regra da IA: nada de termo interno (score, calibração, assertividade).
+function justificativaEngine(p) {
+  const partes = [];
+  const mc = parseFloat(p.media_gols_combinada);
+  // Média de gols só entra quando a aposta é de gols/resultado — num pick de
+  // cartões ela abriria o texto com um dado que não sustenta a escolha.
+  if (mc > 0 && ['gols', 'resultado'].includes(p.mercado_engine))
+    partes.push(`As duas equipes somam média de ${mc.toFixed(1)} gols por jogo`);
+
+  const forma = f => (f || '').toUpperCase().replace(/[^VED]/g, '');
+  const fc = forma(p.forma_casa), ff = forma(p.forma_fora);
+  const conta = (s, c) => (s.match(new RegExp(c, 'g')) || []).length;
+  if (fc) partes.push(`${p.time_casa} vem de ${conta(fc,'V')}V-${conta(fc,'E')}E-${conta(fc,'D')}D`);
+  if (ff) partes.push(`${p.time_fora} de ${conta(ff,'V')}V-${conta(ff,'E')}E-${conta(ff,'D')}D`);
+
+  if (p.mercado_engine === 'escanteios' && parseFloat(p.media_escanteios) > 0)
+    partes.push(`média de ${parseFloat(p.media_escanteios).toFixed(1)} escanteios na competição`);
+  if (p.mercado_engine === 'cartoes' && parseFloat(p.media_cartoes) > 0)
+    partes.push(`média de ${parseFloat(p.media_cartoes).toFixed(1)} cartões na competição`);
+
+  if (p.rank_casa && p.rank_fora)
+    partes.push(`${p.time_casa} é ${p.rank_casa}º e ${p.time_fora} ${p.rank_fora}º na tabela`);
+
+  return partes.length
+    ? partes.join('. ') + '.'
+    : 'Escolha baseada no retrospecto recente das equipes e no comportamento da competição.';
+}
+
+// Converte pick do engine para o formato que a lista oficial já renderiza,
+// para a troca de fonte não exigir mudança no frontend. Devolve também os
+// resultados remapeados: o frontend casa por `jogo_id`, e os ids do engine são
+// próprios — reaproveitar os da IA mostraria resultado no jogo errado.
+function engineParaFormatoLista(engine) {
+  if (!engine?.jogos?.length) return null;
+
+  const resultados = engine.jogos.map((p, i) => ({
+    jogo_id:   i + 1,
+    time_casa: p.time_casa,
+    time_fora: p.time_fora,
+    aposta:    p.aposta_engine,
+    placar:    p.placar || null,
+    encontrado: !!p.placar,
+    resultado_aposta: (p.resultado_engine === 'green' || p.resultado_engine === 'red')
+      ? p.resultado_engine : 'pendente',
+  }));
+  const temAlgumResultado = resultados.some(r => r.resultado_aposta !== 'pendente');
+
+  const apostas = {
+    ...engine,
+    fonte: 'engine',
+    jogos: engine.jogos.map((p, i) => ({
+      id:            i + 1,
+      fixtureId:     p.fixtureId,
+      liga:          p.liga,
+      tipo_liga:     p.tipo_liga || 'eu',
+      time_casa:     p.time_casa,
+      time_fora:     p.time_fora,
+      horario:       p.horario,
+      aposta:        p.aposta_engine,
+      mercado:       p.mercado_engine,
+      odd_mercado:   p.odd_engine,
+      odd_sugerida:  p.odd_engine,
+      confianca:     p.confianca_engine,
+      razao_escolha: `Convergência de ${p.p_calibrado ?? p.score_engine}% nos indicadores da partida`,
+      justificativa: justificativaEngine(p),
+      aposta_backup:  p.alternativas_engine?.[0]?.aposta  || null,
+      mercado_backup: p.alternativas_engine?.[0]?.mercado || null,
+      alternativas:   (p.alternativas_engine || []).map(a => ({
+        aposta: a.aposta, mercado: a.mercado, confianca: 'media', razao: `odd ${a.odd}`,
+      })),
+      forma_casa:       p.forma_casa,
+      forma_fora:       p.forma_fora,
+      media_gols_casa:  p.media_gols_casa  || null,
+      media_gols_fora:  p.media_gols_fora  || null,
+      media_escanteios: p.media_escanteios,
+      media_cartoes:    p.media_cartoes,
+      placar:           p.placar || null,
+      descartado:       false,
+      // Rastro para conferência lado a lado
+      _pick_ia: p.aposta_ia ? { aposta: p.aposta_ia, mercado: p.mercado_ia, odd: p.odd_ia } : null,
+    })),
+  };
+
+  return { apostas, resultados: temAlgumResultado ? { apostas: resultados } : null };
+}
+
 app.get('/apostas-resultado/:data', async (req, res) => {
   const data = normalizarData(req.params.data);
   if (!data) return res.status(400).json({ error: 'Data inválida.' });
   try {
     const row = await dbGet(data);
     if (!row || !row.apostas) return res.json({ data, apostas: null, resultados: null });
-    return res.json({ data, apostas: row.apostas, resultados: row.resultados || null });
+
+    // ?fonte= permite comparar as duas listas sem mexer na configuração
+    const fonte = req.query.fonte || LISTA_OFICIAL;
+    if (fonte === 'engine') {
+      // dbGet não traz apostas_engine; busca só quando é a fonte pedida
+      const eng = await fetch(
+        `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      ).then(r => r.json()).then(r => r[0]?.apostas_engine).catch(() => null);
+
+      const conv = engineParaFormatoLista(eng);
+      // Sem engine para a data, cai na IA em vez de mostrar tela vazia
+      if (conv) return res.json({ data, apostas: conv.apostas, resultados: conv.resultados, fonte: 'engine' });
+    }
+    return res.json({ data, apostas: row.apostas, resultados: row.resultados || null, fonte: 'ia' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
