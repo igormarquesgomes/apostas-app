@@ -7386,7 +7386,56 @@ async function dbSaveApostasEngine(data, apostasEngine) {
   } catch(e) { console.error('Erro dbSaveApostasEngine:', e.message); }
 }
 
-async function gerarApostasEngine(data) {
+// Monta o pool de jogos SEM nenhuma chamada Anthropic.
+// _carregarFixturesComStats já faz busca de fixtures, seleção de ligas, coleta
+// de estatísticas e pré-filtro de odds — tudo API-Football. O custo de IA está
+// só na análise multi-agente que vem depois, e que aqui não roda.
+// Devolve no formato de apostas_dia.apostas para o engine consumir igual.
+async function gerarPoolSemIA(data, horaMin = '07:00', metaJogos = 15) {
+  const loaded = await _carregarFixturesComStats(data, horaMin, metaJogos, new Set());
+  if (!loaded?.jogos?.length) return null;
+
+  const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+  const soma = (a, b) => {
+    const x = num(a), y = num(b);
+    if (x === null && y === null) return null;
+    return ((x || 0) + (y || 0)).toFixed(1);
+  };
+
+  const jogos = loaded.jogos.map((j, i) => {
+    const sc = j._stats?.statsCasa || {}, sf = j._stats?.statsFora || {};
+    return {
+      id: i + 1,
+      fixtureId: j.fixtureId,
+      ligaId:    j.ligaId,
+      liga:      j.liga,
+      tipo_liga: j.tipo,
+      pri:       j.pri,
+      time_casa: j.timeCasa,
+      time_fora: j.timeFora,
+      horario:   j.horario,
+      teamCasaId: j.teamCasaId,
+      teamForaId: j.teamForaId,
+      forma_casa:       sc.forma || null,
+      forma_fora:       sf.forma || null,
+      media_gols_casa:  sc.mediaGols ?? null,
+      media_gols_fora:  sf.mediaGols ?? null,
+      media_escanteios: soma(sc.mediaEscanteios, sf.mediaEscanteios),
+      media_cartoes:    soma(sc.mediaCartoes,    sf.mediaCartoes),
+      h2h_texto:        sc.h2hTexto || sf.h2hTexto || null,
+      descartado: false,
+      // Sem pick da IA: o engine escolhe mercado e linha por conta própria
+      aposta: null, mercado: null, odd_mercado: null, confianca: null,
+    };
+  });
+
+  console.log(`🧮 Pool sem IA: ${jogos.length} jogo(s) montado(s) — nenhuma chamada Anthropic`);
+  return { gerado_em: new Date().toISOString(), fonte: 'pool_sem_ia', total: jogos.length, jogos };
+}
+
+// semIA: ignora a lista da IA e monta o pool próprio. Permite testar o modo
+// autônomo sem precisar desligar a geração Anthropic.
+async function gerarApostasEngine(data, { semIA = false } = {}) {
   const MAX_JOGOS = 15;
   // Piso de acerto calibrado. O objetivo é green na tela, não ROI:
   // um pick de 43% não entra nem que pague odd alta.
@@ -7406,14 +7455,20 @@ async function gerarApostasEngine(data) {
   ]);
 
   const row = rowArr[0];
-  if (!row?.apostas?.jogos?.length) return { erro: 'sem apostas para esta data', data };
 
-  // Pool = todos os jogos não descartados que a IA gerou.
-  // odds_confirmadas já tem todos os mercados/odds verificados pela IA (The Odds API + API-Football).
-  // O engine re-pontua esses mercados com seus próprios critérios estatísticos.
-  const jogosAtivos = row.apostas.jogos.filter(j => !j.descartado);
+  // Pool: prefere a lista da IA quando existe (permite comparar pick a pick).
+  // Sem ela, monta o próprio pool — é isto que torna o engine capaz de rodar
+  // sozinho e permite desligar a geração Anthropic sem quebrar nada.
+  let jogosAtivos = semIA ? [] : (row?.apostas?.jogos || []).filter(j => !j.descartado);
+  let fontePool = 'ia';
+  if (!jogosAtivos.length) {
+    const pool = await gerarPoolSemIA(data);
+    jogosAtivos = pool?.jogos || [];
+    fontePool = 'proprio';
+  }
+  if (!jogosAtivos.length) return { erro: 'sem jogos para esta data', data };
 
-  console.log(`🤖 Engine: calib=${correlacao?.total_apostas||0} · hist=${historicoLiga?.total||0} · ligas=${Object.keys(ligasData||{}).length} · pool=${jogosAtivos.length} jogos`);
+  console.log(`🤖 Engine: calib=${correlacao?.total_apostas||0} · hist=${historicoLiga?.total||0} · ligas=${Object.keys(ligasData||{}).length} · pool=${jogosAtivos.length} jogos (fonte: ${fontePool})`);
 
   if (desempenho) {
     const porMerc = Object.entries(desempenho)
@@ -7518,8 +7573,12 @@ async function gerarApostasEngine(data) {
         score: c.score, p: c.p_calibrado, ev: c.ev,
       })),
       media_gols_combinada: mcGolsReal.toFixed(2),
+      media_gols_casa:  jogo.media_gols_casa ?? null,
+      media_gols_fora:  jogo.media_gols_fora ?? null,
       media_escanteios: ligasData?.[jogo.ligaId]?.media_escanteios || jogo.media_escanteios,
       media_cartoes:    ligasData?.[jogo.ligaId]?.media_cartoes    || jogo.media_cartoes,
+      // Confrontos diretos recentes — base factual da justificativa pública
+      h2h_texto:        jogo.h2h_texto || null,
       forma_casa:       engineParsForma(jogo.forma_casa),
       forma_fora:       engineParsForma(jogo.forma_fora),
       api_season_stats: !!(statsCasa || statsFora),
@@ -7927,7 +7986,7 @@ app.post('/engine/input-stats', async (req, res) => {
 
 app.post('/engine/gerar', async (req, res) => {
   try {
-    const { data, forcar } = req.body;
+    const { data, forcar, semIA } = req.body;
     if (!data) return res.status(400).json({ error: 'data obrigatória' });
     // Não regenera se já tiver 15 picks para o dia (a não ser que forcar=true)
     if (!forcar) {
@@ -7940,9 +7999,29 @@ app.post('/engine/gerar', async (req, res) => {
         return res.json(existing.apostas_engine);
       }
     }
-    const resultado = await gerarApostasEngine(data);
+    const resultado = await gerarApostasEngine(data, { semIA: !!semIA });
     if (resultado.erro) return res.status(404).json(resultado);
     res.json(resultado);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Testa o pool autônomo sem gravar nada: mostra que jogos o engine escolheria
+// se a geração Anthropic estivesse desligada.
+app.get('/engine/pool-sem-ia/:data', async (req, res) => {
+  try {
+    const pool = await gerarPoolSemIA(req.params.data);
+    if (!pool) return res.status(404).json({ erro: 'sem jogos para esta data' });
+    res.json({
+      total: pool.total,
+      custo_anthropic: 0,
+      jogos: pool.jogos.map(j => ({
+        liga: j.liga, jogo: `${j.time_casa} x ${j.time_fora}`, horario: j.horario,
+        forma_casa: j.forma_casa, forma_fora: j.forma_fora,
+        media_gols: `${j.media_gols_casa ?? '-'} / ${j.media_gols_fora ?? '-'}`,
+        media_escanteios: j.media_escanteios, media_cartoes: j.media_cartoes,
+        tem_h2h: !!j.h2h_texto,
+      })),
+    });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -8342,31 +8421,81 @@ const LISTA_OFICIAL = process.env.LISTA_OFICIAL || 'ia';
 // Texto público do pick do engine. Ele não escreve prosa como a IA, então a
 // justificativa é montada a partir dos sinais que ele de fato usou. Vale a
 // mesma regra da IA: nada de termo interno (score, calibração, assertividade).
+// Extrai números dos confrontos diretos. h2h_texto vem de coletarEstatisticas
+// no formato "2026-05-01 Casa 2-1 Fora (3g) | ...", últimos 5 jogos.
+function lerH2H(txt) {
+  if (!txt || /sem h2h/i.test(txt)) return null;
+  const jogos = txt.split('|').map(s => s.trim()).filter(Boolean).map(s => {
+    // A data (2026-05-01) casa com o padrão de placar, então sai primeiro
+    const semData = s.replace(/^\d{4}-\d{2}-\d{2}\s*/, '');
+    const placar = semData.match(/(\d+)\s*-\s*(\d+)/);
+    if (!placar) return null;
+    const a = +placar[1], b = +placar[2];
+    // O total vem anotado como "(Ng)"; usa como conferência quando presente
+    const anotado = semData.match(/\((\d+)g\)/);
+    const total = anotado ? +anotado[1] : a + b;
+    return { a, b, total, ambos: a > 0 && b > 0 };
+  }).filter(Boolean);
+  return jogos.length ? jogos : null;
+}
+
 function justificativaEngine(p) {
   const partes = [];
-  const mc = parseFloat(p.media_gols_combinada);
-  // Média de gols só entra quando a aposta é de gols/resultado — num pick de
-  // cartões ela abriria o texto com um dado que não sustenta a escolha.
-  if (mc > 0 && ['gols', 'resultado'].includes(p.mercado_engine))
-    partes.push(`As duas equipes somam média de ${mc.toFixed(1)} gols por jogo`);
+  const linha = p.linha_engine || '';
+  const alvo = parseFloat((linha.match(/_([\d.]+)$/) || [])[1]);
+  const isOver = linha.startsWith('over');
+  const h2h = lerH2H(p.h2h_texto);
+  const nome = m => m === 'cartoes' ? 'cartões' : m === 'escanteios' ? 'escanteios' : 'gols';
 
+  // 1) O número que sustenta a linha escolhida, no mercado da aposta
+  if (p.mercado_engine === 'gols') {
+    const mc = parseFloat(p.media_gols_combinada);
+    const mgc = parseFloat(p.media_gols_casa), mgf = parseFloat(p.media_gols_fora);
+    if (mc > 0) {
+      const detalhe = (Number.isFinite(mgc) && Number.isFinite(mgf))
+        ? ` (${mgc.toFixed(1)} do ${p.time_casa} e ${mgf.toFixed(1)} do ${p.time_fora})`
+        : '';
+      partes.push(`As duas equipes somam ${mc.toFixed(1)} gols por jogo${detalhe}`);
+    }
+  } else if (p.mercado_engine === 'escanteios') {
+    const me = parseFloat(p.media_escanteios);
+    if (me > 0) partes.push(`A média de escanteios nos jogos das duas equipes é de ${me.toFixed(1)}`);
+  } else if (p.mercado_engine === 'cartoes') {
+    const mca = parseFloat(p.media_cartoes);
+    if (mca > 0) partes.push(`A média de cartões nos jogos das duas equipes é de ${mca.toFixed(1)}`);
+  }
+
+  // 2) Confronto direto — só quando fala do mercado apostado
+  if (h2h && p.mercado_engine === 'gols') {
+    if (linha === 'btts' || linha === 'no_btts') {
+      const n = h2h.filter(j => j.ambos).length;
+      const contra = h2h.length - n;
+      // Só cita a contagem quando ela de fato apoia a escolha
+      if (linha === 'btts' && n) partes.push(`Nos últimos ${h2h.length} confrontos diretos, ${n} tiveram gol dos dois lados`);
+      if (linha === 'no_btts' && contra) partes.push(`Em ${contra} dos últimos ${h2h.length} confrontos diretos, ao menos um time passou em branco`);
+    } else if (Number.isFinite(alvo)) {
+      const n = h2h.filter(j => isOver ? j.total > alvo : j.total < alvo).length;
+      if (n) partes.push(`${n} dos últimos ${h2h.length} confrontos diretos ficaram ${isOver ? 'acima' : 'abaixo'} de ${alvo} gols`);
+    }
+    const medH2H = (h2h.reduce((s, j) => s + j.total, 0) / h2h.length);
+    if (h2h.length >= 3) partes.push(`com média de ${medH2H.toFixed(1)} gols nesses encontros`);
+  }
+
+  // 3) Momento das equipes
   const forma = f => (f || '').toUpperCase().replace(/[^VED]/g, '');
   const fc = forma(p.forma_casa), ff = forma(p.forma_fora);
   const conta = (s, c) => (s.match(new RegExp(c, 'g')) || []).length;
-  if (fc) partes.push(`${p.time_casa} vem de ${conta(fc,'V')}V-${conta(fc,'E')}E-${conta(fc,'D')}D`);
-  if (ff) partes.push(`${p.time_fora} de ${conta(ff,'V')}V-${conta(ff,'E')}E-${conta(ff,'D')}D`);
+  const desc = (t, s) => `${t} vem de ${conta(s,'V')}V-${conta(s,'E')}E-${conta(s,'D')}D`;
+  if (fc && ff) partes.push(`${desc(p.time_casa, fc)} e ${desc(p.time_fora, ff)} nos últimos jogos`);
+  else if (fc) partes.push(desc(p.time_casa, fc) + ' nos últimos jogos');
 
-  if (p.mercado_engine === 'escanteios' && parseFloat(p.media_escanteios) > 0)
-    partes.push(`média de ${parseFloat(p.media_escanteios).toFixed(1)} escanteios na competição`);
-  if (p.mercado_engine === 'cartoes' && parseFloat(p.media_cartoes) > 0)
-    partes.push(`média de ${parseFloat(p.media_cartoes).toFixed(1)} cartões na competição`);
+  // 4) Contexto de tabela, quando há diferença que importa
+  if (p.rank_casa && p.rank_fora && Math.abs(p.rank_casa - p.rank_fora) >= 4)
+    partes.push(`${p.time_casa} é o ${p.rank_casa}º e ${p.time_fora} o ${p.rank_fora}º na competição`);
 
-  if (p.rank_casa && p.rank_fora)
-    partes.push(`${p.time_casa} é ${p.rank_casa}º e ${p.time_fora} ${p.rank_fora}º na tabela`);
-
-  return partes.length
-    ? partes.join('. ') + '.'
-    : 'Escolha baseada no retrospecto recente das equipes e no comportamento da competição.';
+  if (!partes.length)
+    return `Escolha apoiada no retrospecto recente das duas equipes e no comportamento de ${nome(p.mercado_engine)} na competição.`;
+  return partes.join('. ') + '.';
 }
 
 // Converte pick do engine para o formato que a lista oficial já renderiza,
