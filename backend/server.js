@@ -6767,19 +6767,31 @@ const ENGINE_ANO = new Date().getFullYear();
 // Converte o mapa flat de odds (retornado por buscarOddsFixture) para lista de candidatos
 // com {aposta, mercado, odd, linha} prontos para o engine de pontuação.
 // Exclui: mercados parciais (1º tempo), individuais por time, odd fora de [1.20, 12.0]
-function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora) {
+// incluirTempo: aceita mercados de primeiro tempo. Fica desligado por padrão
+// porque só valem a pena em jogo com poucos mercados de tempo integral — e
+// porque exigem o placar do intervalo para validar (ver validarPickEngine).
+function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = false } = {}) {
   if (!oddsMap) return [];
-  const EXCLUIR = ['1st half','2nd half','first half','second half','half time','halftime','1h ','2h ','ht ','home team','away team','total - home','total - away','home total','away total'];
+  const SO_TIME    = ['home team','away team','total - home','total - away','home total','away total'];
+  const PRIMEIRO_T = ['1st half','first half','half time','halftime','1h ','ht '];
+  const SEGUNDO_T  = ['2nd half','second half','2h '];
   const candidatos = [];
   for (const [chave, odd] of Object.entries(oddsMap)) {
     if (!odd || odd < 1.25 || odd > 12) continue;
     const [betNome, val] = chave.split('|');
     if (!betNome || !val) continue;
-    if (EXCLUIR.some(ex => betNome.includes(ex))) continue;
+    if (SO_TIME.some(ex => betNome.includes(ex))) continue;
+
+    // Segundo tempo nunca entra: exigiria o placar do 2T, que é derivado
+    // (final menos intervalo) e some quando um dos dois falta.
+    if (SEGUNDO_T.some(ex => betNome.includes(ex))) continue;
+    const ehPrimeiroTempo = PRIMEIRO_T.some(ex => betNome.includes(ex));
+    if (ehPrimeiroTempo && !incluirTempo) continue;
 
     let mercado = null, linha = null, aposta = null;
 
-    if (betNome.includes('match winner') || betNome === '1x2') {
+    if (betNome.includes('match winner') || betNome === '1x2' ||
+        (ehPrimeiroTempo && betNome.includes('winner'))) {
       mercado = 'resultado';
       if (val === 'home')      { linha = 'casa';   aposta = `${timeCasa || 'Casa'} vence`; }
       else if (val === 'draw') { linha = 'empate';  aposta = 'Empate'; }
@@ -6811,6 +6823,16 @@ function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora) {
     }
 
     if (!mercado || !linha) continue;
+
+    // Primeiro tempo vira mercado próprio: comporta-se diferente do tempo
+    // integral, então merece bucket separado na calibração em vez de poluir
+    // a taxa histórica de "gols".
+    if (ehPrimeiroTempo) {
+      if (mercado !== 'gols' && mercado !== 'resultado') continue; // só o que dá para validar
+      mercado = `${mercado}_1t`;
+      aposta  = `${aposta} (1º tempo)`;
+    }
+
     candidatos.push({ aposta, mercado, odd, linha });
   }
   return candidatos;
@@ -7474,6 +7496,8 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
   // Piso de acerto calibrado. O objetivo é green na tela, não ROI:
   // um pick de 43% não entra nem que pague odd alta.
   const P_MINIMO = 50;
+  // Abaixo disso o quadro do jogo é raso e vale abrir o 1º tempo
+  const MIN_MERCADOS_SEM_TEMPO = 6;
 
   // Carrega jogos da IA (que já têm odds_confirmadas) + dados históricos em paralelo
   const [rowArr, correlacao, historicoLiga, histLinhaLiga, ligasData, desempenho] = await Promise.all([
@@ -7545,7 +7569,18 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
     // Busca TODOS os mercados disponíveis para o fixture via cache da API-Football.
     // A IA pode ter escolhido um mercado sem odd — o engine pivota para o melhor com odd real.
     const oddsRaw = await buscarOddsFixture(jogo.fixtureId, data);
-    const todosOsMercados = oddsMapParaCandidatos(oddsRaw, jogo.time_casa, jogo.time_fora);
+    let todosOsMercados = oddsMapParaCandidatos(oddsRaw, jogo.time_casa, jogo.time_fora);
+
+    // Jogo com pouca oferta de tempo integral: abre para mercados de 1º tempo.
+    // Dia fraco costuma trazer jogos com quadro raso, e sem isso eles ficariam
+    // com uma ou duas linhas ruins — ou fora da lista.
+    if (todosOsMercados.length < MIN_MERCADOS_SEM_TEMPO) {
+      const comTempo = oddsMapParaCandidatos(oddsRaw, jogo.time_casa, jogo.time_fora, { incluirTempo: true });
+      if (comTempo.length > todosOsMercados.length) {
+        console.log(`  ⏱️  ${jogo.time_casa} x ${jogo.time_fora}: só ${todosOsMercados.length} mercado(s) — abrindo 1º tempo (${comTempo.length})`);
+        todosOsMercados = comTempo;
+      }
+    }
 
     // Se não há nenhum mercado com odd real no bookmaker → jogo sem cobertura, exclui
     if (!todosOsMercados.length) continue;
@@ -7936,6 +7971,9 @@ async function validarEngineData(data) {
         const gF = f.goals?.away;
         if (gC == null || gF == null) continue;
         jogo.placar = `${gC}-${gF}`;
+        // Placar do intervalo — necessário para validar mercados de 1º tempo
+        const hC = f.score?.halftime?.home, hF = f.score?.halftime?.away;
+        if (hC != null && hF != null) jogo.placar_ht = `${hC}-${hF}`;
         atualizados++;
       }
 
@@ -7947,14 +7985,14 @@ async function validarEngineData(data) {
       }
 
       const anterior = jogo.resultado_engine;
-      jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, stats || jogo.stats_engine);
+      jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, stats || jogo.stats_engine, jogo.placar_ht);
       if (jogo.resultado_engine !== anterior) atualizados++;
 
       // Calcula resultado_ia usando parseLinha no texto da aposta_ia
       if (!jogo.resultado_ia || jogo.resultado_ia === 'pendente') {
         const linhaIa = parseLinha(jogo.aposta_ia, jogo.mercado_ia);
         const statsIa = ['cartoes','escanteios'].includes(jogo.mercado_ia) ? (stats || jogo.stats_engine) : null;
-        if (linhaIa) jogo.resultado_ia = validarPickEngine(linhaIa, jogo.mercado_ia, jogo.placar, statsIa);
+        if (linhaIa) jogo.resultado_ia = validarPickEngine(linhaIa, jogo.mercado_ia, jogo.placar, statsIa, jogo.placar_ht);
       }
     } catch(e) { console.error(`Engine validar ${jogo.fixtureId}:`, e.message); }
   }
@@ -8089,12 +8127,23 @@ function parseLinha(aposta, mercado) {
   return null;
 }
 
-function validarPickEngine(linha, mercado, placar, stats) {
+function validarPickEngine(linha, mercado, placar, stats, placarHT) {
   if (!linha || !mercado) return 'pendente';
-  const parts = (placar || '').split('-').map(Number);
+
+  // Mercados de primeiro tempo usam o placar do intervalo. Sem ele fica
+  // pendente — validar contra o placar final daria resultado errado, não nulo.
+  const ehPrimeiroTempo = mercado.endsWith('_1t');
+  const alvo = ehPrimeiroTempo ? placarHT : placar;
+  if (ehPrimeiroTempo) mercado = mercado.slice(0, -3);
+
+  const parts = (alvo || '').split('-').map(Number);
   const placarOk = parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1]);
   const [gC, gF] = placarOk ? parts : [0, 0];
   const total = gC + gF;
+
+  // Cartões e escanteios de primeiro tempo não são suportados: as stats da API
+  // vêm agregadas do jogo inteiro, sem recorte por tempo.
+  if (ehPrimeiroTempo && !['gols', 'resultado'].includes(mercado)) return 'pendente';
 
   if (mercado === 'gols') {
     if (!placarOk) return 'pendente';
