@@ -7342,9 +7342,20 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     // cliente quer ver 3 ou 4 greens em 5, não um green de odd 5. Sem histórico
     // validado não há como calibrar: cai de volta para o score bruto.
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    const pCal = ancora === null
+    let pCal = ancora === null
       ? null
       : clamp(ancora + clamp((score - 70) * 0.1, -8, 8), 5, 95);
+
+    // Teto pela probabilidade implícita da odd. As faixas de calibração são
+    // grosseiras no topo — "2.00+" é aberta, então "Não BTTS @2.53" e
+    // "Under 0.5 @10.30" caíam no mesmo balde e herdavam a mesma taxa (~69%).
+    // Resultado: 0 a 0, que a casa paga 10, aparecia como 75% de chance.
+    // A odd é o melhor prior disponível: permite acreditar em vantagem sobre o
+    // mercado, mas não em 75% num evento precificado a 10%.
+    if (pCal !== null) {
+      const implicita = 100 / odd;
+      pCal = Math.min(pCal, clamp(implicita * 1.6, 5, 95));
+    }
 
     // EV é dado auxiliar para desempate, nunca critério principal.
     const ev = pCal === null ? null : +((pCal / 100) * odd).toFixed(3);
