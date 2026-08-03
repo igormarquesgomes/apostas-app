@@ -7062,6 +7062,23 @@ function engineFaixaOdd(odd) {
   return '2.00+';
 }
 
+// Picks gerados antes da correção do parser de mercados, quando o casamento por
+// substring deixava entrar recortes rotulados como o mercado cheio.
+// Não dá para reavaliar: a linha registrada nunca foi a que estava em jogo.
+// Ficam fora da calibração — entraram com green/red que não corresponde à
+// aposta real e enviesariam a taxa histórica.
+function pickContaminado(j) {
+  const m = String(j.linha_engine || '').match(/^(over|under)_([\d.]+)$/);
+  if (!m) return null;
+  // Linha asiática (.25/.75/inteira): meio-ganho e meio-reembolso tratados
+  // como resultado seco pelo validador. Só .5 é linha limpa.
+  if (!/\.5$/.test(m[2])) return 'asiatica';
+  // "over/under 30m-45m" e "15m-30m" viravam Over 0.5 do jogo inteiro.
+  // O mercado real paga ~1.05–1.25; acima disso é janela de minutos.
+  if (m[2] === '0.5' && m[1] === 'over' && Number(j.odd_engine) >= 1.40) return 'janela';
+  return null;
+}
+
 // ─── Aprendizado diário do engine ────────────────────────────────────────────
 // Lê os próprios picks já validados e mede o que REALMENTE aconteceu por
 // (mercado, faixa de odd). O score do engine é uma previsão de taxa de acerto;
@@ -7079,6 +7096,7 @@ async function carregarDesempenhoEngine(dias = 60) {
     if (!Array.isArray(rows)) return null;
 
     const acc = {};
+    let contaminados = 0;
     const bump = (chave, green, odd) => {
       const b = acc[chave] || (acc[chave] = { g: 0, r: 0, retorno: 0 });
       if (green) { b.g++; b.retorno += odd; } else { b.r++; }
@@ -7089,6 +7107,7 @@ async function carregarDesempenhoEngine(dias = 60) {
         ? JSON.parse(row.apostas_engine) : row.apostas_engine;
       for (const j of (engine?.jogos || [])) {
         if (j.resultado_engine !== 'green' && j.resultado_engine !== 'red') continue;
+        if (pickContaminado(j)) { contaminados++; continue; }
         const odd = Number(j.odd_engine);
         if (!odd || !j.mercado_engine) continue;
         const faixa = engineFaixaOdd(odd);
@@ -7098,6 +7117,7 @@ async function carregarDesempenhoEngine(dias = 60) {
         bump('__geral', green, odd);
       }
     }
+    if (contaminados) console.log(`🧹 Calibração: ${contaminados} pick(s) de mercado mal-rotulado excluído(s)`);
 
     const tabela = {};
     for (const [chave, b] of Object.entries(acc)) {
@@ -7834,7 +7854,7 @@ app.get('/engine/assertividade', async (req, res) => {
     if (!Array.isArray(rows)) throw new Error('Supabase retornou: ' + JSON.stringify(rows).slice(0, 200));
 
     const porDia = [];
-    let totalGreen = 0, totalRed = 0, totalPendente = 0;
+    let totalGreen = 0, totalRed = 0, totalPendente = 0, totalContaminados = 0;
     let totalIaGreen = 0, totalIaRed = 0;
     const porMercado = {};
 
@@ -7858,7 +7878,7 @@ app.get('/engine/assertividade', async (req, res) => {
       }
 
       const jogosComResultado = [];
-      let dGreen = 0, dRed = 0, dPend = 0, dIaGreen = 0, dIaRed = 0;
+      let dGreen = 0, dRed = 0, dPend = 0, dIaGreen = 0, dIaRed = 0, dContaminados = 0;
 
       for (const j of engine.jogos) {
         const placar    = j.placar || null;
@@ -7868,8 +7888,13 @@ app.get('/engine/assertividade', async (req, res) => {
         const rIa = jogoId != null ? iaPorJogoId[jogoId] : null;
         const resultado_ia = (rIa === 'green' || rIa === 'red') ? rIa : null;
 
+        // Mercado mal-rotulado pelo parser antigo: o green/red não corresponde
+        // à aposta que estava escrita, então não entra na conta.
+        const contaminado = pickContaminado(j);
+        if (contaminado) { dContaminados++; totalContaminados++; }
+
         // Par comparável: os dois lados resolvidos para o mesmo jogo
-        const parValido = (resultado === 'green' || resultado === 'red') && resultado_ia !== null;
+        const parValido = !contaminado && (resultado === 'green' || resultado === 'red') && resultado_ia !== null;
 
         if (!parValido) { dPend++; totalPendente++; }
         else {
