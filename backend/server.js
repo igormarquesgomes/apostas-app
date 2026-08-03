@@ -7399,37 +7399,37 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     // define o NÍVEL; o score apenas desloca alguns pontos dentro dele. Deixar
     // um score alto sobrepor uma taxa medida é o que mantinha o engine apostando
     // em cartões com 43% de acerto a odds que exigem 48%.
-    // Âncora, do mais específico ao mais geral: bucket exato → mercado → global.
-    let realAss = null, realRoi = null, realTotal = 0, ancora = null;
+    // Desempenho realizado do bucket — vira correção, não mais a âncora.
+    let realAss = null, realRoi = null, realTotal = 0;
     if (desempenho) {
       const exato = desempenho[`${mercado}|${faixa}`];
       const porMerc = desempenho[mercado];
-      const geral = desempenho.__geral;
       const real = (exato?.total >= AMIN_REAL) ? exato
                  : (porMerc?.total >= AMIN_REAL) ? porMerc
                  : null;
-      if (real) { realAss = real.ass; realRoi = real.roi; realTotal = real.total; ancora = real.ass; }
-      else if (geral?.total >= 20) ancora = geral.ass;
+      if (real) { realAss = real.ass; realRoi = real.roi; realTotal = real.total; }
     }
 
-    // Probabilidade calibrada: é ela que ranqueia. O objetivo é acerto — o
-    // cliente quer ver 3 ou 4 greens em 5, não um green de odd 5. Sem histórico
-    // validado não há como calibrar: cai de volta para o score bruto.
+    // ── Probabilidade calibrada ──────────────────────────────────────────────
+    // A base é o PREÇO, não a média histórica do bucket. Ancorar no bucket
+    // achatava tudo: no Thor x Breidablik os quatro candidatos saíram com
+    // p≈61 porque dividiam o mesmo balde, e o desempate acabava escolhendo a
+    // odd mais alta — ou seja, o resultado menos provável. A odd é o único
+    // sinal que diferencia candidatos dentro do MESMO jogo.
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    let pCal = ancora === null
-      ? null
-      : clamp(ancora + clamp((score - 70) * 0.1, -8, 8), 5, 95);
+    const implicita = 100 / odd;
+    // Desconta parte da margem da casa (~5%) embutida na odd
+    const pMercado = clamp(implicita * 1.05, 5, 95);
 
-    // Teto pela probabilidade implícita da odd. As faixas de calibração são
-    // grosseiras no topo — "2.00+" é aberta, então "Não BTTS @2.53" e
-    // "Under 0.5 @10.30" caíam no mesmo balde e herdavam a mesma taxa (~69%).
-    // Resultado: 0 a 0, que a casa paga 10, aparecia como 75% de chance.
-    // A odd é o melhor prior disponível: permite acreditar em vantagem sobre o
-    // mercado, mas não em 75% num evento precificado a 10%.
-    if (pCal !== null) {
-      const implicita = 100 / odd;
-      pCal = Math.min(pCal, clamp(implicita * 1.6, 5, 95));
-    }
+    // O modelo desloca em torno do preço: score 70 é neutro, e o deslocamento
+    // é limitado — discordar do mercado é possível, virar a mesa não.
+    const ajusteModelo = clamp((score - 70) * 0.15, -10, 10);
+    let pCal = clamp(pMercado + ajusteModelo, 5, 95);
+
+    // Teto pelo que o bucket de fato entregou: impede prometer bem mais do que
+    // esse tipo de aposta vem convertendo. Só puxa para baixo — misturar com a
+    // média do bucket puxaria os azarões para cima, que era o defeito anterior.
+    if (realTotal >= AMIN_REAL) pCal = Math.min(pCal, realAss + 5);
 
     // EV é dado auxiliar para desempate, nunca critério principal.
     const ev = pCal === null ? null : +((pCal / 100) * odd).toFixed(3);
@@ -7449,11 +7449,14 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     });
   }
 
-  // Ranqueia por probabilidade calibrada de acerto. EV entra só como desempate
-  // entre opções de acerto equivalente — aí sim vale preferir a que paga mais.
+  // Ranqueia por probabilidade de acerto. No empate, prefere a odd MENOR —
+  // maior probabilidade implícita. Desempatar por EV puxava para a odd alta,
+  // ou seja, para o resultado menos provável: foi assim que "Dupla Chance 1X
+  // @2.08" ganhou de "Breidablik vence @1.68" num jogo em que o visitante era
+  // claramente superior.
   candidatos.sort((a, b) =>
     (b.p_calibrado ?? b.score) - (a.p_calibrado ?? a.score) ||
-    (b.ev ?? 0) - (a.ev ?? 0)
+    a.odd - b.odd
   );
   return candidatos;
 }
@@ -7685,10 +7688,11 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
     });
   }
 
-  // Melhor pick primeiro dentro de cada nível: probabilidade de acerto, EV desempata.
+  // Melhor pick primeiro dentro de cada nível: probabilidade de acerto e, no
+  // empate, a odd menor — mesmo critério do ranking de candidatos.
   const porQualidade = (a, b) =>
     (b.p_calibrado ?? b.score_engine) - (a.p_calibrado ?? a.score_engine) ||
-    (b.ev_engine ?? 0) - (a.ev_engine ?? 0);
+    (a.odd_engine ?? 99) - (b.odd_engine ?? 99);
 
   // As 15 vagas são preenchidas por PRIORIDADE, não por probabilidade.
   // Com 10 jogos de Série A e 10 de Série B, entram os 10 de A e 5 de B — são
