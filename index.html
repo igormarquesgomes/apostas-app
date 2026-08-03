@@ -918,10 +918,7 @@ async function _salvarCorrecao(data,jogoId){
 // tem caminho proprio de validacao (/engine/validar e /engine/input-stats).
 function adminBloqueado(){
   if(FONTE_LISTA!=='engine') return false;
-  alert('Lista exibindo picks do Engine.
-
-Correcoes manuais valem para a lista da IA e ficam desabilitadas aqui.
-Use a aba Experimental para ajustar o Engine.');
+  alert('Lista exibindo picks do Engine. Correcoes manuais valem para a lista da IA e ficam desabilitadas aqui. Use a aba Experimental para ajustar o Engine.');
   return true;
 }
 
