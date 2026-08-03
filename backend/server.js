@@ -205,6 +205,7 @@ function parsearBookmakersOdds(bookmakers) {
   const fonte = preferidos.length > 0 ? preferidos : bookmakers;
   const acum = {};
   for (const bm of fonte) {
+    const conhecida = BOOKMAKERS_PREFERIDOS.has(bm.id);
     for (const bet of bm.bets || []) {
       const betNome = normStr(bet.name);
       for (const v of bet.values || []) {
@@ -212,24 +213,32 @@ function parsearBookmakersOdds(bookmakers) {
         const odd = parseFloat(v.odd);
         if (!odd || isNaN(odd)) continue;
         const chave = `${betNome}|${val}`;
-        if (!acum[chave]) acum[chave] = [];
-        acum[chave].push(odd);
+        if (!acum[chave]) acum[chave] = { odds: [], conhecidas: 0 };
+        acum[chave].odds.push(odd);
+        if (conhecida) acum[chave].conhecidas++;
       }
     }
   }
-  const odds = {}, casas = {};
-  for (const [chave, vals] of Object.entries(acum)) {
+  const odds = {}, meta = {};
+  for (const [chave, v] of Object.entries(acum)) {
+    const vals = v.odds;
     odds[chave] = parseFloat((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2));
-    casas[chave] = vals.length;
+    meta[chave] = {
+      n: vals.length,
+      conhecidas: v.conhecidas,
+      min: Math.min(...vals),
+      max: Math.max(...vals),
+    };
   }
   if (!Object.keys(odds).length) return null;
 
-  // Quantas casas ofereciam cada mercado. A odd acima é a MÉDIA entre elas,
-  // então um mercado de uma casa só vira um preço que talvez não exista em
-  // lugar nenhum — e que o cliente não consegue apostar.
-  // Não-enumerável de propósito: os laços que fazem Object.entries(oddsMap)
-  // continuam vendo só os pares chave→odd.
-  Object.defineProperty(odds, '__casas', { value: casas, enumerable: false });
+  // Por chave: quantas casas ofereciam, quantas delas são conhecidas
+  // (Bet365, Betano, Betfair, Bwin, Betway, 1xBet, Pinnacle) e a faixa de
+  // preços. A odd acima é a MÉDIA — sem esses dados não dá para saber se ela
+  // representa o mercado ou se é um número que não existe em lugar nenhum.
+  // Não-enumerável: os laços que fazem Object.entries(oddsMap) seguem vendo
+  // apenas os pares chave→odd.
+  Object.defineProperty(odds, '__meta', { value: meta, enumerable: false });
   return odds;
 }
 
@@ -902,6 +911,10 @@ const PRI_NUCLEO = 10;
 // Piso de acerto calibrado do engine. O objetivo do produto e green na tela:
 // um pick abaixo disso nao entra nem que pague odd alta.
 const P_MINIMO_ENGINE = 50;
+
+// Diferença de força (em pontos percentuais de aproveitamento) a partir da qual
+// apostar no lado mais fraco vira incoerência com os dados exibidos ao cliente.
+const DIF_FORCA_MAX = 25;
 
 // ─── Prioridade de competições brasileiras fora de LIGAS_PRIORITY ────────────
 // Copa do Brasil, estaduais e regionais não estão no mapa de prioridade, então
@@ -6813,9 +6826,12 @@ const MERCADOS_ACEITOS = {
   'first half winner':           { mercado: 'resultado_1t', tipo: '1x2', tempo: true },
 };
 
-function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = false, minCasas = 2 } = {}) {
+// minConhecidas: quantas casas CONHECIDAS precisam oferecer o mercado.
+// DISPERSAO_MAX: razão máxima entre a maior e a menor odd entre as casas.
+function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora,
+  { incluirTempo = false, minConhecidas = 2, dispersaoMax = 1.30 } = {}) {
   if (!oddsMap) return [];
-  const porChave = oddsMap.__casas || {};
+  const meta = oddsMap.__meta || {};
   const candidatos = [];
   for (const [chave, odd] of Object.entries(oddsMap)) {
     if (!odd || odd < 1.25 || odd > 12) continue;
@@ -6826,11 +6842,18 @@ function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = fal
     if (!def) continue;                          // nome desconhecido: fora
     if (def.tempo && !incluirTempo) continue;
 
-    // Mercado de uma casa só: a odd exibida é média de uma amostra de um, e o
-    // cliente pode não achar onde apostar. Só barra quando há a informação —
-    // odds antigas em cache não têm __casas e passam como antes.
-    const casas = porChave[chave];
-    if (casas != null && casas < minCasas) continue;
+    // Só vale se casas conhecidas oferecem — Bet365, Betano, Betfair e afins.
+    // Contar casa qualquer não serve: quando nenhuma preferida cobre o jogo, o
+    // parser cai para todas, e duas casas obscuras concordando não garantem que
+    // o cliente ache onde apostar. Odds antigas em cache não têm __meta e
+    // passam como antes.
+    const m = meta[chave];
+    if (m) {
+      if (m.conhecidas < minConhecidas) continue;
+      // Dispersão: média só representa o mercado se as casas concordam.
+      // Anunciar 2.08 e o cliente achar 1.02 ou 3.46 é outro produto.
+      if (m.min > 0 && (m.max / m.min) > dispersaoMax) continue;
+    }
 
     let mercado = def.mercado, linha = null, aposta = null;
     const ehPrimeiroTempo = !!def.tempo;
@@ -6862,7 +6885,11 @@ function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = fal
     if (!mercado || !linha) continue;
     // mercado já vem como gols_1t / resultado_1t pela tabela, e o rótulo já
     // recebeu o sufixo acima — não há segundo ajuste a fazer aqui.
-    candidatos.push({ aposta, mercado, odd, linha, casas: casas ?? null });
+    candidatos.push({
+      aposta, mercado, odd, linha,
+      casas: m ? m.conhecidas : null,
+      odd_min: m ? m.min : null, odd_max: m ? m.max : null,
+    });
   }
   return candidatos;
 }
@@ -7336,6 +7363,19 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     if (!linha || !faixa) continue;
 
     if (!engineSanityOk(linha, mercado, jogoMedidas)) continue;
+
+    // Coerência com o que a justificativa vai mostrar. O engine chegou a
+    // indicar "Dupla Chance 1X" para um mandante de 1V-2E-2D contra um
+    // visitante de 4V-1E-0D e 4º colocado — o oposto dos dados exibidos ao
+    // cliente. Aposta no lado claramente mais fraco não entra, nem como
+    // dupla chance que o cubra.
+    if (mercado === 'resultado' || mercado === 'resultado_1t') {
+      const difForca = _winHome - _winAway;
+      const noMandante  = linha === 'casa' || linha === '1X';
+      const noVisitante = linha === 'fora' || linha === 'X2';
+      if (noMandante  && difForca <= -DIF_FORCA_MAX) continue;
+      if (noVisitante && difForca >=  DIF_FORCA_MAX) continue;
+    }
 
     // ── Sinal 1: correlacao_odds — assertividade global mercado+linha+faixa ──
     let assCalib = null, totalCalib = 0;
