@@ -890,6 +890,10 @@ function isTimesEuropaB(timeCasa, timeFora) {
 // produto, não estatística. Mesmo limiar já usado no pré-filtro de odds.
 const PRI_NUCLEO = 10;
 
+// Piso de acerto calibrado do engine. O objetivo do produto e green na tela:
+// um pick abaixo disso nao entra nem que pague odd alta.
+const P_MINIMO_ENGINE = 50;
+
 // ─── Prioridade de competições brasileiras fora de LIGAS_PRIORITY ────────────
 // Copa do Brasil, estaduais e regionais não estão no mapa de prioridade, então
 // caem no pool complementar. O que decide se valem é quem está jogando: uma
@@ -7431,7 +7435,10 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
     // média do bucket puxaria os azarões para cima, que era o defeito anterior.
     if (realTotal >= AMIN_REAL) pCal = Math.min(pCal, realAss + 5);
 
-    // EV é dado auxiliar para desempate, nunca critério principal.
+    // Vantagem sobre o mercado, em pontos percentuais: o quanto o modelo
+    // acredita além do que o preço embute.
+    const edge = pCal === null ? null : +(pCal - implicita).toFixed(2);
+    // EV é dado auxiliar de exibição, nunca critério de ordenação.
     const ev = pCal === null ? null : +((pCal / 100) * odd).toFixed(3);
 
     candidatos.push({
@@ -7445,18 +7452,23 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
       real_ass: realAss, real_roi: realRoi, real_total: realTotal,
       score: Math.round(score),
       p_calibrado: pCal === null ? null : Math.round(pCal),
-      ev,
+      edge, ev,
+      acerto_ok: pCal === null || pCal >= P_MINIMO_ENGINE,
     });
   }
 
-  // Ranqueia por probabilidade de acerto. No empate, prefere a odd MENOR —
-  // maior probabilidade implícita. Desempatar por EV puxava para a odd alta,
-  // ou seja, para o resultado menos provável: foi assim que "Dupla Chance 1X
-  // @2.08" ganhou de "Breidablik vence @1.68" num jogo em que o visitante era
-  // claramente superior.
+  // Primeiro o piso de acerto, depois a vantagem sobre o mercado.
+  //
+  // Ranquear pela probabilidade pura escolhia sempre a odd mais curta — a
+  // probabilidade vem do preço, então a mais provável é sempre a que paga menos
+  // (a lista inteira caiu para 1.26–1.44, com "Under 13.5 escanteios @1.27").
+  // Ranquear por EV fazia o oposto: puxava para a odd mais alta.
+  // O critério certo é: entre as que passam do piso de acerto, prefere aquela
+  // em que o modelo mais discorda do preço a nosso favor.
   candidatos.sort((a, b) =>
-    (b.p_calibrado ?? b.score) - (a.p_calibrado ?? a.score) ||
-    a.odd - b.odd
+    (b.acerto_ok === a.acerto_ok ? 0 : (b.acerto_ok ? 1 : -1)) ||
+    (b.edge ?? -99) - (a.edge ?? -99) ||
+    (b.p_calibrado ?? b.score) - (a.p_calibrado ?? a.score)
   );
   return candidatos;
 }
@@ -7525,9 +7537,7 @@ async function gerarPoolSemIA(data, horaMin = '07:00', metaJogos = 15) {
 // autônomo sem precisar desligar a geração Anthropic.
 async function gerarApostasEngine(data, { semIA = false } = {}) {
   const MAX_JOGOS = 15;
-  // Piso de acerto calibrado. O objetivo é green na tela, não ROI:
-  // um pick de 43% não entra nem que pague odd alta.
-  const P_MINIMO = 50;
+  const P_MINIMO = P_MINIMO_ENGINE;
   // Abaixo disso o quadro do jogo é raso e vale abrir o 1º tempo
   const MIN_MERCADOS_SEM_TEMPO = 6;
 
