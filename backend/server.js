@@ -6767,72 +6767,70 @@ const ENGINE_ANO = new Date().getFullYear();
 // Converte o mapa flat de odds (retornado por buscarOddsFixture) para lista de candidatos
 // com {aposta, mercado, odd, linha} prontos para o engine de pontuação.
 // Exclui: mercados parciais (1º tempo), individuais por time, odd fora de [1.20, 12.0]
-// incluirTempo: aceita mercados de primeiro tempo. Fica desligado por padrão
-// porque só valem a pena em jogo com poucos mercados de tempo integral — e
-// porque exigem o placar do intervalo para validar (ver validarPickEngine).
+// A API devolve ~126 nomes de mercado por fixture, muitos deles recortes que
+// parecem o mercado cheio: "over/under 30m-45m" (gols numa janela de minutos),
+// "goal line" (asiático, com meio-ganho), "total - home" (só um time).
+// Casar por substring pegava esses e rotulava como se fosse a partida inteira —
+// "Over 0.5 gols @2.15" era na verdade a janela 30-45min, quando o mercado
+// cheio pagava 1.02. O cliente apostaria outra coisa, por outro preço.
+// Por isso a lista é explícita: nome exato, nada de includes.
+const MERCADOS_ACEITOS = {
+  // tempo integral
+  'match winner':      { mercado: 'resultado', tipo: '1x2' },
+  '1x2':               { mercado: 'resultado', tipo: '1x2' },
+  'double chance':     { mercado: 'resultado', tipo: 'dc' },
+  'goals over/under':  { mercado: 'gols',      tipo: 'ou' },
+  'both teams score':  { mercado: 'gols',      tipo: 'btts' },
+  'corners over under':{ mercado: 'escanteios',tipo: 'ou' },
+  'yellow over/under': { mercado: 'cartoes',   tipo: 'ou' },
+  'cards over/under':  { mercado: 'cartoes',   tipo: 'ou' },
+  // primeiro tempo (só entram com incluirTempo)
+  'goals over/under first half': { mercado: 'gols_1t',      tipo: 'ou',  tempo: true },
+  'first half winner':           { mercado: 'resultado_1t', tipo: '1x2', tempo: true },
+};
+
 function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = false } = {}) {
   if (!oddsMap) return [];
-  const SO_TIME    = ['home team','away team','total - home','total - away','home total','away total'];
-  const PRIMEIRO_T = ['1st half','first half','half time','halftime','1h ','ht '];
-  const SEGUNDO_T  = ['2nd half','second half','2h '];
   const candidatos = [];
   for (const [chave, odd] of Object.entries(oddsMap)) {
     if (!odd || odd < 1.25 || odd > 12) continue;
     const [betNome, val] = chave.split('|');
     if (!betNome || !val) continue;
-    if (SO_TIME.some(ex => betNome.includes(ex))) continue;
 
-    // Segundo tempo nunca entra: exigiria o placar do 2T, que é derivado
-    // (final menos intervalo) e some quando um dos dois falta.
-    if (SEGUNDO_T.some(ex => betNome.includes(ex))) continue;
-    const ehPrimeiroTempo = PRIMEIRO_T.some(ex => betNome.includes(ex));
-    if (ehPrimeiroTempo && !incluirTempo) continue;
+    const def = MERCADOS_ACEITOS[betNome];
+    if (!def) continue;                          // nome desconhecido: fora
+    if (def.tempo && !incluirTempo) continue;
 
-    let mercado = null, linha = null, aposta = null;
+    let mercado = def.mercado, linha = null, aposta = null;
+    const ehPrimeiroTempo = !!def.tempo;
+    const sufixo = ehPrimeiroTempo ? ' (1º tempo)' : '';
 
-    if (betNome.includes('match winner') || betNome === '1x2' ||
-        (ehPrimeiroTempo && betNome.includes('winner'))) {
-      mercado = 'resultado';
-      if (val === 'home')      { linha = 'casa';   aposta = `${timeCasa || 'Casa'} vence`; }
-      else if (val === 'draw') { linha = 'empate';  aposta = 'Empate'; }
-      else if (val === 'away') { linha = 'fora';   aposta = `${timeFora || 'Fora'} vence`; }
-    } else if (betNome.includes('double chance')) {
-      mercado = 'resultado';
-      if      (val.includes('home') && val.includes('draw'))  { linha = '1X'; aposta = 'Dupla Chance 1X'; }
-      else if (val.includes('draw') && val.includes('away'))  { linha = 'X2'; aposta = 'Dupla Chance X2'; }
-      else if (val.includes('home') && val.includes('away'))  { linha = '12'; aposta = 'Dupla Chance 12'; }
-    } else if ((betNome.includes('goals over') || betNome.includes('total goals') ||
-                (betNome.includes('over/under') && !betNome.includes('corner') && !betNome.includes('card'))) &&
-               !betNome.includes('home') && !betNome.includes('away')) {
-      mercado = 'gols';
-      const m = val.match(/^(over|under)\s+([\d.]+)$/);
-      if (m) { linha = `${m[1]}_${m[2]}`; aposta = `${m[1] === 'over' ? 'Over' : 'Under'} ${m[2]} gols`; }
-    } else if (betNome.includes('both teams') || betNome.includes('btts') || betNome === 'goals scored') {
-      mercado = 'gols';
-      if      (val === 'yes') { linha = 'btts';     aposta = 'BTTS'; }
-      else if (val === 'no')  { linha = 'no_btts';  aposta = 'Não BTTS'; }
-    } else if (betNome.includes('corner') && !betNome.includes('home') && !betNome.includes('away')) {
-      mercado = 'escanteios';
-      const m = val.match(/^(over|under)\s+([\d.]+)$/);
-      if (m) { linha = `${m[1]}_${m[2]}`; aposta = `${m[1] === 'over' ? 'Over' : 'Under'} ${m[2]} escanteios`; }
-    } else if ((betNome.includes('card') || betNome.includes('yellow')) &&
-               !betNome.includes('home') && !betNome.includes('away') && !betNome.includes('red')) {
-      mercado = 'cartoes';
-      const m = val.match(/^(over|under)\s+([\d.]+)$/);
-      if (m) { linha = `${m[1]}_${m[2]}`; aposta = `${m[1] === 'over' ? 'Over' : 'Under'} ${m[2]} cartões`; }
+    if (def.tipo === '1x2') {
+      if (val === 'home')      { linha = 'casa';   aposta = `${timeCasa || 'Casa'} vence${sufixo}`; }
+      else if (val === 'draw') { linha = 'empate'; aposta = `Empate${sufixo}`; }
+      else if (val === 'away') { linha = 'fora';   aposta = `${timeFora || 'Fora'} vence${sufixo}`; }
+    } else if (def.tipo === 'dc') {
+      if      (val.includes('home') && val.includes('draw')) { linha = '1X'; aposta = 'Dupla Chance 1X'; }
+      else if (val.includes('draw') && val.includes('away')) { linha = 'X2'; aposta = 'Dupla Chance X2'; }
+      else if (val.includes('home') && val.includes('away')) { linha = '12'; aposta = 'Dupla Chance 12'; }
+    } else if (def.tipo === 'btts') {
+      if      (val === 'yes') { linha = 'btts';    aposta = 'BTTS'; }
+      else if (val === 'no')  { linha = 'no_btts'; aposta = 'Não BTTS'; }
+    } else if (def.tipo === 'ou') {
+      // Só linhas .5: as asiáticas (.25/.75 e inteiras) têm meio-ganho e
+      // meio-reembolso, que validarPickEngine trata como green/red seco.
+      const m = val.match(/^(over|under)\s+(\d+\.5)$/);
+      if (m) {
+        const nome = mercado.startsWith('gols') ? 'gols'
+                   : mercado === 'escanteios' ? 'escanteios' : 'cartões';
+        linha = `${m[1]}_${m[2]}`;
+        aposta = `${m[1] === 'over' ? 'Over' : 'Under'} ${m[2]} ${nome}${sufixo}`;
+      }
     }
 
     if (!mercado || !linha) continue;
-
-    // Primeiro tempo vira mercado próprio: comporta-se diferente do tempo
-    // integral, então merece bucket separado na calibração em vez de poluir
-    // a taxa histórica de "gols".
-    if (ehPrimeiroTempo) {
-      if (mercado !== 'gols' && mercado !== 'resultado') continue; // só o que dá para validar
-      mercado = `${mercado}_1t`;
-      aposta  = `${aposta} (1º tempo)`;
-    }
-
+    // mercado já vem como gols_1t / resultado_1t pela tabela, e o rótulo já
+    // recebeu o sufixo acima — não há segundo ajuste a fazer aqui.
     candidatos.push({ aposta, mercado, odd, linha });
   }
   return candidatos;
