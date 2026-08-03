@@ -217,11 +217,20 @@ function parsearBookmakersOdds(bookmakers) {
       }
     }
   }
-  const odds = {};
+  const odds = {}, casas = {};
   for (const [chave, vals] of Object.entries(acum)) {
     odds[chave] = parseFloat((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2));
+    casas[chave] = vals.length;
   }
-  return Object.keys(odds).length ? odds : null;
+  if (!Object.keys(odds).length) return null;
+
+  // Quantas casas ofereciam cada mercado. A odd acima é a MÉDIA entre elas,
+  // então um mercado de uma casa só vira um preço que talvez não exista em
+  // lugar nenhum — e que o cliente não consegue apostar.
+  // Não-enumerável de propósito: os laços que fazem Object.entries(oddsMap)
+  // continuam vendo só os pares chave→odd.
+  Object.defineProperty(odds, '__casas', { value: casas, enumerable: false });
+  return odds;
 }
 
 // ─── API-Football /odds — por fixture ────────────────────────────────────────
@@ -6804,8 +6813,9 @@ const MERCADOS_ACEITOS = {
   'first half winner':           { mercado: 'resultado_1t', tipo: '1x2', tempo: true },
 };
 
-function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = false } = {}) {
+function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = false, minCasas = 2 } = {}) {
   if (!oddsMap) return [];
+  const porChave = oddsMap.__casas || {};
   const candidatos = [];
   for (const [chave, odd] of Object.entries(oddsMap)) {
     if (!odd || odd < 1.25 || odd > 12) continue;
@@ -6815,6 +6825,12 @@ function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = fal
     const def = MERCADOS_ACEITOS[betNome];
     if (!def) continue;                          // nome desconhecido: fora
     if (def.tempo && !incluirTempo) continue;
+
+    // Mercado de uma casa só: a odd exibida é média de uma amostra de um, e o
+    // cliente pode não achar onde apostar. Só barra quando há a informação —
+    // odds antigas em cache não têm __casas e passam como antes.
+    const casas = porChave[chave];
+    if (casas != null && casas < minCasas) continue;
 
     let mercado = def.mercado, linha = null, aposta = null;
     const ehPrimeiroTempo = !!def.tempo;
@@ -6846,7 +6862,7 @@ function oddsMapParaCandidatos(oddsMap, timeCasa, timeFora, { incluirTempo = fal
     if (!mercado || !linha) continue;
     // mercado já vem como gols_1t / resultado_1t pela tabela, e o rótulo já
     // recebeu o sufixo acima — não há segundo ajuste a fazer aqui.
-    candidatos.push({ aposta, mercado, odd, linha });
+    candidatos.push({ aposta, mercado, odd, linha, casas: casas ?? null });
   }
   return candidatos;
 }
