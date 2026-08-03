@@ -636,7 +636,18 @@ function aplicarOddsEPivotar(jogo, oddsFixture) {
       jogo.odd_mercado = melhor.odd;
       jogo.confianca = melhor.odd >= 1.50 ? 'alta' : 'media';
       jogo.descartado = false; jogo.analisando = false; jogo.descartado_motivo = null;
-      jogo.justificativa = `Mercado disponível confirmado na API com odd ${melhor.odd}.`;
+      // Este texto é exibido ao público. Antes vinha "Mercado disponível
+      // confirmado na API com odd X" — encanamento interno na tela do cliente.
+      jogo.justificativa = justificativaEngine({
+        time_casa: jogo.time_casa, time_fora: jogo.time_fora,
+        mercado_engine: mercadoMap,
+        linha_engine: (String(apostaFinal).match(/(over|under)\s+([\d.]+)/i) || []).slice(1).join('_').toLowerCase() || null,
+        media_gols_combinada: ((parseFloat(jogo.media_gols_casa) || 0) + (parseFloat(jogo.media_gols_fora) || 0)).toFixed(2),
+        media_gols_casa: jogo.media_gols_casa, media_gols_fora: jogo.media_gols_fora,
+        media_escanteios: jogo.media_escanteios, media_cartoes: jogo.media_cartoes,
+        forma_casa: jogo.forma_casa, forma_fora: jogo.forma_fora,
+        h2h_texto: jogo.h2h_texto || null,
+      });
       coletarOddsConfirmadas();
       console.log(`  🎯 [FALLBACK] ${jogo.time_casa} x ${jogo.time_fora} → ${apostaFinal} (${mercadoMap}) @ ${melhor.odd}`);
       return null;
