@@ -7468,6 +7468,8 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
       real_ass: realAss, real_roi: realRoi, real_total: realTotal,
       score: Math.round(score),
       p_calibrado: pCal === null ? null : Math.round(pCal),
+      // Quantas casas ofereciam este mercado (a odd é a média entre elas)
+      casas: o.casas ?? null,
       edge, ev,
       acerto_ok: pCal === null || pCal >= P_MINIMO_ENGINE,
     });
@@ -7691,6 +7693,10 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
       // Probabilidade calibrada de acerto — critério principal
       p_calibrado:    melhor.p_calibrado,
       acerto_ok:      melhor.p_calibrado == null || melhor.p_calibrado >= P_MINIMO,
+      // Vantagem sobre o preço — é o critério de ordenação entre candidatos
+      edge_engine:    melhor.edge,
+      // Quantas casas ofereciam o mercado; a odd é a média entre elas
+      casas_engine:   melhor.casas,
       // EV e ROI: dados auxiliares, exibidos para avaliação
       ev_engine:      melhor.ev,
       real_ass:       melhor.real_ass, real_roi: melhor.real_roi, real_total: melhor.real_total,
