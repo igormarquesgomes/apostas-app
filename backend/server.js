@@ -7683,7 +7683,7 @@ async function gerarApostasEngine(data, { semIA = false } = {}) {
         : (melhor.p_calibrado >= 62 ? 'alta' : melhor.p_calibrado >= 55 ? 'media' : 'baixa'),
       alternativas_engine: candidatos.slice(1, 4).map(c => ({
         aposta: c.aposta, mercado: c.mercado, odd: c.odd,
-        score: c.score, p: c.p_calibrado, ev: c.ev,
+        score: c.score, p: c.p_calibrado, edge: c.edge, ev: c.ev,
       })),
       media_gols_combinada: mcGolsReal.toFixed(2),
       media_gols_casa:  jogo.media_gols_casa ?? null,
