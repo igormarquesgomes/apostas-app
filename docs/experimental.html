@@ -665,8 +665,8 @@ function renderAssertividade(d){
             <td style="padding:7px 10px;text-align:center;">${badgeRes(j.resultado_engine)}</td>
             <td style="padding:7px 10px;text-align:center;">${badgeRes(j.resultado_ia)}</td>
             <td style="padding:7px 10px;text-align:center;">
-              ${j.resultado_engine === 'pendente' && ['cartoes','escanteios'].includes(j.mercado_engine)
-                ? `<button onclick="abrirInputStats('${j._data}','${j.fixtureId}','${j.time_casa} × ${j.time_fora}','${j.mercado_engine}')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1.5px solid #7C3AED;background:#F5F3FF;color:#7C3AED;cursor:pointer;font-weight:700">+ stats</button>`
+              ${['cartoes','escanteios'].includes(j.mercado_engine) && j.placar
+                ? `<button onclick="abrirInputStats('${j._data}','${j.fixtureId}','${j.time_casa} × ${j.time_fora}','${j.mercado_engine}',${j.mercado_engine==='cartoes' ? (j.stats_engine?.cartoesTotal ?? 'null') : (j.stats_engine?.escanteiosTotal ?? 'null')})" title="${j.resultado_engine === 'pendente' ? 'Informar estatística' : 'Corrigir estatística informada'}" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1.5px solid #7C3AED;background:${j.resultado_engine === 'pendente' ? '#F5F3FF' : '#fff'};color:#7C3AED;cursor:pointer;font-weight:700">${j.resultado_engine === 'pendente' ? '+ stats' : '✎ stats'}</button>`
                 : j.score_engine != null ? `<span style="font-size:11px;font-weight:700;color:${j.confianca_engine==='alta'?'#16A34A':j.confianca_engine==='media'?'#3B82F6':'#B45309'}">${j.score_engine}%</span>` : '—'}
             </td>
           </tr>`;
@@ -675,7 +675,10 @@ function renderAssertividade(d){
     </table>`;
 }
 
-function abrirInputStats(data, fixtureId, jogo, mercado){
+function abrirInputStats(data, fixtureId, jogo, mercado, atual){
+  // `atual` vem preenchido quando a estatistica ja foi informada, para
+  // corrigir sem precisar lembrar o que estava la.
+  const v = (atual === null || atual === undefined) ? '' : atual;
   const isCart = mercado === 'cartoes';
   const isEsc  = mercado === 'escanteios';
   const html = `
@@ -685,9 +688,9 @@ function abrirInputStats(data, fixtureId, jogo, mercado){
         <div style="font-size:11px;color:#94A3B8;margin-bottom:16px">${data} · ${mercado}</div>
         ${isCart||isEsc ? `
           ${isCart ? `<label style="display:block;font-size:12px;font-weight:600;color:#64748B;margin-bottom:4px">Total de cartões</label>
-          <input id="inp-cartoes" type="number" min="0" placeholder="ex: 4" style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px">` : ''}
+          <input id="inp-cartoes" type="number" min="0" placeholder="ex: 4" value="${v}" style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px">` : ''}
           ${isEsc ? `<label style="display:block;font-size:12px;font-weight:600;color:#64748B;margin-bottom:4px">Total de escanteios</label>
-          <input id="inp-esc" type="number" min="0" placeholder="ex: 9" style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px">` : ''}
+          <input id="inp-esc" type="number" min="0" placeholder="ex: 9" value="${v}" style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px">` : ''}
         ` : ''}
         <div style="display:flex;gap:8px;margin-top:4px">
           <button onclick="fecharModalStats()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-weight:600">Cancelar</button>
