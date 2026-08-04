@@ -8096,11 +8096,24 @@ async function validarEngineData(data) {
         atualizados++;
       }
 
-      // Para cartões/escanteios busca stats detalhadas
-      let stats = null;
-      if (['cartoes','escanteios'].includes(jogo.mercado_engine)) {
-        stats = await buscarStatsFixture(jogo.fixtureId);
-        if (stats) jogo.stats_engine = { cartoesTotal: stats.cartoesTotal, escanteiosTotal: stats.escanteiosTotal, hasCardData: stats.hasCardData, hasCornerData: stats.hasCornerData };
+      // Para cartões/escanteios busca stats detalhadas.
+      // Stat informada à mão nunca é sobrescrita: buscarStatsFixture devolve
+      // objeto mesmo quando a API não tem o dado (zeros e hasCornerData:false),
+      // e o `if (stats)` apagava o que o usuário tinha digitado — a cada
+      // execução da validação.
+      let stats = jogo.stats_engine?.manual ? jogo.stats_engine : null;
+      if (!stats && ['cartoes','escanteios'].includes(jogo.mercado_engine)) {
+        const api = await buscarStatsFixture(jogo.fixtureId);
+        // Só grava se a API trouxe o dado do mercado em questão
+        const util = api && ((jogo.mercado_engine === 'cartoes' && api.hasCardData)
+                          || (jogo.mercado_engine === 'escanteios' && api.hasCornerData));
+        if (util) {
+          stats = { cartoesTotal: api.cartoesTotal, escanteiosTotal: api.escanteiosTotal,
+                    hasCardData: api.hasCardData, hasCornerData: api.hasCornerData };
+          jogo.stats_engine = stats;
+        } else {
+          stats = jogo.stats_engine || null; // preserva o que já havia
+        }
       }
 
       const anterior = jogo.resultado_engine;
@@ -8157,13 +8170,18 @@ app.post('/engine/input-stats', async (req, res) => {
     const jogo = engine.jogos.find(j => String(j.fixtureId) === String(fixtureId));
     if (!jogo) return res.status(404).json({ erro: 'jogo não encontrado' });
 
+    const antes = jogo.stats_engine || {};
     jogo.stats_engine = {
-      cartoesTotal:   cartoesTotal   != null ? Number(cartoesTotal)   : (jogo.stats_engine?.cartoesTotal   ?? null),
-      escanteiosTotal: escanteiosTotal != null ? Number(escanteiosTotal) : (jogo.stats_engine?.escanteiosTotal ?? null),
-      hasCardData:    cartoesTotal   != null,
-      hasCornerData:  escanteiosTotal != null,
+      cartoesTotal:    cartoesTotal    != null ? Number(cartoesTotal)    : (antes.cartoesTotal    ?? null),
+      escanteiosTotal: escanteiosTotal != null ? Number(escanteiosTotal) : (antes.escanteiosTotal ?? null),
+      hasCardData:     cartoesTotal    != null || antes.hasCardData   === true,
+      hasCornerData:   escanteiosTotal != null || antes.hasCornerData === true,
+      // Marca de origem: validarEngineData não sobrescreve stat manual com o
+      // retorno vazio da API, que era o que apagava este valor a cada execução.
+      manual: true,
+      informado_em: new Date().toISOString(),
     };
-    jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, jogo.stats_engine);
+    jogo.resultado_engine = validarPickEngine(jogo.linha_engine, jogo.mercado_engine, jogo.placar, jogo.stats_engine, jogo.placar_ht);
 
     await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
       method: 'PATCH',
