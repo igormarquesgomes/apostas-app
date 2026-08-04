@@ -8001,6 +8001,8 @@ app.get('/engine/assertividade', async (req, res) => {
           odd_engine: j.odd_engine, linha_engine: j.linha_engine,
           score_engine: j.score_engine, confianca_engine: j.confianca_engine,
           placar, resultado_engine: resultado,
+          // usado para pré-preencher o modal de correção de estatística
+          stats_engine: j.stats_engine || null,
           aposta_ia: j.aposta_ia, mercado_ia: j.mercado_ia, odd_ia: j.odd_ia, resultado_ia,
         });
       }
