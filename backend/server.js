@@ -9098,35 +9098,45 @@ function agendarRotina() {
     setTimeout(tick08h, 24 * 60 * 60 * 1000);
   }, ms08h);
 
-  // ── 15:00 BRT (18:00 UTC) — primeira validação parcial dos jogos do dia ─
-  const ms15h = msAteHoraUTC(18, 0);
-  console.log(`⏰ Próxima validação parcial (15h) em ${Math.round(ms15h/60000)} min`);
-  setTimeout(function tick15h() {
-    const hoje = hojeStr();
-    console.log(`⏰ [15h] Validação parcial — ${hoje}`);
-    agentValidar(hoje, { forcarWebSearch: false }).catch(console.error);
-    setTimeout(tick15h, 24 * 60 * 60 * 1000);
-  }, ms15h);
+  // ── Validações parciais do dia: 15h, 18h e 21h BRT ──────────────────────
+  // Cada uma valida os DOIS caminhos e tem catch-up, como a rotina das 08h.
+  const PARCIAIS = [
+    { rotulo: '15h', horaUTC: 18, ws: false, atraso: 8000  },
+    { rotulo: '18h', horaUTC: 21, ws: true,  atraso: 12000 },
+    { rotulo: '21h', horaUTC: 0,  ws: true,  atraso: 16000 },
+  ];
+  for (const { rotulo, horaUTC, ws, atraso } of PARCIAIS) {
+    if (deveExecutarCatchup(horaUTC, 0)) {
+      console.log(`⚡ Catch-up ${rotulo}: validação parcial`);
+      setTimeout(() => validacaoParcial(rotulo, { forcarWebSearch: ws }), atraso);
+    }
+    const ms = msAteHoraUTC(horaUTC, 0);
+    console.log(`⏰ Próxima validação parcial (${rotulo}) em ${Math.round(ms/60000)} min`);
+    setTimeout(function tick() {
+      validacaoParcial(rotulo, { forcarWebSearch: ws });
+      setTimeout(tick, 24 * 60 * 60 * 1000);
+    }, ms);
+  }
+}
 
-  // ── 18:00 BRT (21:00 UTC) — segunda validação parcial ───────────────────
-  const ms18h = msAteHoraUTC(21, 0);
-  console.log(`⏰ Próxima validação parcial (18h) em ${Math.round(ms18h/60000)} min`);
-  setTimeout(function tick18h() {
-    const hoje = hojeStr();
-    console.log(`⏰ [18h] Validação parcial — ${hoje}`);
-    agentValidar(hoje, { forcarWebSearch: true }).catch(console.error);
-    setTimeout(tick18h, 24 * 60 * 60 * 1000);
-  }, ms18h);
-
-  // ── 21:00 BRT (00:00 UTC) — terceira validação parcial ──────────────────
-  const ms21h = msAteHoraUTC(0, 0);
-  console.log(`⏰ Próxima validação parcial (21h) em ${Math.round(ms21h/60000)} min`);
-  setTimeout(function tick21h() {
-    const hoje = hojeStr();
-    console.log(`⏰ [21h] Validação parcial — ${hoje}`);
-    agentValidar(hoje, { forcarWebSearch: true }).catch(console.error);
-    setTimeout(tick21h, 24 * 60 * 60 * 1000);
-  }, ms21h);
+// Valida os dois caminhos do dia corrente. Antes as parciais só chamavam
+// agentValidar, que grava em `resultados` — o campo da IA. Como a lista oficial
+// passou a vir do engine, ela ficava o dia inteiro sem green/red: os picks do
+// engine só eram validados no dia seguinte, dentro da rotina das 08h.
+async function validacaoParcial(rotulo, opts) {
+  const hoje = hojeStr();
+  console.log(`⏰ [${rotulo}] Validação parcial — ${hoje}`);
+  try {
+    await agentValidar(hoje, opts);
+  } catch (e) {
+    console.error(`❌ [${rotulo}] Validação IA falhou:`, e.message);
+  }
+  try {
+    const r = await validarEngineData(hoje);
+    if (r) console.log(`🔍 [${rotulo}] Engine ${hoje}: ${r.green}G ${r.red}R ${r.pendente}pend (${r.atualizados} atualizados)`);
+  } catch (e) {
+    console.error(`❌ [${rotulo}] Validação engine falhou:`, e.message);
+  }
 }
 
 app.listen(PORT, () => {
