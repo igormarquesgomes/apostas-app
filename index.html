@@ -698,7 +698,7 @@ function render(jogos,data){
       }else if(j.resultado==='cancelado'){
         resBadge=`<span class="result-badge void">↩ ANULADO</span>`;
       }else if(j.resultado==='pendente'&&(j.mercado==='escanteios'||j.mercado==='cartoes'||(j.aposta||'').toLowerCase().includes('escanteio')||(j.aposta||'').toLowerCase().includes('cartao')||(j.aposta||'').toLowerCase().includes('corner'))){
-        resBadge=`<button class="btn-stats" onclick="informarStats(event,'${dataAtual}',${j.id},'${j.aposta||''}','${j.mercado||''}')">📊 Stats</button>`;
+        resBadge=`<button class="btn-stats" onclick="informarStats(event,'${dataAtual}',${j.id},'${j.aposta||''}','${j.mercado||''}',${j.fixtureId||'null'})">📊 Stats</button>`;
       }else if(j.resultado==='pendente'){
         resBadge=`<button class="act-btn" onclick="editarResultado(event,${i},dataAtual,${j.id},'${j.resultado}')">✏️ Resultado</button>`;
       }
@@ -965,23 +965,43 @@ async function anularJogo(event,data,jogoId){
   }catch(e){alert('Endpoint /anular-jogo não implementado ainda.');}
 }
 
-async function informarStats(event,data,jogoId,aposta,mercado){
-  if(adminBloqueado()) return;
+// Informar estatística funciona nas duas fontes, cada uma no seu endpoint:
+// a lista da IA grava por jogo_id em /informar-stats; a do engine grava por
+// fixtureId em /engine/input-stats. Antes esta função era bloqueada junto com
+// as ações destrutivas, o que deixava a lista do engine sem como preencher
+// escanteios e cartões — a requisição nem chegava a sair.
+async function informarStats(event,data,jogoId,aposta,mercado,fixtureId){
   event.stopPropagation();
-  const isEsc=mercado==='escanteios'||aposta.toLowerCase().includes('escanteio')||aposta.toLowerCase().includes('corner');
-  const isCart=mercado==='cartoes'||aposta.toLowerCase().includes('cartao')||aposta.toLowerCase().includes('cartão');
+  const ap=(aposta||'').toLowerCase();
+  const isEsc=mercado==='escanteios'||ap.includes('escanteio')||ap.includes('corner');
+  const isCart=mercado==='cartoes'||ap.includes('cartao')||ap.includes('cartão');
   let escanteios=null,cartoes=null;
-  if(isEsc){const v=prompt(`Total de escanteios no jogo:\n(aposta: ${aposta})`);if(v===null)return;escanteios=parseInt(v);if(isNaN(escanteios))return alert('Número inválido');}
-  if(isCart){const v=prompt(`Total de cartões no jogo:\n(lembre: vermelho = 2)\n(aposta: ${aposta})`);if(v===null)return;cartoes=parseInt(v);if(isNaN(cartoes))return alert('Número inválido');}
+  if(isEsc){const v=prompt(`Total de escanteios no jogo:\n(aposta: ${aposta})`);if(v===null)return;escanteios=parseInt(v);if(isNaN(escanteios)||escanteios<0)return alert('Número inválido');}
+  if(isCart){const v=prompt(`Total de cartões no jogo:\n(lembre: vermelho = 2)\n(aposta: ${aposta})`);if(v===null)return;cartoes=parseInt(v);if(isNaN(cartoes)||cartoes<0)return alert('Número inválido');}
+  if(escanteios===null&&cartoes===null) return;
+
+  const noEngine = FONTE_LISTA==='engine';
+  if(noEngine && !fixtureId) return alert('Jogo sem identificador na API — não dá para gravar a estatística.');
+
+  const url = noEngine ? `${BACKEND_URL}/engine/input-stats` : `${BACKEND_URL}/informar-stats`;
+  const body = noEngine
+    ? {data, fixtureId, ...(cartoes!==null?{cartoesTotal:cartoes}:{}), ...(escanteios!==null?{escanteiosTotal:escanteios}:{})}
+    : {data, jogo_id:jogoId, escanteios, cartoes};
+
   try{
-    const r=await fetch(`${BACKEND_URL}/informar-stats`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,jogo_id:jogoId,escanteios,cartoes})});
-    const j=await r.json();
-    if(j.ok){
-      alert(`✅ ${j.resultado?.toUpperCase()} — resultado atualizado!`);
-      const r2=await fetch(urlApostas(data));
-      const d2=await r2.json();
-      if(d2.apostas?.jogos?.length>0){const resultados=d2.resultados?.apostas||[];const jogosComRes=d2.apostas.jogos.map(jg=>{const res=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:res?.resultado_aposta||null,placar:res?.placar||null,mercados_resultado:res?.mercados_resultado||null};});render(jogosComRes,data);}
-    }else{alert('Erro: '+(j.error||'desconhecido'));}
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const txt=await r.text();
+    let j; try{ j=JSON.parse(txt); }catch(e){ throw new Error(`resposta inválida do servidor (HTTP ${r.status})`); }
+    if(j.error||j.erro) throw new Error(j.error||j.erro);
+
+    const res = noEngine ? j.resultado_engine : j.resultado;
+    alert(`✅ ${String(res||'atualizado').toUpperCase()} — resultado atualizado!`);
+    const d2=await fetch(urlApostas(data)).then(x=>x.json());
+    if(d2.apostas?.jogos?.length>0){
+      const resultados=d2.resultados?.apostas||[];
+      const jogosComRes=d2.apostas.jogos.map(jg=>{const rr=resultados.find(x=>x.jogo_id===jg.id);return{...jg,resultado:rr?.resultado_aposta||null,placar:rr?.placar||null,mercados_resultado:rr?.mercados_resultado||null};});
+      render(jogosComRes,data);
+    }
   }catch(e){alert('Erro: '+e.message);}
 }
 
