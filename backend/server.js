@@ -9002,7 +9002,10 @@ async function rotinaComplementoDiurno() {
   }
 }
 
-async function rotinaEngine08h() {
+// rotulo: só para os logs (ex.: '04h', '08h'). A geração das 04h deixa a lista
+// pronta de madrugada; a das 08h só complementa as datas que não chegaram a 15
+// (odds que ainda não estavam disponíveis às 04h costumam aparecer até lá).
+async function rotinaEngine(rotulo = '08h') {
   const hoje = hojeStr();
   const dOffset = n => { const d = new Date(hoje + 'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
   const amanha = dOffset(1);
@@ -9018,30 +9021,31 @@ async function rotinaEngine08h() {
       const r = await validarEngineData(data);
       if (!r) continue;
       if (r.atualizados > 0 || r.pendente > 0) {
-        console.log(`🔍 [Engine 08h] Validado ${data}: ${r.green}G ${r.red}R ${r.pendente}pend (${r.atualizados} atualizados)`);
+        console.log(`🔍 [Engine ${rotulo}] Validado ${data}: ${r.green}G ${r.red}R ${r.pendente}pend (${r.atualizados} atualizados)`);
       }
     } catch(e) {
-      console.error(`❌ [Engine 08h] Erro ao validar ${data}:`, e.message);
+      console.error(`❌ [Engine ${rotulo}] Erro ao validar ${data}:`, e.message);
     }
   }
 
   const datas = [hoje, amanha];
   for (const data of datas) {
     try {
-      // Verifica se já há 15 picks para esta data
+      // Já com 15 picks → não mexe (é o "só complementar se faltar" das 08h)
       const existing = await fetch(
         `${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}&select=apostas_engine`,
         { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
       ).then(r => r.json()).then(r => r[0]);
-      if (existing?.apostas_engine?.jogos?.length >= 15) {
-        console.log(`🔒 [Engine 08h] ${data} já tem ${existing.apostas_engine.jogos.length} picks — pulando`);
+      const jaTem = existing?.apostas_engine?.jogos?.length || 0;
+      if (jaTem >= 15) {
+        console.log(`🔒 [Engine ${rotulo}] ${data} já tem ${jaTem} picks — pulando`);
         continue;
       }
-      console.log(`🤖 [Engine 08h] Gerando picks para ${data}...`);
+      console.log(`🤖 [Engine ${rotulo}] ${jaTem ? `Só ${jaTem}/15 — complementando` : 'Gerando'} picks para ${data}...`);
       const resultado = await gerarApostasEngine(data);
-      console.log(`✅ [Engine 08h] ${data}: ${resultado?.total || 0} picks gerados`);
+      console.log(`✅ [Engine ${rotulo}] ${data}: ${resultado?.total || 0} picks`);
     } catch(e) {
-      console.error(`❌ [Engine 08h] Erro em ${data}:`, e.message);
+      console.error(`❌ [Engine ${rotulo}] Erro em ${data}:`, e.message);
     }
   }
 }
@@ -9118,16 +9122,30 @@ function agendarRotina() {
     console.log('💤 IA desligada (IA_ATIVA≠true): rotinas de geração/validação por IA não agendadas — só o engine roda.');
   }
 
-  // ── 08:00 BRT (11:00 UTC) — validar dias anteriores + gerar picks do engine ─
+  // ── 04:00 BRT (07:00 UTC) — geração principal do engine ─────────────────
+  // Deixa a lista pronta de madrugada, para quem acorda cedo já usá-la.
+  if (deveExecutarCatchup(7, 0)) {
+    console.log(`⚡ Catch-up 04h: gerando picks engine`);
+    setTimeout(() => rotinaEngine('04h').catch(console.error), 5000);
+  }
+  const ms04h = msAteHoraUTC(7, 0);
+  console.log(`⏰ Próxima rotinaEngine (04h) em ${Math.round(ms04h/60000)} min`);
+  setTimeout(function tick04h() {
+    console.log(`⏰ [04h] Gerando picks engine`);
+    rotinaEngine('04h').catch(console.error);
+    setTimeout(tick04h, 24 * 60 * 60 * 1000);
+  }, ms04h);
+
+  // ── 08:00 BRT (11:00 UTC) — complemento: só as datas com < 15 picks ─────
   if (deveExecutarCatchup(11, 0)) {
-    console.log(`⚡ Catch-up 08h: validando dias anteriores e gerando picks engine`);
-    setTimeout(() => rotinaEngine08h().catch(console.error), 5000);
+    console.log(`⚡ Catch-up 08h: complemento do engine`);
+    setTimeout(() => rotinaEngine('08h').catch(console.error), 5000);
   }
   const ms08h = msAteHoraUTC(11, 0);
-  console.log(`⏰ Próxima rotinaEngine08h (08h) em ${Math.round(ms08h/60000)} min`);
+  console.log(`⏰ Próxima rotinaEngine (08h) em ${Math.round(ms08h/60000)} min`);
   setTimeout(function tick08h() {
-    console.log(`⏰ [08h] Validando dias anteriores e gerando picks engine`);
-    rotinaEngine08h().catch(console.error);
+    console.log(`⏰ [08h] Complemento do engine (datas com < 15)`);
+    rotinaEngine('08h').catch(console.error);
     setTimeout(tick08h, 24 * 60 * 60 * 1000);
   }, ms08h);
 
