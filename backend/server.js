@@ -7561,11 +7561,7 @@ async function dbSaveApostasEngine(data, apostasEngine) {
 // só na análise multi-agente que vem depois, e que aqui não roda.
 // Devolve no formato de apostas_dia.apostas para o engine consumir igual.
 async function gerarPoolSemIA(data, horaMin = '07:00', metaJogos = 15) {
-  // Pede um pool bem maior que a meta: em dia futuro, parte dos jogos ainda não
-  // tem odds postadas e será descartada no scoring — inclusive jogos de núcleo,
-  // que entram no pool sem odds e caem depois. A folga extra deixa complementares
-  // COM odds absorverem esses drops, para a lista fechar 15.
-  const loaded = await _carregarFixturesComStats(data, horaMin, metaJogos + 15, new Set());
+  const loaded = await _carregarFixturesComStats(data, horaMin, metaJogos, new Set());
   if (!loaded?.jogos?.length) return null;
 
   const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
@@ -7920,38 +7916,6 @@ app.get('/engine/desempenho', async (req, res) => {
 });
 
 // Debug: retorna dados brutos para diagnóstico
-// Diagnóstico: por que um fixture perde todos os candidatos. Mostra a contagem
-// em cada estágio do filtro de mercados.
-app.get('/engine/debug-mercados/:fixtureId', async (req, res) => {
-  try {
-    const { fixtureId } = req.params;
-    const data = req.query.data || hojeStr();
-    const oddsRaw = await buscarOddsFixture(fixtureId, data, true);
-    if (!oddsRaw) return res.json({ erro: 'sem odds para o fixture', fixtureId });
-
-    const meta = oddsRaw.__meta || {};
-    const estagios = { total: 0, faixaOdd: 0, nomeAceito: 0, semConhecidas: 0, dispersao: 0, sobreviveram: 0 };
-    const barrados = { conhecidas: [], dispersao: [] };
-
-    for (const [chave, odd] of Object.entries(oddsRaw)) {
-      estagios.total++;
-      if (!odd || odd < 1.25 || odd > 12) continue;
-      estagios.faixaOdd++;
-      const [betNome] = chave.split('|');
-      const def = MERCADOS_ACEITOS[betNome];
-      if (!def || (def.tempo)) continue;
-      estagios.nomeAceito++;
-      const m = meta[chave];
-      if (m && m.conhecidas < 2) { estagios.semConhecidas++; if (barrados.conhecidas.length < 8) barrados.conhecidas.push(`${chave} (conhecidas=${m.conhecidas}/${m.n})`); continue; }
-      if (m && m.min > 0 && (m.max / m.min) > 1.30) { estagios.dispersao++; if (barrados.dispersao.length < 8) barrados.dispersao.push(`${chave} (${m.min}–${m.max}, x${(m.max/m.min).toFixed(2)})`); continue; }
-      estagios.sobreviveram++;
-    }
-
-    const candidatos = oddsMapParaCandidatos(oddsRaw, 'Casa', 'Fora');
-    res.json({ fixtureId, data, estagios, candidatos_finais: candidatos.length, barrados });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
 app.get('/engine/debug-raw', async (req, res) => {
   try {
     const rows = await fetch(
