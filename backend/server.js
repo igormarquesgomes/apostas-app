@@ -912,6 +912,17 @@ const PRI_NUCLEO = 10;
 // um pick abaixo disso nao entra nem que pague odd alta.
 const P_MINIMO_ENGINE = 50;
 
+// ─── Chave-mestra da geração com IA ──────────────────────────────────────────
+// OFF por padrão: a lista oficial vem do engine (custo Anthropic zero). Com a
+// IA desligada, o agendador não programa nenhuma rotina que chame a Anthropic
+// (geração, validação por IA, complemento, múltiplas, relatórios). O engine e a
+// validação do engine seguem rodando normalmente.
+// Para REATIVAR: definir a env var IA_ATIVA=true no Render e redeployar. É só
+// isso — nenhuma rotina foi apagada, apenas deixam de ser agendadas.
+// Os endpoints manuais de geração/validação por IA continuam funcionando, para
+// teste pontual, independentemente desta flag.
+const IA_ATIVA = process.env.IA_ATIVA === 'true';
+
 // Diferença de força (em pontos percentuais de aproveitamento) a partir da qual
 // apostar no lado mais fraco vira incoerência com os dados exibidos ao cliente.
 const DIF_FORCA_MAX = 25;
@@ -9036,74 +9047,76 @@ async function rotinaEngine08h() {
 }
 
 function agendarRotina() {
-  // ── 00:00 BRT (03:00 UTC) — validação noturna inicial + calibrações ─────
-  // SEM catch-up: não deve rodar fora da madrugada
-  const ms00h = msAteHoraUTC(3, 0);
-  console.log(`⏰ Próxima rotinaNoturna (00h) em ${Math.round(ms00h/60000)} min`);
-  setTimeout(function tick00h() {
-    rotinaNoturna().catch(console.error);
-    setTimeout(tick00h, 24 * 60 * 60 * 1000);
-  }, ms00h);
+  // ── Rotinas que consomem Anthropic — só agendadas com IA_ATIVA ──────────
+  if (IA_ATIVA) {
+    // 00:00 BRT (03:00 UTC) — validação noturna inicial + calibrações
+    const ms00h = msAteHoraUTC(3, 0);
+    console.log(`⏰ Próxima rotinaNoturna (00h) em ${Math.round(ms00h/60000)} min`);
+    setTimeout(function tick00h() {
+      rotinaNoturna().catch(console.error);
+      setTimeout(tick00h, 24 * 60 * 60 * 1000);
+    }, ms00h);
 
-  // ── 03:00 BRT (06:00 UTC) — validação final + relatório diário ───────────
-  // SEM catch-up: não deve rodar fora da madrugada
-  const ms03h = msAteHoraUTC(6, 0);
-  console.log(`⏰ Próxima rotinaDas03h (03h) em ${Math.round(ms03h/60000)} min`);
-  setTimeout(function tick03h() {
-    rotinaDas03h().catch(console.error);
-    setTimeout(tick03h, 24 * 60 * 60 * 1000);
-  }, ms03h);
+    // 03:00 BRT (06:00 UTC) — validação final + relatório diário
+    const ms03h = msAteHoraUTC(6, 0);
+    console.log(`⏰ Próxima rotinaDas03h (03h) em ${Math.round(ms03h/60000)} min`);
+    setTimeout(function tick03h() {
+      rotinaDas03h().catch(console.error);
+      setTimeout(tick03h, 24 * 60 * 60 * 1000);
+    }, ms03h);
 
-  // ── 03:30 BRT (06:30 UTC) — gerar apostas de hoje e amanhã ──────────────
-  // Catch-up: se servidor reiniciou em até 90 min depois, gera apostas do dia
-  if (deveExecutarCatchup(6, 30)) {
-    console.log(`⚡ Catch-up 03h30: gerando apostas (passou < ${CATCHUP_MAX_MIN} min)`);
-    setTimeout(() => rotina04h().catch(console.error), 15000);
+    // 03:30 BRT (06:30 UTC) — gerar apostas de hoje e amanhã
+    if (deveExecutarCatchup(6, 30)) {
+      console.log(`⚡ Catch-up 03h30: gerando apostas (passou < ${CATCHUP_MAX_MIN} min)`);
+      setTimeout(() => rotina04h().catch(console.error), 15000);
+    }
+    const ms0330 = msAteHoraUTC(6, 30);
+    console.log(`⏰ Próxima rotina04h (03h30) em ${Math.round(ms0330/60000)} min`);
+    setTimeout(function tick0330() {
+      rotina04h().catch(console.error);
+      setTimeout(tick0330, 24 * 60 * 60 * 1000);
+    }, ms0330);
+
+    // 04:15 BRT (07:15 UTC) — verificar integridade e corrigir
+    if (deveExecutarCatchup(7, 15)) {
+      console.log(`⚡ Catch-up 04h15: verificando integridade`);
+      setTimeout(() => rotina05h().catch(console.error), 30000);
+    }
+    const ms0415 = msAteHoraUTC(7, 15);
+    console.log(`⏰ Próxima rotina05h (04h15) em ${Math.round(ms0415/60000)} min`);
+    setTimeout(function tick0415() {
+      rotina05h().catch(console.error);
+      setTimeout(tick0415, 24 * 60 * 60 * 1000);
+    }, ms0415);
+
+    // 07:00 BRT (10:00 UTC) — complemento diurno 1
+    if (deveExecutarCatchup(10, 0)) {
+      console.log(`⚡ Catch-up 07h: complemento diurno`);
+      setTimeout(() => rotinaComplementoDiurno().catch(console.error), 5000);
+    }
+    const ms07h = msAteHoraUTC(10, 0);
+    console.log(`⏰ Próximo complemento diurno (07h) em ${Math.round(ms07h/60000)} min`);
+    setTimeout(function tick07h() {
+      console.log(`⏰ [07h] Complemento diurno`);
+      rotinaComplementoDiurno().catch(console.error);
+      setTimeout(tick07h, 24 * 60 * 60 * 1000);
+    }, ms07h);
+
+    // 12:00 BRT (15:00 UTC) — complemento diurno 2
+    if (deveExecutarCatchup(15, 0)) {
+      console.log(`⚡ Catch-up 12h: complemento diurno`);
+      setTimeout(() => rotinaComplementoDiurno().catch(console.error), 5000);
+    }
+    const ms12h = msAteHoraUTC(15, 0);
+    console.log(`⏰ Próximo complemento diurno (12h) em ${Math.round(ms12h/60000)} min`);
+    setTimeout(function tick12h() {
+      console.log(`⏰ [12h] Complemento diurno`);
+      rotinaComplementoDiurno().catch(console.error);
+      setTimeout(tick12h, 24 * 60 * 60 * 1000);
+    }, ms12h);
+  } else {
+    console.log('💤 IA desligada (IA_ATIVA≠true): rotinas de geração/validação por IA não agendadas — só o engine roda.');
   }
-  const ms0330 = msAteHoraUTC(6, 30);
-  console.log(`⏰ Próxima rotina04h (03h30) em ${Math.round(ms0330/60000)} min`);
-  setTimeout(function tick0330() {
-    rotina04h().catch(console.error);
-    setTimeout(tick0330, 24 * 60 * 60 * 1000);
-  }, ms0330);
-
-  // ── 04:15 BRT (07:15 UTC) — verificar integridade e corrigir ────────────
-  if (deveExecutarCatchup(7, 15)) {
-    console.log(`⚡ Catch-up 04h15: verificando integridade`);
-    setTimeout(() => rotina05h().catch(console.error), 30000);
-  }
-  const ms0415 = msAteHoraUTC(7, 15);
-  console.log(`⏰ Próxima rotina05h (04h15) em ${Math.round(ms0415/60000)} min`);
-  setTimeout(function tick0415() {
-    rotina05h().catch(console.error);
-    setTimeout(tick0415, 24 * 60 * 60 * 1000);
-  }, ms0415);
-
-  // ── 07:00 BRT (10:00 UTC) — complemento diurno 1 ────────────────────────
-  if (deveExecutarCatchup(10, 0)) {
-    console.log(`⚡ Catch-up 07h: complemento diurno`);
-    setTimeout(() => rotinaComplementoDiurno().catch(console.error), 5000);
-  }
-  const ms07h = msAteHoraUTC(10, 0);
-  console.log(`⏰ Próximo complemento diurno (07h) em ${Math.round(ms07h/60000)} min`);
-  setTimeout(function tick07h() {
-    console.log(`⏰ [07h] Complemento diurno`);
-    rotinaComplementoDiurno().catch(console.error);
-    setTimeout(tick07h, 24 * 60 * 60 * 1000);
-  }, ms07h);
-
-  // ── 12:00 BRT (15:00 UTC) — complemento diurno 2 ────────────────────────
-  if (deveExecutarCatchup(15, 0)) {
-    console.log(`⚡ Catch-up 12h: complemento diurno`);
-    setTimeout(() => rotinaComplementoDiurno().catch(console.error), 5000);
-  }
-  const ms12h = msAteHoraUTC(15, 0);
-  console.log(`⏰ Próximo complemento diurno (12h) em ${Math.round(ms12h/60000)} min`);
-  setTimeout(function tick12h() {
-    console.log(`⏰ [12h] Complemento diurno`);
-    rotinaComplementoDiurno().catch(console.error);
-    setTimeout(tick12h, 24 * 60 * 60 * 1000);
-  }, ms12h);
 
   // ── 08:00 BRT (11:00 UTC) — validar dias anteriores + gerar picks do engine ─
   if (deveExecutarCatchup(11, 0)) {
@@ -9146,10 +9159,14 @@ function agendarRotina() {
 async function validacaoParcial(rotulo, opts) {
   const hoje = hojeStr();
   console.log(`⏰ [${rotulo}] Validação parcial — ${hoje}`);
-  try {
-    await agentValidar(hoje, opts);
-  } catch (e) {
-    console.error(`❌ [${rotulo}] Validação IA falhou:`, e.message);
+  // Validação da IA só quando a IA está ativa — senão gasta Anthropic à toa
+  // validando uma lista que ninguém vê.
+  if (IA_ATIVA) {
+    try {
+      await agentValidar(hoje, opts);
+    } catch (e) {
+      console.error(`❌ [${rotulo}] Validação IA falhou:`, e.message);
+    }
   }
   try {
     const r = await validarEngineData(hoje);
