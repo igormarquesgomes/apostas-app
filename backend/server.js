@@ -7561,7 +7561,11 @@ async function dbSaveApostasEngine(data, apostasEngine) {
 // só na análise multi-agente que vem depois, e que aqui não roda.
 // Devolve no formato de apostas_dia.apostas para o engine consumir igual.
 async function gerarPoolSemIA(data, horaMin = '07:00', metaJogos = 15) {
-  const loaded = await _carregarFixturesComStats(data, horaMin, metaJogos, new Set());
+  // Pede um pool bem maior que a meta: em dia futuro, parte dos jogos ainda não
+  // tem odds postadas e será descartada no scoring — inclusive jogos de núcleo,
+  // que entram no pool sem odds e caem depois. A folga extra deixa complementares
+  // COM odds absorverem esses drops, para a lista fechar 15.
+  const loaded = await _carregarFixturesComStats(data, horaMin, metaJogos + 15, new Set());
   if (!loaded?.jogos?.length) return null;
 
   const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
