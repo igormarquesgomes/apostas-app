@@ -8794,9 +8794,11 @@ app.get('/apostas-resultado/:data', async (req, res) => {
   if (!data) return res.status(400).json({ error: 'Data inválida.' });
   try {
     const row = await dbGet(data);
-    if (!row || !row.apostas) return res.json({ data, apostas: null, resultados: null });
 
-    // ?fonte= permite comparar as duas listas sem mexer na configuração
+    // ?fonte= permite comparar as duas listas sem mexer na configuração.
+    // O engine é checado ANTES da guarda de row.apostas: com a IA desligada não
+    // existe lista da IA, mas o engine tem os picks — a guarda antiga retornava
+    // null e a tela ficava vazia mesmo com 15 picks no banco.
     const fonte = req.query.fonte || LISTA_OFICIAL;
     if (fonte === 'engine') {
       // dbGet não traz apostas_engine; busca só quando é a fonte pedida
@@ -8809,6 +8811,8 @@ app.get('/apostas-resultado/:data', async (req, res) => {
       // Sem engine para a data, cai na IA em vez de mostrar tela vazia
       if (conv) return res.json({ data, apostas: conv.apostas, resultados: conv.resultados, fonte: 'engine' });
     }
+
+    if (!row || !row.apostas) return res.json({ data, apostas: null, resultados: null });
     return res.json({ data, apostas: row.apostas, resultados: row.resultados || null, fonte: 'ia' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
