@@ -7544,20 +7544,37 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
 
 async function dbSaveApostasEngine(data, apostasEngine) {
   try {
-    // Upsert em vez de PATCH puro. PATCH só atualiza linha existente e retorna
-    // 200 com zero linhas afetadas quando a linha não existe — falha silenciosa.
-    // Com a IA desligada, dias futuros não têm linha criada previamente (era a
-    // gerarApostas da IA que criava), então o engine gerava e "salvava" sem
-    // efeito nenhum. A próxima chamada regenerava do zero.
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
-      method: 'POST',
+    // Estratégia: PATCH primeiro (dias que já têm linha, criados pela IA ou pelo
+    // próprio engine) e, se afetar 0 linhas, cai para POST (cria a linha nova).
+    // Antes usava PATCH puro, que retorna 200 mesmo sem afetar linha nenhuma —
+    // falha silenciosa. Com a IA desligada, dias futuros nunca tinham linha e
+    // o "salvar" não persistia; cada chamada regenerava do zero.
+    let res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
+      method: 'PATCH',
       headers: {
         'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates,return=minimal',
+        // return=representation faz o Supabase devolver as linhas afetadas —
+        // sem isso, um PATCH que não achou nada é indistinguível de sucesso.
+        'Prefer': 'return=representation',
       },
-      body: JSON.stringify({ data, apostas_engine: apostasEngine }),
+      body: JSON.stringify({ apostas_engine: apostasEngine }),
     });
+    if (res.ok) {
+      const linhas = await res.json().catch(() => []);
+      if (!Array.isArray(linhas) || linhas.length === 0) {
+        // Sem linha para o dia — cria com POST
+        res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({ data, apostas_engine: apostasEngine }),
+        });
+      }
+    }
     if (!res.ok) { const err = await res.text(); console.error(`❌ dbSaveApostasEngine erro ${res.status}: ${err}`); }
     else console.log(`🤖 Engine salvo — ${data} | ${apostasEngine?.jogos?.length || 0} jogos`);
   } catch(e) { console.error('Erro dbSaveApostasEngine:', e.message); }
