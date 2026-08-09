@@ -7560,10 +7560,13 @@ async function dbSaveApostasEngine(data, apostasEngine) {
       },
       body: JSON.stringify({ apostas_engine: apostasEngine }),
     });
+    let via = 'PATCH';
     if (res.ok) {
       const linhas = await res.json().catch(() => []);
-      if (!Array.isArray(linhas) || linhas.length === 0) {
-        // Sem linha para o dia — cria com POST
+      const patchAfetou = Array.isArray(linhas) && linhas.length > 0;
+      console.log(`🔧 dbSaveApostasEngine: PATCH ${data} status=${res.status} linhas=${Array.isArray(linhas)?linhas.length:'?'}`);
+      if (!patchAfetou) {
+        via = 'POST';
         res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
           method: 'POST',
           headers: {
@@ -7573,8 +7576,14 @@ async function dbSaveApostasEngine(data, apostasEngine) {
           },
           body: JSON.stringify({ data, apostas_engine: apostasEngine }),
         });
+        console.log(`🔧 dbSaveApostasEngine: POST ${data} status=${res.status}`);
+        if (!res.ok) { const err = await res.text(); console.error(`❌ POST body: ${err.slice(0,300)}`); }
       }
+    } else {
+      const err = await res.text();
+      console.error(`❌ PATCH ${data} status=${res.status}: ${err.slice(0,300)}`);
     }
+    console.log(`🔧 salvo via ${via}`);
     if (!res.ok) { const err = await res.text(); console.error(`❌ dbSaveApostasEngine erro ${res.status}: ${err}`); }
     else console.log(`🤖 Engine salvo — ${data} | ${apostasEngine?.jogos?.length || 0} jogos`);
   } catch(e) { console.error('Erro dbSaveApostasEngine:', e.message); }
