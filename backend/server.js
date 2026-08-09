@@ -7544,11 +7544,19 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
 
 async function dbSaveApostasEngine(data, apostasEngine) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia?data=eq.${data}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ apostas_engine: apostasEngine })
+    // Upsert em vez de PATCH puro. PATCH só atualiza linha existente e retorna
+    // 200 com zero linhas afetadas quando a linha não existe — falha silenciosa.
+    // Com a IA desligada, dias futuros não têm linha criada previamente (era a
+    // gerarApostas da IA que criava), então o engine gerava e "salvava" sem
+    // efeito nenhum. A próxima chamada regenerava do zero.
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ data, apostas_engine: apostasEngine }),
     });
     if (!res.ok) { const err = await res.text(); console.error(`❌ dbSaveApostasEngine erro ${res.status}: ${err}`); }
     else console.log(`🤖 Engine salvo — ${data} | ${apostasEngine?.jogos?.length || 0} jogos`);
