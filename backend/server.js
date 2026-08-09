@@ -7581,7 +7581,9 @@ async function dbSaveApostasEngine(data, apostasEngine) {
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal',
           },
-          body: JSON.stringify({ data, apostas_engine: apostasEngine }),
+          // apostas é NOT NULL no schema. Precisa de placeholder para criar
+          // linha nova — com a IA desligada, o dia futuro nunca teve lista.
+          body: JSON.stringify({ data, apostas: { jogos: [] }, apostas_engine: apostasEngine }),
         });
         const postBody = res.ok ? '' : await res.text();
         st.etapas.push({ tipo: 'POST', status: res.status, erro: postBody.slice(0, 300) });
