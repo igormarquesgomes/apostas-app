@@ -7542,11 +7542,8 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
   return candidatos;
 }
 
-// Guarda o último status para debug — sem depender dos logs do Render
-let _ultimoStatusEngineSave = null;
 async function dbSaveApostasEngine(data, apostasEngine) {
-  const st = { data, quando: new Date().toISOString(), etapas: [] };
-  _ultimoStatusEngineSave = st;
+  const st = { data, etapas: [] };
   try {
     // Estratégia: PATCH primeiro (dias que já têm linha, criados pela IA ou pelo
     // próprio engine) e, se afetar 0 linhas, cai para POST (cria a linha nova).
@@ -7599,8 +7596,6 @@ async function dbSaveApostasEngine(data, apostasEngine) {
   }
 }
 
-// Debug: le o ultimo status do dbSaveApostasEngine (nao passa pelos logs do Render)
-app.get('/engine/debug-save', (req, res) => res.json(_ultimoStatusEngineSave || { vazio: true }));
 
 // Monta o pool de jogos SEM nenhuma chamada Anthropic.
 // _carregarFixturesComStats já faz busca de fixtures, seleção de ligas, coleta
