@@ -8687,11 +8687,13 @@ app.get('/multiplas/:data', async (req, res) => {
 });
 
 // Endpoint para o dashboard buscar apostas + resultados por data
-// Fonte padrão de /apostas-resultado. Fica em 'ia' porque o endpoint alimenta
-// várias telas (ligas, público, experimental) que devem seguir medindo a IA.
-// A lista oficial pede ?fonte=engine explicitamente — assim o teste do engine
-// não vaza para as outras páginas.
-const LISTA_OFICIAL = process.env.LISTA_OFICIAL || 'ia';
+// Fonte padrão de /apostas-resultado. Antes ficava em 'ia' para não vazar o
+// teste do engine para outras telas. Com a IA desligada, dias futuros não têm
+// lista da IA e o endpoint retornava apostas:null — a pública, ligas etc.
+// ficavam vazias. O padrão passa a ser 'engine', que é o que de fato gera.
+// Se um dia a IA for reativada, dá para forçar via env LISTA_OFICIAL=ia ou
+// passar ?fonte=ia em consultas específicas.
+const LISTA_OFICIAL = process.env.LISTA_OFICIAL || 'engine';
 
 // Texto público do pick do engine. Ele não escreve prosa como a IA, então a
 // justificativa é montada a partir dos sinais que ele de fato usou. Vale a
