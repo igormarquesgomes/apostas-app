@@ -7542,7 +7542,11 @@ function engineScoreJogo(jogo, correlacao, historicoLiga, histLinhaLiga, ligasDa
   return candidatos;
 }
 
+// Guarda o último status para debug — sem depender dos logs do Render
+let _ultimoStatusEngineSave = null;
 async function dbSaveApostasEngine(data, apostasEngine) {
+  const st = { data, quando: new Date().toISOString(), etapas: [] };
+  _ultimoStatusEngineSave = st;
   try {
     // Estratégia: PATCH primeiro (dias que já têm linha, criados pela IA ou pelo
     // próprio engine) e, se afetar 0 linhas, cai para POST (cria a linha nova).
@@ -7560,13 +7564,16 @@ async function dbSaveApostasEngine(data, apostasEngine) {
       },
       body: JSON.stringify({ apostas_engine: apostasEngine }),
     });
-    let via = 'PATCH';
+    st.etapas.push({ tipo: 'PATCH', status: res.status });
     if (res.ok) {
-      const linhas = await res.json().catch(() => []);
+      const rawTxt = await res.text();
+      let linhas = null;
+      try { linhas = JSON.parse(rawTxt); } catch(e) {}
+      st.etapas[0].respostaTipo = Array.isArray(linhas) ? 'array' : typeof linhas;
+      st.etapas[0].respostaTamanho = Array.isArray(linhas) ? linhas.length : (rawTxt.length);
+      st.etapas[0].preview = rawTxt.slice(0, 200);
       const patchAfetou = Array.isArray(linhas) && linhas.length > 0;
-      console.log(`🔧 dbSaveApostasEngine: PATCH ${data} status=${res.status} linhas=${Array.isArray(linhas)?linhas.length:'?'}`);
       if (!patchAfetou) {
-        via = 'POST';
         res = await fetch(`${SUPABASE_URL}/rest/v1/apostas_dia`, {
           method: 'POST',
           headers: {
@@ -7576,18 +7583,22 @@ async function dbSaveApostasEngine(data, apostasEngine) {
           },
           body: JSON.stringify({ data, apostas_engine: apostasEngine }),
         });
-        console.log(`🔧 dbSaveApostasEngine: POST ${data} status=${res.status}`);
-        if (!res.ok) { const err = await res.text(); console.error(`❌ POST body: ${err.slice(0,300)}`); }
+        const postBody = res.ok ? '' : await res.text();
+        st.etapas.push({ tipo: 'POST', status: res.status, erro: postBody.slice(0, 300) });
       }
     } else {
-      const err = await res.text();
-      console.error(`❌ PATCH ${data} status=${res.status}: ${err.slice(0,300)}`);
+      st.etapas[0].erro = (await res.text()).slice(0, 300);
     }
-    console.log(`🔧 salvo via ${via}`);
-    if (!res.ok) { const err = await res.text(); console.error(`❌ dbSaveApostasEngine erro ${res.status}: ${err}`); }
-    else console.log(`🤖 Engine salvo — ${data} | ${apostasEngine?.jogos?.length || 0} jogos`);
-  } catch(e) { console.error('Erro dbSaveApostasEngine:', e.message); }
+    st.final = res.ok ? 'ok' : `fail ${res.status}`;
+    if (res.ok) console.log(`🤖 Engine salvo — ${data} | ${apostasEngine?.jogos?.length || 0} jogos (${st.etapas.length}x)`);
+  } catch(e) {
+    st.excecao = e.message;
+    console.error('Erro dbSaveApostasEngine:', e.message);
+  }
 }
+
+// Debug: le o ultimo status do dbSaveApostasEngine (nao passa pelos logs do Render)
+app.get('/engine/debug-save', (req, res) => res.json(_ultimoStatusEngineSave || { vazio: true }));
 
 // Monta o pool de jogos SEM nenhuma chamada Anthropic.
 // _carregarFixturesComStats já faz busca de fixtures, seleção de ligas, coleta
