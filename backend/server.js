@@ -5846,6 +5846,24 @@ app.post('/rotina-complemento', async (req, res) => {
 });
 
 // Debug: mostra jogosComp ordenados que _carregarFixturesComStats selecionaria
+// Diagnóstico: todos os fixtures crus do dia, agrupados por liga.
+app.get('/debug-fixtures-raw/:data', async (req, res) => {
+  try {
+    const fixtures = await buscarFixturesPorData(req.params.data);
+    const q = (req.query.q || '').toLowerCase();
+    const items = fixtures
+      .filter(f => f.fixture?.status?.short === 'NS')
+      .map(f => ({
+        ligaId: f.league?.id, liga: f.league?.name, pais: f.league?.country,
+        casa: f.teams?.home?.name, fora: f.teams?.away?.name,
+      }))
+      .filter(x => !q || (x.liga||'').toLowerCase().includes(q) || (x.casa||'').toLowerCase().includes(q) || (x.fora||'').toLowerCase().includes(q));
+    const porLiga = {};
+    items.forEach(x => { const k = `${x.ligaId} · ${x.liga}`; (porLiga[k] = porLiga[k] || []).push(`${x.casa} x ${x.fora}`); });
+    res.json({ total: items.length, por_liga: porLiga });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/debug-fixtures/:data', async (req, res) => {
   const data = req.params.data;
   const metaJogos = parseInt(req.query.meta) || 7;
