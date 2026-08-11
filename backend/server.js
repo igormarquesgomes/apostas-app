@@ -782,9 +782,18 @@ const TIMES_CHAMPIONS = new Set([
 ]);
 
 function isTimesChampions(timeCasa, timeFora) {
-  const n = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
-  const nc = n(timeCasa), nf = n(timeFora);
-  return [...TIMES_CHAMPIONS].some(t => nc?.includes(t) || nf?.includes(t) || t.includes(nc?.split(' ')[0]) || t.includes(nf?.split(' ')[0]));
+  const n = s => s?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').trim() || '';
+  // Compara\u00e7\u00e3o por palavras inteiras, n\u00e3o substring. Antes um simples includes
+  // fazia "Bayern Alzenau" bater com "bayern", "Inter Miami" com "inter" e
+  // "Sporting San Jose" com "sporting" \u2014 falsos positivos em amistoso.
+  // Nome de uma palavra (inter, milan, porto, benfica) precisa casar exato.
+  // Nome de duas palavras (real madrid, manchester city, bayern munich) precisa
+  // aparecer como sequ\u00eancia.
+  const tem = nome => {
+    const alvo = ` ${n(nome)} `;
+    return [...TIMES_CHAMPIONS].some(t => alvo.includes(` ${t} `));
+  };
+  return tem(timeCasa) || tem(timeFora);
 }
 
 const LIGAS_PRIORITY = {
@@ -811,6 +820,10 @@ const LIGAS_PRIORITY = {
   // Amistosos internacionais (só seleções campeãs)
   848: { nome:'Conference League',      tipo:'copa', pri:66 },
   10:  { nome:'Amistoso Internacional',tipo:'copa', pri:67, selecaoCampea:true },
+  // Amistosos de clubes — só entra jogo com clube de Champions (Real, Barça,
+  // Milan, PSG, Bayern, Porto, Sporting, Benfica etc.). Amistoso qualquer
+  // vira ruído: elenco misto, escalação imprevisível, contexto sem peso.
+  667: { nome:'Amistoso de Clubes',    tipo:'eu',   pri:65, clubeChampion:true },
   // Irlanda — ligas com bom histórico de odds, melhor que pri=90 genérico europeu
   357: { nome:'Liga Premier Irlanda',      tipo:'eu', pri:68 },
   358: { nome:'Primeira Divisão Irlanda',  tipo:'eu', pri:69 },
@@ -1774,6 +1787,7 @@ async function gerarApostas(data, horaMin, metaJogos, timesIgnorar = new Set()) 
     if (ligaMatch) {
       // Eliminatórias e Amistosos: só seleções campeãs
       if (ligaMatch.selecaoCampea && !isSelecaoCampea(timeCasa, timeFora)) continue;
+      if (ligaMatch.clubeChampion && !isTimesChampions(timeCasa, timeFora)) continue;
       const priFinal = priPrioritaria(
         ligaMatch, timeCasa, timeFora,
         f.teams?.home?.id, f.teams?.away?.id, teamsSerieAB
@@ -2722,6 +2736,7 @@ async function _carregarFixturesComStats(data, horaMin, metaJogos, timesIgnorar)
     const ligaMatch = LIGAS_PRIORITY[ligaId];
     if (ligaMatch) {
       if (ligaMatch.selecaoCampea && !isSelecaoCampea(timeCasa, timeFora)) continue;
+      if (ligaMatch.clubeChampion && !isTimesChampions(timeCasa, timeFora)) continue;
       const priFinal = priPrioritaria(
         ligaMatch, timeCasa, timeFora,
         f.teams?.home?.id, f.teams?.away?.id, teamsSerieAB
