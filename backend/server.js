@@ -807,6 +807,8 @@ const LIGAS_PRIORITY = {
   11:  { nome:'Sul-Americana',         tipo:'copa', pri:4 },
   3:   { nome:'Europa League',         tipo:'copa', pri:4 },
   2:   { nome:'Champions League',      tipo:'copa', pri:4 },
+  // UEFA Super Cup — decisão anual campeão Champions vs Europa
+  531: { nome:'Supercopa da UEFA',    tipo:'copa', pri:4 },
   // Grandes ligas europeias (pri 5 com times Champions, pri 6 sem)
   135: { nome:'Serie A 🇮🇹',           tipo:'it',   pri:5 },
   140: { nome:'La Liga 🇪🇸',            tipo:'es',   pri:5 },
